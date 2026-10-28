@@ -23,7 +23,7 @@ const RESET_COLLECTION = "pinResetAuthorizations";
 const CODE_TTL_MS = 10 * 60 * 1000;
 
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
-const makeCode = () => crypto.randomInt(0, 100000000).toString().padStart(8, "0");
+const makeCode = () => crypto.randomInt(0, 1000000).toString().padStart(6, "0");
 
 function requireFields(body, fields) {
   for (const field of fields) {
@@ -89,7 +89,7 @@ app.post("/api/customer/reset-pin", async (req, res) => {
     const code = req.body.code.trim();
     const newPin = req.body.newPin;
     if (!/^\d{10}$/.test(mobile)) return res.status(400).json({ error: "Enter a valid registered 10-digit mobile number." });
-    if (!/^\d{8}$/.test(code)) return res.status(400).json({ error: "Reset code must contain 8 digits." });
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Reset code must contain 6 digits." });
     if (!/^\d{6}$/.test(newPin)) return res.status(400).json({ error: "New PIN must contain exactly 6 digits." });
 
     const matches = await db.collection("customers").where("mobile", "==", mobile).limit(2).get();
