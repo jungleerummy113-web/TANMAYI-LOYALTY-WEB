@@ -1,5 +1,10 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#171717">
+<meta name="description" content="TANMAYI STORE AND GIFTS Digital Loyalty System">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>TANMAYI STORE AND GIFTS | Loyalty</title>
 <style>
 :root{--gold:#d6ad55;--ink:#171717;--muted:#6b6254;--red:#8d1d24}
@@ -99,4 +104,14 @@ $('close').onclick=()=>{$('detail').classList.add('hidden');selected=null};
 async function refresh(){if(!selected)return;const r=doc(db,'customers',selected.id),s=await getDoc(r);selected={id:selected.id,...s.data()};$('detailStamps').textContent=selected.stamps||0;const b=await getDocs(query(collection(db,'customers',selected.id,'bills'),orderBy('date','desc')));const rd=await getDocs(query(collection(db,'customers',selected.id,'redemptions'),orderBy('date','desc')));const lastRedeem=rd.empty?null:rd.docs[0].data().date;$('detailBillTotal').textContent=money(b.docs.reduce((sum,x)=>sum+Number(x.data().billTotal||0),0));$('billRows').innerHTML=b.docs.map(d=>`<tr><td>${date(d.data().date)}</td><td>${money(d.data().billTotal)}</td><td>+${d.data().stampsAdded||0}</td></tr>`).join('')||'<tr><td colspan="3">No bills yet</td></tr>';$('detailGiftCount').textContent=rd.size;$('redRows').innerHTML=rd.docs.map(d=>`<tr><td>${date(d.data().date)}</td><td>Free gift</td><td>10</td></tr>`).join('')||'<tr><td colspan="3">No redemptions yet</td></tr>';customers=customers.map(c=>c.id===selected.id?selected:c);$('stampCount').textContent=customers.reduce((a,c)=>a+Number(c.stamps||0),0);render()}
 $('saveBill').onclick=async()=>{clear('billMsg');if(!selected)return;const amount=Number($('billAmount').value);if(!Number.isFinite(amount)||amount<=0){msg('billMsg','Enter a valid bill amount.');return}const add=amount<=800?1:2;try{await runTransaction(db,async tx=>{const r=doc(db,'customers',selected.id),s=await tx.get(r);if(!s.exists())throw Error('Customer not found');const d=s.data();tx.update(r,{stamps:Number(d.stamps||0)+add,billTotal:Number(d.billTotal||0)+amount});tx.set(doc(collection(db,'customers',selected.id,'bills')),{billTotal:amount,stampsAdded:add,date:serverTimestamp()})});$('billAmount').value='';msg('billMsg',`${add} stamp(s) added.`);await refresh()}catch(e){msg('billMsg',e.message)}};
 $('redeem').onclick=async()=>{clear('redeemMsg');if(!selected)return;try{await runTransaction(db,async tx=>{const r=doc(db,'customers',selected.id),s=await tx.get(r);if(!s.exists())throw Error('Customer not found');const n=Number(s.data().stamps||0);if(n<10)throw Error(`Only ${n} stamps. 10 required.`);tx.update(r,{stamps:n-10,billTotal:0});tx.set(doc(collection(db,'customers',selected.id,'redemptions')),{gift:'Free gift',stampsUsed:10,date:serverTimestamp(),confirmedBy:auth.currentUser.uid})});msg('redeemMsg','Gift redemption recorded.');await refresh()}catch(e){msg('redeemMsg',e.message)}};
-</script></body></html>
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch((err) => {
+      console.warn("App offline support registration failed:", err);
+    });
+  });
+}
+</script>
+\n</body></html>
