@@ -1,50 +1,87 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TANMAYI STORE AND GIFTS | Loyalty Admin</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TANMAYI STORE AND GIFTS | Loyalty</title>
 <style>
-:root{--gold:#d6ad55;--ink:#171717;--paper:#fffaf0;--muted:#6b6254;--red:#8d1d24}*{box-sizing:border-box}body{margin:0;background:#f4f1ea;color:var(--ink);font:15px system-ui,Arial,sans-serif}.top{background:linear-gradient(120deg,#171717,#3a2a16);color:#fff;padding:22px 18px;border-bottom:4px solid var(--gold)}.top h1{font-size:21px;margin:0;color:#f0cc78}.top p{margin:5px 0 0;color:#e7dcc6}.wrap{max-width:1000px;margin:22px auto;padding:0 14px}.card{background:white;border:1px solid #e6dfd2;border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 3px 14px #241a0b0b}.hidden{display:none}h2{font-size:18px;margin:0 0 14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 5px}input{width:100%;padding:12px;border:1px solid #cfc7b9;border-radius:9px;font:inherit}button{border:0;border-radius:9px;padding:12px 16px;background:var(--red);color:#fff;font-weight:650;font:inherit;cursor:pointer;margin:8px 6px 0 0}button.secondary{background:#39342d}button.gold{background:#a87922}button:disabled{opacity:.5}small,.muted{color:var(--muted)}.msg{padding:10px;border-radius:8px;background:#fff3d7;margin:10px 0;white-space:pre-wrap}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:var(--paper);border-radius:10px;padding:12px}.stat b{font-size:23px;display:block}.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;padding:10px 7px;border-bottom:1px solid #eee;font-size:13px}th{color:var(--muted)}.scroll{overflow-x:auto}.tag{display:inline-block;background:#f5e8c8;padding:4px 8px;border-radius:20px;font-size:12px}
-</style>
-</head>
-<body>
-<header class="top"><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System · Admin Panel</p></header>
+:root{--gold:#d6ad55;--ink:#171717;--muted:#6b6254;--red:#8d1d24}
+*{box-sizing:border-box}body{margin:0;background:#f4f1ea;color:var(--ink);font:15px system-ui,Arial}
+header{background:linear-gradient(120deg,#171717,#3a2a16);color:#f0cc78;padding:22px 18px;border-bottom:4px solid var(--gold)}
+header h1{font-size:21px;margin:0}.wrap{max-width:1000px;margin:22px auto;padding:0 14px}
+.card{background:#fff;border:1px solid #e6dfd2;border-radius:14px;padding:18px;margin:14px 0}
+.hidden{display:none}h2{font-size:18px;margin:0 0 14px}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 5px}
+input{width:100%;padding:12px;border:1px solid #cfc7b9;border-radius:9px;font:inherit}
+button{border:0;border-radius:9px;padding:12px 16px;background:var(--red);color:#fff;font:inherit;cursor:pointer;margin:8px 6px 0 0}
+.secondary{background:#39342d}.gold{background:#a87922}.msg{padding:10px;background:#fff3d7;border-radius:8px;margin:10px 0;white-space:pre-wrap}
+.muted,small{color:var(--muted)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:#fffaf0;border-radius:10px;padding:12px}.stat b{font-size:23px;display:block}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;padding:10px 7px;border-bottom:1px solid #eee;font-size:13px}
+.scroll{overflow-x:auto}.tag{background:#f5e8c8;padding:4px 8px;border-radius:20px}
+@media(max-width:520px){.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:span 2}}
+</style></head><body>
+<header><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System</p></header>
 <main class="wrap">
-<section id="loginCard" class="card"><h2>Admin Login</h2><p class="muted">Sign in with the admin email and password created in Firebase Authentication.</p><label>Email</label><input id="email" type="email" autocomplete="username" placeholder="Admin email"><label>Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Password"><button id="loginBtn">Login</button><div id="loginMsg" class="msg hidden"></div></section>
-<section id="app" class="hidden">
-<div class="card row"><div><h2>Admin Dashboard</h2><small id="adminEmail"></small></div><button class="secondary" id="logoutBtn">Logout</button></div>
-<div class="stats"><div class="stat"><small>Customers</small><b id="customerCount">0</b></div><div class="stat"><small>Stamps issued</small><b id="stampCount">0</b></div><div class="stat"><small>Gifts redeemed</small><b id="giftCount">0</b></div></div>
-<section class="card"><h2>Add Customer</h2><div class="grid"><div><label>Customer name</label><input id="cName" placeholder="Full name"></div><div><label>Mobile number</label><input id="cMobile" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div><div><label>Village</label><input id="cVillage" placeholder="Village"></div></div><button id="addCustomer">Save Customer</button><div id="customerMsg" class="msg hidden"></div></section>
-<section class="card"><h2>Customers</h2><label>Search by name or mobile</label><input id="search" placeholder="Type name or mobile"><div class="scroll"><table><thead><tr><th>Name / ID</th><th>Mobile</th><th>Village</th><th>Stamps</th><th>Action</th></tr></thead><tbody id="customerRows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></section>
-<section id="detail" class="card hidden"><div class="row"><h2 id="detailName">Customer</h2><button class="secondary" id="closeDetail">Close</button></div><p id="detailInfo" class="muted"></p><div class="stats"><div class="stat"><small>Current stamps</small><b id="detailStamps">0</b></div><div class="stat"><small>Bills total</small><b id="detailBills">₹0</b></div><div class="stat"><small>Gifts redeemed</small><b id="detailGifts">0</b></div></div>
-<h2 style="margin-top:18px">Add Bill</h2><label>Bill amount (₹)</label><input id="billAmount" type="number" min="1" step="1" placeholder="Enter bill amount"><small>₹1–₹800 = 1 stamp · Above ₹800 = 2 stamps</small><br><button id="saveBill">Save Bill & Add Stamps</button><div id="billMsg" class="msg hidden"></div>
+<section id="adminLogin" class="card"><h2>Admin Login</h2><label>Email</label><input id="email" type="email" placeholder="Admin email">
+<label>Password</label><input id="password" type="password" placeholder="Password"><button id="loginBtn">Admin Login</button><div id="adminMsg" class="msg hidden"></div></section>
+<section id="customerLogin" class="card"><h2>Customer Login / Register</h2><p class="muted">Verify your mobile number with OTP. New customers can register after verification.</p>
+<label>10-digit mobile number</label><input id="phone" inputmode="numeric" maxlength="10" placeholder="Mobile number">
+<div id="recaptcha-container"></div><button id="sendOtp">Send OTP</button>
+<div id="otpArea" class="hidden"><label>OTP</label><input id="otp" inputmode="numeric" maxlength="6" placeholder="Enter OTP"><button id="verifyOtp">Verify OTP</button></div>
+<div id="phoneMsg" class="msg hidden"></div></section>
+<section id="profile" class="card hidden"><h2>Complete Registration</h2><p class="muted">Mobile verified. Enter your name and village.</p>
+<label>Name</label><input id="name" placeholder="Full name"><label>Village</label><input id="village" placeholder="Village">
+<button id="register">Register</button><div id="profileMsg" class="msg hidden"></div></section>
+<section id="customerView" class="card hidden"><div class="row"><h2>My Loyalty Account</h2><button class="secondary" id="customerLogout">Logout</button></div>
+<p id="welcome" class="muted"></p><div class="stats"><div class="stat"><small>My stamps</small><b id="myStamps">0</b></div>
+<div class="stat"><small>Bills total</small><b id="myBills">₹0</b></div><div class="stat"><small>Gifts redeemed</small><b id="myGifts">0</b></div></div>
+<p class="muted">₹1–₹800 = 1 stamp · Above ₹800 = 2 stamps · 10 stamps = 1 free gift.</p></section>
+<section id="adminApp" class="hidden">
+<div class="card row"><div><h2>Admin Dashboard</h2><small id="adminEmail"></small></div><button class="secondary" id="logout">Logout</button></div>
+<div class="stats"><div class="stat"><small>Total Customers</small><b id="customerCount">0</b></div><div class="stat"><small>Stamp balance</small><b id="stampCount">0</b></div><div class="stat"><small>Gifts redeemed</small><b id="giftCount">0</b></div></div>
+<section class="card"><h2>Registered Customers</h2><label>Search name or mobile</label><input id="search" placeholder="Search">
+<div class="scroll"><table><thead><tr><th>Name / ID</th><th>Mobile</th><th>Village</th><th>Registered</th><th>Stamps</th><th>Action</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+<section id="detail" class="card hidden"><div class="row"><h2 id="detailName">Customer</h2><button class="secondary" id="close">Close</button></div><p id="detailInfo" class="muted"></p>
+<div class="stats"><div class="stat"><small>Current stamps</small><b id="detailStamps">0</b></div><div class="stat"><small>Bills total</small><b id="detailBillTotal">₹0</b></div><div class="stat"><small>Gifts redeemed</small><b id="detailGiftCount">0</b></div></div>
+<h2 style="margin-top:18px">Add Bill</h2><label>Bill amount (₹)</label><input id="billAmount" type="number" min="1" step="1"><small>₹1–₹800 = 1 stamp · Above ₹800 = 2 stamps</small><br>
+<button id="saveBill">Save Bill & Add Stamps</button><div id="billMsg" class="msg hidden"></div>
 <h2 style="margin-top:18px">Bill History</h2><div class="scroll"><table><thead><tr><th>Date</th><th>Bill</th><th>Stamps</th></tr></thead><tbody id="billRows"></tbody></table></div>
-<h2 style="margin-top:18px">Reward Redemption</h2><p class="muted">10 stamps = 1 free gift. Confirm only after handing the gift to the customer.</p><button class="gold" id="redeemBtn">Confirm Gift Handed Over</button><div id="redeemMsg" class="msg hidden"></div><div class="scroll"><table><thead><tr><th>Date</th><th>Gift</th><th>Stamps used</th></tr></thead><tbody id="redeemRows"></tbody></table></div></section>
-</section>
-</main>
+<h2 style="margin-top:18px">Reward Redemption</h2><p class="muted">Confirm only after handing the free gift to the customer.</p><button class="gold" id="redeem">Confirm Gift Handed Over</button><div id="redeemMsg" class="msg hidden"></div>
+<div class="scroll"><table><thead><tr><th>Date</th><th>Gift</th><th>Stamps used</th></tr></thead><tbody id="redRows"></tbody></table></div></section>
+</section></main>
 <script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, runTransaction, serverTimestamp, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-const firebaseConfig={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-store-and-gifts.firebaseapp.com',projectId:'tanmayi-store-and-gifts',storageBucket:'tanmayi-store-and-gifts.firebasestorage.app',messagingSenderId:'1061146758363',appId:'1:1061146758363:web:3260ea51094ba5fbab10fe',measurementId:'G-3RWVE6G0W9'};
-const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
-const $=id=>document.getElementById(id);let customers=[],selected=null;
-function message(id,text){$(id).textContent=text;$(id).classList.remove('hidden')}
-function clearMessage(id){$(id).textContent='';$(id).classList.add('hidden')}
-function rupees(n){return '₹'+Number(n||0).toLocaleString('en-IN')}
-$('loginBtn').onclick=async()=>{clearMessage('loginMsg');try{await signInWithEmailAndPassword(auth,$('email').value.trim(),$('password').value)}catch(e){message('loginMsg',e.message)}};
-$('logoutBtn').onclick=()=>signOut(auth);
-onAuthStateChanged(auth,async user=>{if(!user){$('loginCard').classList.remove('hidden');$('app').classList.add('hidden');return}try{const a=await getDoc(doc(db,'admins',user.uid));if(!a.exists()||a.data().role!=='admin'||a.data().active!==true){await signOut(auth);throw new Error('This account is not an active admin. Check the admins document and role.')} $('loginCard').classList.add('hidden');$('app').classList.remove('hidden');$('adminEmail').textContent=user.email||'';await loadCustomers()}catch(e){message('loginMsg',e.message);$('loginCard').classList.remove('hidden');$('app').classList.add('hidden')}});
-async function loadCustomers(){const snap=await getDocs(collection(db,'customers'));customers=snap.docs.filter(d=>d.id!=='AUTO-ID').map(d=>({id:d.id,...d.data()}));renderCustomers();let stamps=0,gifts=0;for(const c of customers){stamps+=Number(c.stamps||0);const r=await getDocs(collection(db,'customers',c.id,'redemptions'));gifts+=r.size} $('customerCount').textContent=customers.length;$('stampCount').textContent=stamps;$('giftCount').textContent=gifts}
-function renderCustomers(){const term=$('search').value.trim().toLowerCase();const list=customers.filter(c=>(c.name||'').toLowerCase().includes(term)||(c.mobile||'').includes(term));$('customerRows').innerHTML=list.map(c=>`<tr><td>${esc(c.name||'')}<br><small>${c.id}</small></td><td>${esc(c.mobile||'')}</td><td>${esc(c.village||'')}</td><td><span class="tag">${Number(c.stamps||0)} / 10</span></td><td><button data-id="${c.id}">Open</button></td></tr>`).join('')||'<tr><td colspan="5">No customers found</td></tr>';document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>openCustomer(b.dataset.id))}
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-$('search').oninput=renderCustomers;
-$('addCustomer').onclick=async()=>{clearMessage('customerMsg');const name=$('cName').value.trim(),mobile=$('cMobile').value.trim(),village=$('cVillage').value.trim();if(!name||!/^\d{10}$/.test(mobile)||!village){message('customerMsg','Enter name, valid 10-digit mobile and village.');return}if(customers.some(c=>c.mobile===mobile)){message('customerMsg','This mobile number is already registered.');return}try{await addDoc(collection(db,'customers'),{name,mobile,village,stamps:0,billTotal:0,createdAt:serverTimestamp()});$('cName').value=$('cMobile').value=$('cVillage').value='';message('customerMsg','Customer saved.');await loadCustomers()}catch(e){message('customerMsg',e.message)}};
-async function openCustomer(id){selected=customers.find(c=>c.id===id);if(!selected)return;$('detail').classList.remove('hidden');$('detailName').textContent=selected.name||'Customer';$('detailInfo').textContent=`ID: ${id} · Mobile: ${selected.mobile||''} · Village: ${selected.village||''}`;await refreshDetail()}
-$('closeDetail').onclick=()=>{$('detail').classList.add('hidden');selected=null};
-async function refreshDetail(){if(!selected)return;const ref=doc(db,'customers',selected.id),snap=await getDoc(ref);selected={id:selected.id,...snap.data()};$('detailStamps').textContent=selected.stamps||0;$('detailBills').textContent=rupees(selected.billTotal);const bills=await getDocs(query(collection(db,'customers',selected.id,'bills'),orderBy('date','desc')));$('billRows').innerHTML=bills.docs.map(d=>{const b=d.data();return `<tr><td>${b.date?.toDate?b.date.toDate().toLocaleString(): '—'}</td><td>${rupees(b.billTotal)}</td><td>+${b.stampsAdded||0}</td></tr>`}).join('')||'<tr><td colspan="3">No bills yet</td></tr>';const reds=await getDocs(query(collection(db,'customers',selected.id,'redemptions'),orderBy('date','desc')));$('detailGifts').textContent=reds.size;$('redeemRows').innerHTML=reds.docs.map(d=>`<tr><td>${d.data().date?.toDate?d.data().date.toDate().toLocaleString():'—'}</td><td>1 free gift</td><td>10</td></tr>`).join('')||'<tr><td colspan="3">No redemptions yet</td></tr>';await loadCustomersSummaryOnly()}
-async function loadCustomersSummaryOnly(){let stamps=0;customers=customers.map(c=>c.id===selected.id?selected:c);for(const c of customers)stamps+=Number(c.stamps||0);$('stampCount').textContent=stamps}
-$('saveBill').onclick=async()=>{clearMessage('billMsg');if(!selected)return;const amount=Number($('billAmount').value);if(!Number.isFinite(amount)||amount<=0){message('billMsg','Enter a valid bill amount.');return}const added=amount<=800?1:2;try{await runTransaction(db,async tx=>{const ref=doc(db,'customers',selected.id),s=await tx.get(ref);if(!s.exists())throw new Error('Customer not found');const data=s.data();tx.update(ref,{stamps:Number(data.stamps||0)+added,billTotal:Number(data.billTotal||0)+amount});const bill=doc(collection(db,'customers',selected.id,'bills'));tx.set(bill,{billTotal:amount,stampsAdded:added,date:serverTimestamp()})});$('billAmount').value='';message('billMsg',`Bill saved. ${added} stamp(s) added.`);await refreshDetail()}catch(e){message('billMsg',e.message)}};
-$('redeemBtn').onclick=async()=>{clearMessage('redeemMsg');if(!selected)return;try{await runTransaction(db,async tx=>{const ref=doc(db,'customers',selected.id),s=await tx.get(ref);if(!s.exists())throw new Error('Customer not found');const count=Number(s.data().stamps||0);if(count<10)throw new Error(`Only ${count} stamp(s). 10 stamps are required.`);tx.update(ref,{stamps:count-10});const redemption=doc(collection(db,'customers',selected.id,'redemptions'));tx.set(redemption,{gift:'Free gift',stampsUsed:10,date:serverTimestamp(),confirmedBy:auth.currentUser.uid})});message('redeemMsg','Redemption recorded. 10 stamps deducted after confirmation.');await refreshDetail()}catch(e){message('redeemMsg',e.message)}};
-</script>
-</body></html>
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import{getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut,RecaptchaVerifier,signInWithPhoneNumber}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import{getFirestore,collection,doc,getDoc,getDocs,updateDoc,runTransaction,serverTimestamp,query,orderBy,setDoc}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+const cfg={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-store-and-gifts.firebaseapp.com',projectId:'tanmayi-store-and-gifts',storageBucket:'tanmayi-store-and-gifts.firebasestorage.app',messagingSenderId:'1061146758363',appId:'1:1061146758363:web:3260ea51094ba5fbab10fe',measurementId:'G-3RWVE6G0W9'};
+const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),$=id=>document.getElementById(id);
+let customers=[],selected=null,confirmation=null,recaptcha=null;
+const msg=(id,s)=>{$(id).textContent=s;$(id).classList.remove('hidden')},clear=id=>{$(id).textContent='';$(id).classList.add('hidden')};
+const money=n=>'₹'+Number(n||0).toLocaleString('en-IN');
+const date=s=>s?.toDate?s.toDate().toLocaleString('en-IN'):'—';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function show(id){['adminLogin','customerLogin','profile','customerView','adminApp'].forEach(x=>$(x).classList.toggle('hidden',x!==id))}
+$('loginBtn').onclick=async()=>{clear('adminMsg');try{await signInWithEmailAndPassword(auth,$('email').value.trim(),$('password').value)}catch(e){msg('adminMsg',e.message)}};
+$('logout').onclick=$('customerLogout').onclick=()=>signOut(auth);
+$('sendOtp').onclick=async()=>{clear('phoneMsg');let n=$('phone').value.trim();if(!/^\d{10}$/.test(n)){msg('phoneMsg','Enter a valid 10-digit mobile number.');return}
+try{if(!recaptcha)recaptcha=new RecaptchaVerifier(auth,'recaptcha-container',{size:'normal'});confirmation=await signInWithPhoneNumber(auth,'+91'+n,recaptcha);$('otpArea').classList.remove('hidden');msg('phoneMsg','OTP sent. Enter the OTP.')}
+catch(e){if(recaptcha){try{await recaptcha.clear()}catch{}recaptcha=null}msg('phoneMsg',e.message)}};
+$('verifyOtp').onclick=async()=>{clear('phoneMsg');try{if(!confirmation)throw Error('Request OTP first.');await confirmation.confirm($('otp').value.trim());msg('phoneMsg','Mobile verified.')}catch(e){msg('phoneMsg',e.message)}};
+onAuthStateChanged(auth,async user=>{if(!user){show('adminLogin');$('customerLogin').classList.remove('hidden');return}
+try{let a=await getDoc(doc(db,'admins',user.uid));if(a.exists()&&a.data().role==='admin'&&a.data().active===true){show('adminApp');$('customerLogin').classList.add('hidden');$('adminEmail').textContent=user.email||'';await loadCustomers();return}
+if(!user.phoneNumber){await signOut(auth);return}let c=await getDoc(doc(db,'customers',user.uid));if(!c.exists()){show('profile');$('customerLogin').classList.add('hidden')}else{show('customerView');$('customerLogin').classList.add('hidden');await customerHome(c)}
+}catch(e){show('adminLogin');$('customerLogin').classList.remove('hidden');msg('adminMsg',e.message)}});
+$('register').onclick=async()=>{clear('profileMsg');let u=auth.currentUser,n=$('name').value.trim(),v=$('village').value.trim();if(!u?.phoneNumber){msg('profileMsg','Verify mobile first.');return}if(!n||!v){msg('profileMsg','Enter name and village.');return}
+try{let r=doc(db,'customers',u.uid),old=await getDoc(r);if(old.exists())throw Error('This mobile number is already registered.');await setDoc(r,{name:n,mobile:u.phoneNumber,village:v,stamps:0,billTotal:0,createdAt:serverTimestamp()});let c=await getDoc(r);show('customerView');await customerHome(c)}catch(e){msg('profileMsg',e.message)}};
+async function customerHome(s){let c=s.data();$('welcome').textContent=`${c.name||''} · ${c.mobile||''} · ${c.village||''}`;$('myStamps').textContent=c.stamps||0;$('myBills').textContent=money(c.billTotal);let r=await getDocs(collection(db,'customers',s.id,'redemptions'));$('myGifts').textContent=r.size}
+async function loadCustomers(){let s=await getDocs(collection(db,'customers'));customers=s.docs.filter(d=>d.id!=='AUTO-ID').map(d=>({id:d.id,...d.data()}));render();let st=0,g=0;for(let c of customers){st+=Number(c.stamps||0);g+=(await getDocs(collection(db,'customers',c.id,'redemptions'))).size}$('customerCount').textContent=customers.length;$('stampCount').textContent=st;$('giftCount').textContent=g}
+function render(){let t=$('search').value.trim().toLowerCase(),list=customers.filter(c=>(c.name||'').toLowerCase().includes(t)||(c.mobile||'').includes(t));$('rows').innerHTML=list.map(c=>`<tr><td>${esc(c.name)}<br><small>${esc(c.id)}</small></td><td>${esc(c.mobile)}</td><td>${esc(c.village)}</td><td>${date(c.createdAt)}</td><td>${Number(c.stamps||0)} / 10</td><td><button data-id="${esc(c.id)}">Open</button></td></tr>`).join('')||'<tr><td colspan="6">No customers found</td></tr>';document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>openCustomer(b.dataset.id))}
+$('search').oninput=render;
+async function openCustomer(id){selected=customers.find(c=>c.id===id);if(!selected)return;$('detail').classList.remove('hidden');$('detailName').textContent=selected.name||'Customer';$('detailInfo').textContent=`ID: ${id} · ${selected.mobile||''} · ${selected.village||''} · Registered: ${date(selected.createdAt)}`;await refresh()}
+$('close').onclick=()=>{$('detail').classList.add('hidden');selected=null};
+async function refresh(){if(!selected)return;let r=doc(db,'customers',selected.id),s=await getDoc(r);selected={id:selected.id,...s.data()};$('detailStamps').textContent=selected.stamps||0;$('detailBillTotal').textContent=money(selected.billTotal);
+let b=await getDocs(query(collection(db,'customers',selected.id,'bills'),orderBy('date','desc')));$('billRows').innerHTML=b.docs.map(d=>`<tr><td>${date(d.data().date)}</td><td>${money(d.data().billTotal)}</td><td>+${d.data().stampsAdded||0}</td></tr>`).join('')||'<tr><td colspan="3">No bills yet</td></tr>';
+let rd=await getDocs(query(collection(db,'customers',selected.id,'redemptions'),orderBy('date','desc')));$('detailGiftCount').textContent=rd.size;$('redRows').innerHTML=rd.docs.map(d=>`<tr><td>${date(d.data().date)}</td><td>Free gift</td><td>10</td></tr>`).join('')||'<tr><td colspan="3">No redemptions yet</td></tr>';
+customers=customers.map(c=>c.id===selected.id?selected:c);$('stampCount').textContent=customers.reduce((a,c)=>a+Number(c.stamps||0),0);render()}
+$('saveBill').onclick=async()=>{clear('billMsg');if(!selected)return;let amount=Number($('billAmount').value);if(!Number.isFinite(amount)||amount<=0){msg('billMsg','Enter a valid bill amount.');return}let add=amount<=800?1:2;
+try{await runTransaction(db,async tx=>{let r=doc(db,'customers',selected.id),s=await tx.get(r);if(!s.exists())throw Error('Customer not found');let d=s.data();tx.update(r,{stamps:Number(d.stamps||0)+add,billTotal:Number(d.billTotal||0)+amount});tx.set(doc(collection(db,'customers',selected.id,'bills')),{billTotal:amount,stampsAdded:add,date:serverTimestamp()})});$('billAmount').value='';msg('billMsg',`${add} stamp(s) added.`);await refresh()}catch(e){msg('billMsg',e.message)}};
+$('redeem').onclick=async()=>{clear('redeemMsg');if(!selected)return;try{await runTransaction(db,async tx=>{let r=doc(db,'customers',selected.id),s=await tx.get(r);if(!s.exists())throw Error('Customer not found');let n=Number(s.data().stamps||0);if(n<10)throw Error(`Only ${n} stamps. 10 required.`);tx.update(r,{stamps:n-10});tx.set(doc(collection(db,'customers',selected.id,'redemptions')),{gift:'Free gift',stampsUsed:10,date:serverTimestamp(),confirmedBy:auth.currentUser.uid})});msg('redeemMsg','Gift redemption recorded.');await refresh()}catch(e){msg('redeemMsg',e.message)}};
+</script></body></html>
