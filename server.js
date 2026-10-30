@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
-const { getStorage } = require("firebase-admin/storage");
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -16,11 +15,10 @@ if (!admin.apps.length) {
   } else {
     credential = admin.credential.applicationDefault();
   }
-  admin.initializeApp({ credential, projectId, storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "tanmayi-store-and-gifts.firebasestorage.app" });
+  admin.initializeApp({ credential, projectId });
 }
 const db = admin.firestore();
 const auth = admin.auth();
-const bucket = getStorage().bucket();
 const RESET_COLLECTION = "pinResetAuthorizations";
 const CODE_TTL_MS = 10 * 60 * 1000;
 
@@ -209,8 +207,8 @@ app.get("/api/customer/home", requireUser, async (req,res)=>{
 app.get("/api/customer/history", requireUser, async (req,res)=>{
   try {
     const s=await customerRef(req.user.uid).collection("bills").orderBy("date","desc").limit(100).get().catch(()=>({docs:[]}));
-    // Customer-visible history intentionally excludes bill amount and stamp count.
-    res.json({history:s.docs.map(x=>({id:x.id,date:safeDate(x.data().date)}))});
+    // The authenticated customer can see their own bill date/time and amount.
+    res.json({history:s.docs.map(x=>({id:x.id,date:safeDate(x.data().date),amount:moneyNumber(x.data().billTotal)}))});
   }catch(e){res.status(500).json({error:"Could not load bill history."});}
 });
 app.post("/api/customer/redeem-taken", requireUser, async (req,res)=>{
@@ -293,21 +291,14 @@ const OFFER_HOLD_MS = 60 * 60 * 1000;
 const MAX_ACTIVE_PRODUCTS = 8;
 function decodeImage(dataUrl) {
   if (typeof dataUrl !== "string") throw new Error("Both product photos are required.");
-  const match = dataUrl.match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i);
-  if (!match) throw new Error("Upload valid JPG, PNG or WEBP photos.");
-  const buffer = Buffer.from(match[2], "base64");
-  if (!buffer.length || buffer.length > 1800 * 1024) throw new Error("Each compressed photo must be smaller than 1.8 MB.");
-  return { buffer, contentType: match[1].toLowerCase().replace("jpg", "jpeg") === "jpeg" ? "image/jpeg" : `image/${match[1].toLowerCase()}` };
-}
-async function storeProductPhoto(productId, index, dataUrl) {
-  const image = decodeImage(dataUrl), token = crypto.randomUUID();
-  const path = `shop-products/${productId}/photo-${index}.jpg`;
-  const file = bucket.file(path);
-  await file.save(image.buffer, { resumable: false, metadata: { contentType: image.contentType, cacheControl: "public,max-age=31536000", metadata: { firebaseStorageDownloadTokens: token } } });
-  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+  const match = dataUrl.match(/^data:image\/(jpeg|jpg);base64,([A-Za-z0-9+/=]+)$/i);
+  if (!match) throw new Error("Upload valid JPG, PNG or WEBP photos. Photos are converted to compressed JPG before saving.");
+  // Keep each image below 360 KB so both photos fit safely inside Firestore's 1 MiB document limit.
+  if (dataUrl.length > 360000) throw new Error("Photo is too large after compression. Please choose a smaller image.");
+  return dataUrl;
 }
 app.get("/api/admin/products", requireAdmin, async (_req, res) => {
-  try { const snap = await db.collection(PRODUCTS_COLLECTION).orderBy("createdAt", "desc").get(); res.json({ products: snap.docs.map(d => ({ id:d.id, ...d.data(), createdAt:safeDate(d.data().createdAt) })) }); }
+  try { const snap = await db.collection(PRODUCTS_COLLECTION).orderBy("createdAt", "desc").get(); res.json({ products: snap.docs.map(d => { const x=d.data(); return { id:d.id, ...x, photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]), createdAt:safeDate(x.createdAt) }; }) }); }
   catch (e) { console.error("admin products", e); res.status(500).json({ error:"Could not load products." }); }
 });
 app.post("/api/admin/products", requireAdmin, async (req, res) => {
@@ -319,8 +310,8 @@ app.post("/api/admin/products", requireAdmin, async (req, res) => {
     if (active.size >= MAX_ACTIVE_PRODUCTS) return res.status(400).json({ error:"You can keep a maximum of 8 active products. Pause an existing offer first." });
     decodeImage(req.body?.photo1); decodeImage(req.body?.photo2);
     productRef = db.collection(PRODUCTS_COLLECTION).doc();
-    const photoUrls = await Promise.all([storeProductPhoto(productRef.id, 1, req.body.photo1), storeProductPhoto(productRef.id, 2, req.body.photo2)]);
-    await productRef.set({ name, originalPrice, offerPrice, photoUrls, active:true, createdAt:admin.firestore.FieldValue.serverTimestamp(), updatedAt:admin.firestore.FieldValue.serverTimestamp(), createdBy:req.adminUid });
+    const photoData = [decodeImage(req.body.photo1), decodeImage(req.body.photo2)];
+    await productRef.set({ name, originalPrice, offerPrice, photoData, active:true, createdAt:admin.firestore.FieldValue.serverTimestamp(), updatedAt:admin.firestore.FieldValue.serverTimestamp(), createdBy:req.adminUid });
     res.json({ ok:true, id:productRef.id });
   } catch (e) { console.error("create product", e); res.status(400).json({ error:e.message || "Could not upload product." }); }
 });
@@ -334,7 +325,7 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
   } catch (e) { res.status(500).json({ error:"Could not update offer." }); }
 });
 app.get("/api/customer/offers", requireUser, async (_req, res) => {
-  try { const snap = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(); res.json({ products:snap.docs.map(d => ({ id:d.id, name:d.data().name, originalPrice:moneyNumber(d.data().originalPrice), offerPrice:moneyNumber(d.data().offerPrice), photoUrls:Array.isArray(d.data().photoUrls)?d.data().photoUrls:[] })) }); }
+  try { const snap = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(); res.json({ products:snap.docs.map(d => { const x=d.data(); return { id:d.id, name:x.name, originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]) }; }) }); }
   catch (e) { console.error("customer offers", e); res.status(500).json({ error:"Could not load offers." }); }
 });
 app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
