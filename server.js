@@ -298,8 +298,23 @@ function decodeImage(dataUrl) {
   return dataUrl;
 }
 app.get("/api/admin/products", requireAdmin, async (_req, res) => {
-  try { const snap = await db.collection(PRODUCTS_COLLECTION).orderBy("createdAt", "desc").get(); res.json({ products: snap.docs.map(d => { const x=d.data(); return { id:d.id, ...x, photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]), createdAt:safeDate(x.createdAt) }; }) }); }
-  catch (e) { console.error("admin products", e); res.status(500).json({ error:"Could not load products." }); }
+  try {
+    const [snap, reservationSnap] = await Promise.all([
+      db.collection(PRODUCTS_COLLECTION).orderBy("createdAt", "desc").get(),
+      db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
+    ]);
+    const now = Date.now(), heldByProduct = new Map();
+    reservationSnap.docs.forEach(r => {
+      const x = r.data();
+      if (asMillis(x.expiresAt) > now) heldByProduct.set(x.productId, (heldByProduct.get(x.productId) || 0) + 1);
+    });
+    res.json({ products: snap.docs.map(d => {
+      const x=d.data(), stock=Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
+      const reservedCount=heldByProduct.get(d.id) || 0;
+      return { id:d.id, ...x, stock, reservedCount, availableStock:Math.max(0, stock-reservedCount),
+        photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]), createdAt:safeDate(x.createdAt) };
+    }) });
+  } catch (e) { console.error("admin products", e); res.status(500).json({ error:"Could not load products." }); }
 });
 app.post("/api/admin/products", requireAdmin, async (req, res) => {
   let productRef;
@@ -461,6 +476,87 @@ app.post("/api/customer/cancel-offer", requireUser, async (req, res) => {
     });
     res.json({ ok:true });
   } catch (e) { res.status(400).json({ error:e.message || "Could not cancel selected offer." }); }
+});
+
+// Admin view: confirmed reservations waiting for the customer to collect in-store.
+app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
+  try {
+    const snap = await db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get();
+    const now = Date.now();
+    const live = snap.docs.filter(d => asMillis(d.data().expiresAt) > now);
+    const groups = new Map();
+    for (const d of live) {
+      const x = d.data();
+      const key = `${x.customerUid}__${x.productId}`;
+      if (!groups.has(key)) groups.set(key, {
+        customerUid:x.customerUid, productId:x.productId, productName:x.productName || "Product",
+        offerPrice:moneyNumber(x.offerPrice), quantity:0, reservationIds:[], expiresAt:0
+      });
+      const g = groups.get(key);
+      g.quantity += 1;
+      g.reservationIds.push(d.id);
+      g.expiresAt = Math.max(g.expiresAt, asMillis(x.expiresAt));
+    }
+    const orders = await Promise.all([...groups.values()].map(async g => {
+      const [customerSnap, productSnap] = await Promise.all([
+        customerRef(g.customerUid).get(),
+        db.collection(PRODUCTS_COLLECTION).doc(g.productId).get()
+      ]);
+      const c = customerSnap.exists ? customerSnap.data() : {};
+      const p = productSnap.exists ? productSnap.data() : {};
+      return {
+        ...g, customerName:c.name || "Customer", mobile:c.mobile || "",
+        productName:p.name || g.productName, offerPrice:moneyNumber(p.offerPrice ?? g.offerPrice),
+        expiresAt:g.expiresAt, total:moneyNumber(p.offerPrice ?? g.offerPrice) * g.quantity
+      };
+    }));
+    orders.sort((a,b) => a.expiresAt - b.expiresAt);
+    res.json({ orders });
+  } catch (e) {
+    console.error("admin offer orders", e);
+    res.status(500).json({ error:"Could not load confirmed customer offers." });
+  }
+});
+
+// Admin approves only after the customer has physically collected the products.
+// Each active reservation represents one piece; approval decrements physical stock.
+app.post("/api/admin/offer-orders/approve", requireAdmin, async (req, res) => {
+  try {
+    const customerUid = String(req.body?.customerUid || "");
+    const productId = String(req.body?.productId || "");
+    if (!customerUid || !productId) return res.status(400).json({ error:"Customer and product details are required." });
+    const productRef = db.collection(PRODUCTS_COLLECTION).doc(productId);
+    let approvedQuantity = 0;
+    await db.runTransaction(async tx => {
+      const productSnap = await tx.get(productRef);
+      if (!productSnap.exists) throw new Error("Product not found.");
+      const reservationQuery = db.collection(RESERVATIONS_COLLECTION).where("productId", "==", productId);
+      const reservationSnap = await tx.get(reservationQuery);
+      const now = Date.now();
+      const eligible = reservationSnap.docs.filter(d => {
+        const x=d.data();
+        return x.customerUid === customerUid && x.status === "active" && asMillis(x.expiresAt) > now;
+      });
+      if (!eligible.length) throw new Error("No active confirmed items remain. The offer may have expired or been cancelled.");
+      const stock = Number.isInteger(Number(productSnap.data().stock)) ? Number(productSnap.data().stock) : 0;
+      if (stock < eligible.length) throw new Error("Physical stock is lower than the confirmed quantity. Check stock before approval.");
+      approvedQuantity = eligible.length;
+      tx.update(productRef, {
+        stock:stock-approvedQuantity,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        lastCollectedAt:admin.firestore.FieldValue.serverTimestamp()
+      });
+      eligible.forEach(d => tx.update(d.ref, {
+        status:"collected",
+        collectedAt:admin.firestore.FieldValue.serverTimestamp(),
+        collectedBy:req.adminUid
+      }));
+    });
+    res.json({ ok:true, approvedQuantity, message:`Collection approved. ${approvedQuantity} piece(s) deducted from stock.` });
+  } catch (e) {
+    console.error("approve offer collection", e);
+    res.status(400).json({ error:e.message || "Could not approve product collection." });
+  }
 });
 
 app.get("/api/customer/my-offers", requireUser, async (req, res) => {
