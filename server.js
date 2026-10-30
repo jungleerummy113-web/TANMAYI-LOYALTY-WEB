@@ -320,23 +320,52 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
     const ref = db.collection(PRODUCTS_COLLECTION).doc(req.params.id);
     const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ error:"Product not found." });
+    const current = snap.data();
     const updates = { updatedAt:admin.firestore.FieldValue.serverTimestamp() };
+
     if (typeof req.body?.active === "boolean") {
-      if (req.body.active) { const active = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(); if (active.size >= MAX_ACTIVE_PRODUCTS && snap.data().active !== true) return res.status(400).json({ error:"Maximum 8 active products reached." }); }
+      if (req.body.active) {
+        const active = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get();
+        if (active.size >= MAX_ACTIVE_PRODUCTS && current.active !== true) return res.status(400).json({ error:"Maximum 8 active products reached." });
+      }
       updates.active = req.body.active;
     }
+
+    const hasProductEdit = ["name", "originalPrice", "offerPrice"].some(k => req.body?.[k] !== undefined);
+    if (hasProductEdit) {
+      const name = String(req.body?.name ?? current.name ?? "").trim();
+      const originalPrice = Number(req.body?.originalPrice ?? current.originalPrice);
+      const offerPrice = Number(req.body?.offerPrice ?? current.offerPrice);
+      if (!name || name.length > 80 || !Number.isFinite(originalPrice) || originalPrice <= 0 ||
+          !Number.isFinite(offerPrice) || offerPrice <= 0 || offerPrice >= originalPrice) {
+        return res.status(400).json({ error:"Enter a product name and valid prices. Offer price must be below original price." });
+      }
+      updates.name = name;
+      updates.originalPrice = originalPrice;
+      updates.offerPrice = offerPrice;
+    }
+
     if (req.body?.stock !== undefined) {
       const stock = Number(req.body.stock);
       if (!Number.isInteger(stock) || stock < 0 || stock > 100000) return res.status(400).json({ error:"Stock must be a whole number from 0 to 100000." });
       const reservations = await db.collection(RESERVATIONS_COLLECTION).where("productId", "==", req.params.id).get();
       const held = reservations.docs.filter(d => d.data().status === "active" && asMillis(d.data().expiresAt) > Date.now()).length;
-      if (stock < held) return res.status(400).json({ error:`${held} item(s) are currently selected by customers. Stock cannot be lower than this.` });
+      if (stock < held) return res.status(400).json({ error:`${held} item(s) are currently confirmed by customers. Stock cannot be lower than this.` });
       updates.stock = stock;
     }
+
+    if (req.body?.photo1 !== undefined || req.body?.photo2 !== undefined) {
+      const photos = Array.isArray(current.photoData) ? [...current.photoData] : Array.isArray(current.photoUrls) ? [...current.photoUrls] : [];
+      if (req.body?.photo1) photos[0] = decodeImage(req.body.photo1);
+      if (req.body?.photo2) photos[1] = decodeImage(req.body.photo2);
+      if (!photos[0] || !photos[1]) return res.status(400).json({ error:"Both product photos must be available. Choose both photos if this product has no saved photos." });
+      updates.photoData = photos;
+    }
+
     if (Object.keys(updates).length === 1) return res.status(400).json({ error:"No valid product update supplied." });
     await ref.update(updates);
     res.json({ ok:true });
-  } catch (e) { console.error("update product", e); res.status(500).json({ error:e.message || "Could not update offer." }); }
+  } catch (e) { console.error("update product", e); res.status(400).json({ error:e.message || "Could not update offer." }); }
 });
 app.get("/api/customer/offers", requireUser, async (_req, res) => {
   try {
@@ -369,6 +398,56 @@ app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
     res.json({ ok:true, reservation:result });
   } catch (e) { res.status(400).json({ error:e.message || "Could not select this offer." }); }
 });
+
+// Customer confirms the staged cart: only now create one-hour stock holds.
+app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
+  try {
+    const productIds = Array.isArray(req.body?.productIds) ? req.body.productIds.map(x => String(x || "")).filter(Boolean) : [];
+    if (!productIds.length) return res.status(400).json({ error:"Add at least one product before confirming." });
+    if (productIds.length > 30) return res.status(400).json({ error:"You can confirm up to 30 items at a time." });
+
+    const quantities = new Map();
+    for (const id of productIds) quantities.set(id, (quantities.get(id) || 0) + 1);
+    const productRefs = new Map([...quantities.keys()].map(id => [id, db.collection(PRODUCTS_COLLECTION).doc(id)]));
+    const reservationRefs = productIds.map(() => db.collection(RESERVATIONS_COLLECTION).doc());
+    const confirmed = [];
+
+    await db.runTransaction(async tx => {
+      const productSnaps = new Map();
+      for (const [id, ref] of productRefs) productSnaps.set(id, await tx.get(ref));
+
+      const existingByProduct = new Map();
+      for (const id of quantities.keys()) {
+        const query = db.collection(RESERVATIONS_COLLECTION).where("productId", "==", id);
+        existingByProduct.set(id, await tx.get(query));
+      }
+
+      const now = Date.now();
+      for (const [id, quantity] of quantities) {
+        const productSnap = productSnaps.get(id);
+        if (!productSnap?.exists || productSnap.data().active !== true) throw new Error("One of your selected offers is no longer available. Please refresh the offers.");
+        const product = productSnap.data();
+        const stock = Number.isInteger(Number(product.stock)) ? Number(product.stock) : 0;
+        const held = existingByProduct.get(id).docs.filter(d => d.data().status === "active" && asMillis(d.data().expiresAt) > now).length;
+        if (held + quantity > stock) throw new Error(`${product.name || "A selected product"} has only ${Math.max(0, stock-held)} piece(s) available now. Please update your selection.`);
+      }
+
+      const expiresAt = now + OFFER_HOLD_MS;
+      productIds.forEach((id, index) => {
+        const product = productSnaps.get(id).data();
+        tx.create(reservationRefs[index], {
+          customerUid:req.user.uid, productId:id, productName:product.name || "Product",
+          offerPrice:moneyNumber(product.offerPrice), status:"active",
+          createdAt:admin.firestore.FieldValue.serverTimestamp(),
+          expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt)
+        });
+        confirmed.push({ id:reservationRefs[index].id, productId:id, productName:product.name || "Product", offerPrice:moneyNumber(product.offerPrice), expiresAt });
+      });
+    });
+    res.json({ ok:true, reservations:confirmed });
+  } catch (e) { res.status(400).json({ error:e.message || "Could not confirm your selected offers." }); }
+});
+
 app.post("/api/customer/cancel-offer", requireUser, async (req, res) => {
   try {
     const reservationId = String(req.body?.reservationId || "");
