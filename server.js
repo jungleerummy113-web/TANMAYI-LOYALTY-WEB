@@ -2,10 +2,11 @@ const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
+const { getStorage } = require("firebase-admin/storage");
 
 const app = express();
 app.use(cors({ origin: true }));
-app.use(express.json({ limit: "20kb" }));
+app.use(express.json({ limit: "12mb" }));
 
 const projectId = process.env.FIREBASE_PROJECT_ID || "tanmayi-store-and-gifts";
 if (!admin.apps.length) {
@@ -15,10 +16,11 @@ if (!admin.apps.length) {
   } else {
     credential = admin.credential.applicationDefault();
   }
-  admin.initializeApp({ credential, projectId });
+  admin.initializeApp({ credential, projectId, storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "tanmayi-store-and-gifts.firebasestorage.app" });
 }
 const db = admin.firestore();
 const auth = admin.auth();
+const bucket = getStorage().bucket();
 const RESET_COLLECTION = "pinResetAuthorizations";
 const CODE_TTL_MS = 10 * 60 * 1000;
 
@@ -281,6 +283,80 @@ app.post("/api/admin/create-redemption", requireAdmin, async (req,res)=>{
 app.get("/api/admin/summary", requireAdmin, async (_req,res)=>{
   try {const s=await db.collection("customers").get();let stamps=0,gifts=0;for(const d of s.docs){stamps+=moneyNumber(d.data().stamps);const r=await d.ref.collection("redemptions").where("status","==","taken").get();gifts+=r.size;}res.json({customerCount:s.size,stampCount:stamps,giftCount:gifts});}
   catch(e){res.status(500).json({error:"Could not load dashboard."});}
+});
+
+
+// ---------------- ADMIN PRODUCT PHOTOS & CUSTOMER OFFERS ----------------
+const PRODUCTS_COLLECTION = "shopProducts";
+const RESERVATIONS_COLLECTION = "offerReservations";
+const OFFER_HOLD_MS = 60 * 60 * 1000;
+const MAX_ACTIVE_PRODUCTS = 8;
+function decodeImage(dataUrl) {
+  if (typeof dataUrl !== "string") throw new Error("Both product photos are required.");
+  const match = dataUrl.match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i);
+  if (!match) throw new Error("Upload valid JPG, PNG or WEBP photos.");
+  const buffer = Buffer.from(match[2], "base64");
+  if (!buffer.length || buffer.length > 1800 * 1024) throw new Error("Each compressed photo must be smaller than 1.8 MB.");
+  return { buffer, contentType: match[1].toLowerCase().replace("jpg", "jpeg") === "jpeg" ? "image/jpeg" : `image/${match[1].toLowerCase()}` };
+}
+async function storeProductPhoto(productId, index, dataUrl) {
+  const image = decodeImage(dataUrl), token = crypto.randomUUID();
+  const path = `shop-products/${productId}/photo-${index}.jpg`;
+  const file = bucket.file(path);
+  await file.save(image.buffer, { resumable: false, metadata: { contentType: image.contentType, cacheControl: "public,max-age=31536000", metadata: { firebaseStorageDownloadTokens: token } } });
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+}
+app.get("/api/admin/products", requireAdmin, async (_req, res) => {
+  try { const snap = await db.collection(PRODUCTS_COLLECTION).orderBy("createdAt", "desc").get(); res.json({ products: snap.docs.map(d => ({ id:d.id, ...d.data(), createdAt:safeDate(d.data().createdAt) })) }); }
+  catch (e) { console.error("admin products", e); res.status(500).json({ error:"Could not load products." }); }
+});
+app.post("/api/admin/products", requireAdmin, async (req, res) => {
+  let productRef;
+  try {
+    const name = String(req.body?.name || "").trim(), originalPrice = Number(req.body?.originalPrice), offerPrice = Number(req.body?.offerPrice);
+    if (!name || name.length > 80 || !Number.isFinite(originalPrice) || originalPrice <= 0 || !Number.isFinite(offerPrice) || offerPrice <= 0 || offerPrice >= originalPrice) return res.status(400).json({ error:"Enter a product name and valid prices. Offer price must be below original price." });
+    const active = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get();
+    if (active.size >= MAX_ACTIVE_PRODUCTS) return res.status(400).json({ error:"You can keep a maximum of 8 active products. Pause an existing offer first." });
+    decodeImage(req.body?.photo1); decodeImage(req.body?.photo2);
+    productRef = db.collection(PRODUCTS_COLLECTION).doc();
+    const photoUrls = await Promise.all([storeProductPhoto(productRef.id, 1, req.body.photo1), storeProductPhoto(productRef.id, 2, req.body.photo2)]);
+    await productRef.set({ name, originalPrice, offerPrice, photoUrls, active:true, createdAt:admin.firestore.FieldValue.serverTimestamp(), updatedAt:admin.firestore.FieldValue.serverTimestamp(), createdBy:req.adminUid });
+    res.json({ ok:true, id:productRef.id });
+  } catch (e) { console.error("create product", e); res.status(400).json({ error:e.message || "Could not upload product." }); }
+});
+app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
+  try {
+    if (typeof req.body?.active !== "boolean") return res.status(400).json({ error:"Invalid offer status." });
+    const ref = db.collection(PRODUCTS_COLLECTION).doc(req.params.id), snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error:"Product not found." });
+    if (req.body.active) { const active = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(); if (active.size >= MAX_ACTIVE_PRODUCTS && snap.data().active !== true) return res.status(400).json({ error:"Maximum 8 active products reached." }); }
+    await ref.update({ active:req.body.active, updatedAt:admin.firestore.FieldValue.serverTimestamp() }); res.json({ ok:true });
+  } catch (e) { res.status(500).json({ error:"Could not update offer." }); }
+});
+app.get("/api/customer/offers", requireUser, async (_req, res) => {
+  try { const snap = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(); res.json({ products:snap.docs.map(d => ({ id:d.id, name:d.data().name, originalPrice:moneyNumber(d.data().originalPrice), offerPrice:moneyNumber(d.data().offerPrice), photoUrls:Array.isArray(d.data().photoUrls)?d.data().photoUrls:[] })) }); }
+  catch (e) { console.error("customer offers", e); res.status(500).json({ error:"Could not load offers." }); }
+});
+app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
+  try {
+    const productId = String(req.body?.productId || ""); if (!productId) return res.status(400).json({ error:"Select a product." });
+    const productRef = db.collection(PRODUCTS_COLLECTION).doc(productId), reservationRef = db.collection(RESERVATIONS_COLLECTION).doc();
+    let result;
+    await db.runTransaction(async tx => {
+      const product = await tx.get(productRef); if (!product.exists || product.data().active !== true) throw new Error("This offer is no longer available.");
+      const now = Date.now(), expiresAt = now + OFFER_HOLD_MS;
+      tx.create(reservationRef, { customerUid:req.user.uid, productId, productName:product.data().name, offerPrice:moneyNumber(product.data().offerPrice), status:"active", createdAt:admin.firestore.FieldValue.serverTimestamp(), expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt) });
+      result = { id:reservationRef.id, expiresAt };
+    });
+    res.json({ ok:true, reservation:result });
+  } catch (e) { res.status(400).json({ error:e.message || "Could not select this offer." }); }
+});
+app.get("/api/customer/my-offers", requireUser, async (req, res) => {
+  try {
+    const snap = await db.collection(RESERVATIONS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get(), now = Date.now();
+    const reservations = snap.docs.map(d => { const x=d.data(), expiresAt=asMillis(x.expiresAt); return { id:d.id, productName:x.productName||"Product", offerPrice:moneyNumber(x.offerPrice), expiresAt, status:expiresAt > now ? "active" : "expired" }; }).filter(x => x.expiresAt > now).sort((a,b)=>b.expiresAt-a.expiresAt).slice(0,30);
+    res.json({ reservations });
+  } catch (e) { console.error("customer offers history", e); res.status(500).json({ error:"Could not load your selected offers." }); }
 });
 
 const port = process.env.PORT || 10000;
