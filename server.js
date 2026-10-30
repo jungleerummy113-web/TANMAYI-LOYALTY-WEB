@@ -168,7 +168,7 @@ async function getAdminCustomer(uid) {
   if (!snap.exists) return null;
   const d = snap.data();
   const billsSnap = await ref.collection("bills").orderBy("date", "desc").get().catch(async () => ref.collection("bills").get());
-  const bills = billsSnap.docs.map(x => ({ id:x.id, amount:moneyNumber(x.data().billTotal), stampsAdded:moneyNumber(x.data().stampsAdded), date:safeDate(x.data().date) }));
+  const bills = billsSnap.docs.map(x => ({ id:x.id, amount:moneyNumber(x.data().billTotal), stampsAdded:moneyNumber(x.data().stampsAdded), source:x.data().source || "admin-bill", productName:x.data().productName || "", date:safeDate(x.data().date) }));
   const lifetime = bills.reduce((n,b)=>n+b.amount,0);
   const cycle = moneyNumber(d.cycleBillTotal ?? d.billTotal);
   const redSnap = await ref.collection("redemptions").orderBy("date","desc").get().catch(()=>ref.collection("redemptions").get());
@@ -240,6 +240,22 @@ app.get("/api/admin/customers", requireAdmin, async (_req,res)=>{
     for(const d of s.docs){if(d.id==="AUTO-ID")continue;const data=d.data();rows.push({id:d.id,name:data.name||"",mobile:data.mobile||"",village:data.village||"",stamps:moneyNumber(data.stamps),createdAt:safeDate(data.createdAt)});}
     res.json({customers:rows});
   }catch(e){res.status(500).json({error:"Could not load customers."});}
+});
+app.get("/api/admin/reward-eligible", requireAdmin, async (_req,res)=>{
+  try {
+    const snap=await db.collection("customers").get();
+    const eligible=[];
+    for(const d of snap.docs){
+      if(d.id==="AUTO-ID") continue;
+      const x=d.data(), stamps=moneyNumber(x.stamps);
+      if(stamps>=10){
+        const pending=await d.ref.collection("redemptions").where("status","==","pending").limit(1).get();
+        eligible.push({id:d.id,name:x.name||"",mobile:x.mobile||"",village:x.village||"",stamps,pendingRedemption:!pending.empty});
+      }
+    }
+    eligible.sort((a,b)=>b.stamps-a.stamps);
+    res.json({customers:eligible});
+  } catch(e){console.error("reward eligible",e);res.status(500).json({error:"Could not load reward-eligible customers."});}
 });
 app.get("/api/admin/customer/:uid", requireAdmin, async (req,res)=>{
   try {const data=await getAdminCustomer(req.params.uid);if(!data)return res.status(404).json({error:"Customer not found."});res.json(data);}
@@ -526,10 +542,14 @@ app.post("/api/admin/offer-orders/approve", requireAdmin, async (req, res) => {
     const productId = String(req.body?.productId || "");
     if (!customerUid || !productId) return res.status(400).json({ error:"Customer and product details are required." });
     const productRef = db.collection(PRODUCTS_COLLECTION).doc(productId);
-    let approvedQuantity = 0;
+    const cRef = customerRef(customerUid);
+    const billRef = cRef.collection("bills").doc();
+    let approvedQuantity = 0, approvedAmount = 0, stampsAdded = 0;
     await db.runTransaction(async tx => {
       const productSnap = await tx.get(productRef);
+      const customerSnap = await tx.get(cRef);
       if (!productSnap.exists) throw new Error("Product not found.");
+      if (!customerSnap.exists) throw new Error("Customer account not found.");
       const reservationQuery = db.collection(RESERVATIONS_COLLECTION).where("productId", "==", productId);
       const reservationSnap = await tx.get(reservationQuery);
       const now = Date.now();
@@ -540,11 +560,33 @@ app.post("/api/admin/offer-orders/approve", requireAdmin, async (req, res) => {
       if (!eligible.length) throw new Error("No active confirmed items remain. The offer may have expired or been cancelled.");
       const stock = Number.isInteger(Number(productSnap.data().stock)) ? Number(productSnap.data().stock) : 0;
       if (stock < eligible.length) throw new Error("Physical stock is lower than the confirmed quantity. Check stock before approval.");
+
+      // Keep the price agreed when the customer confirmed the offer.
       approvedQuantity = eligible.length;
+      approvedAmount = eligible.reduce((sum,d)=>sum+moneyNumber(d.data().offerPrice),0);
+      if (!(approvedAmount > 0)) throw new Error("Could not calculate the confirmed offer amount.");
+      stampsAdded = approvedAmount <= 800 ? 1 : 2;
+
+      const c=customerSnap.data();
+      const oldCycle=moneyNumber(c.cycleBillTotal ?? c.billTotal);
+      const oldLife=moneyNumber(c.lifetimeBillTotal ?? oldCycle);
       tx.update(productRef, {
         stock:stock-approvedQuantity,
         updatedAt:admin.firestore.FieldValue.serverTimestamp(),
         lastCollectedAt:admin.firestore.FieldValue.serverTimestamp()
+      });
+      tx.update(cRef, {
+        stamps:moneyNumber(c.stamps)+stampsAdded,
+        billTotal:oldCycle+approvedAmount,
+        cycleBillTotal:oldCycle+approvedAmount,
+        lifetimeBillTotal:oldLife+approvedAmount
+      });
+      tx.create(billRef, {
+        billTotal:approvedAmount, stampsAdded, source:"shop-offer",
+        productName:productSnap.data().name || "Shop offer",
+        productId, quantity:approvedQuantity,
+        date:admin.firestore.FieldValue.serverTimestamp(),
+        enteredBy:req.adminUid
       });
       eligible.forEach(d => tx.update(d.ref, {
         status:"collected",
@@ -552,13 +594,15 @@ app.post("/api/admin/offer-orders/approve", requireAdmin, async (req, res) => {
         collectedBy:req.adminUid
       }));
     });
-    res.json({ ok:true, approvedQuantity, message:`Collection approved. ${approvedQuantity} piece(s) deducted from stock.` });
+    res.json({
+      ok:true, approvedQuantity, approvedAmount, stampsAdded,
+      message:`Collection approved. ${approvedQuantity} piece(s) deducted from stock. Bill ₹${approvedAmount} added and ${stampsAdded} stamp(s) awarded.`
+    });
   } catch (e) {
     console.error("approve offer collection", e);
     res.status(400).json({ error:e.message || "Could not approve product collection." });
   }
 });
-
 app.get("/api/customer/my-offers", requireUser, async (req, res) => {
   try {
     const snap = await db.collection(RESERVATIONS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get(), now = Date.now();
