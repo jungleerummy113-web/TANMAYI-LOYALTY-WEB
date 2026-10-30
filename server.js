@@ -194,9 +194,14 @@ app.get("/api/customer/home", requireUser, async (req,res)=>{
     const snap=await customerRef(req.user.uid).get();
     if(!snap.exists) return res.status(404).json({error:"Customer profile not found."});
     const d=snap.data(), bills=await customerRef(req.user.uid).collection("bills").orderBy("date","desc").limit(1).get().catch(()=>({docs:[]}));
+    const latestBillDoc=bills.docs[0]||null;
+    // Show only a bill from the current, unredeemed cycle as the customer's Latest bill.
+    // Historical bills remain stored and visible in Bill History.
+    const latestBillData=latestBillDoc?latestBillDoc.data():null;
+    const latestBillIsCurrent=!!latestBillData && (!d.lastRedeemedAt || asMillis(latestBillData.date)>asMillis(d.lastRedeemedAt));
     const pending=await customerRef(req.user.uid).collection("redemptions").where("status","==","pending").limit(1).get();
     const allRed=await customerRef(req.user.uid).collection("redemptions").where("status","==","taken").get();
-    res.json({profile:{name:d.name||"",mobile:d.mobile||"",village:d.village||""},stamps:moneyNumber(d.stamps),latestBill:bills.docs[0]?safeDate(bills.docs[0].data().date):null,latestBillAmount:bills.docs[0]?moneyNumber(bills.docs[0].data().billTotal):0,giftsRedeemed:allRed.size,pendingRedemption:pending.empty?null:(()=>{const x=pending.docs[0];const a=x.data();return{id:x.id,type:a.type,approvedPoints:moneyNumber(a.approvedPoints),status:a.status,createdAt:safeDate(a.date)}})()});
+    res.json({profile:{name:d.name||"",mobile:d.mobile||"",village:d.village||""},stamps:moneyNumber(d.stamps),latestBill:latestBillIsCurrent?safeDate(latestBillData.date):null,latestBillAmount:latestBillIsCurrent?moneyNumber(latestBillData.billTotal):0,giftsRedeemed:allRed.size,pendingRedemption:pending.empty?null:(()=>{const x=pending.docs[0];const a=x.data();return{id:x.id,type:a.type,approvedPoints:moneyNumber(a.approvedPoints),status:a.status,createdAt:safeDate(a.date)}})()});
   }catch(e){console.error("customer home",e);res.status(500).json({error:"Could not load customer account."});}
 });
 app.get("/api/customer/history", requireUser, async (req,res)=>{
