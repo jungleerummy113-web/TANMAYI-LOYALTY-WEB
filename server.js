@@ -304,29 +304,52 @@ app.get("/api/admin/products", requireAdmin, async (_req, res) => {
 app.post("/api/admin/products", requireAdmin, async (req, res) => {
   let productRef;
   try {
-    const name = String(req.body?.name || "").trim(), originalPrice = Number(req.body?.originalPrice), offerPrice = Number(req.body?.offerPrice);
-    if (!name || name.length > 80 || !Number.isFinite(originalPrice) || originalPrice <= 0 || !Number.isFinite(offerPrice) || offerPrice <= 0 || offerPrice >= originalPrice) return res.status(400).json({ error:"Enter a product name and valid prices. Offer price must be below original price." });
+    const name = String(req.body?.name || "").trim(), originalPrice = Number(req.body?.originalPrice), offerPrice = Number(req.body?.offerPrice), stock = Number(req.body?.stock);
+    if (!name || name.length > 80 || !Number.isFinite(originalPrice) || originalPrice <= 0 || !Number.isFinite(offerPrice) || offerPrice <= 0 || offerPrice >= originalPrice || !Number.isInteger(stock) || stock < 0) return res.status(400).json({ error:"Enter a product name and valid prices. Offer price must be below original price." });
     const active = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get();
     if (active.size >= MAX_ACTIVE_PRODUCTS) return res.status(400).json({ error:"You can keep a maximum of 8 active products. Pause an existing offer first." });
     decodeImage(req.body?.photo1); decodeImage(req.body?.photo2);
     productRef = db.collection(PRODUCTS_COLLECTION).doc();
     const photoData = [decodeImage(req.body.photo1), decodeImage(req.body.photo2)];
-    await productRef.set({ name, originalPrice, offerPrice, photoData, active:true, createdAt:admin.firestore.FieldValue.serverTimestamp(), updatedAt:admin.firestore.FieldValue.serverTimestamp(), createdBy:req.adminUid });
+    await productRef.set({ name, originalPrice, offerPrice, stock, photoData, active:true, createdAt:admin.firestore.FieldValue.serverTimestamp(), updatedAt:admin.firestore.FieldValue.serverTimestamp(), createdBy:req.adminUid });
     res.json({ ok:true, id:productRef.id });
   } catch (e) { console.error("create product", e); res.status(400).json({ error:e.message || "Could not upload product." }); }
 });
 app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
   try {
-    if (typeof req.body?.active !== "boolean") return res.status(400).json({ error:"Invalid offer status." });
-    const ref = db.collection(PRODUCTS_COLLECTION).doc(req.params.id), snap = await ref.get();
+    const ref = db.collection(PRODUCTS_COLLECTION).doc(req.params.id);
+    const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ error:"Product not found." });
-    if (req.body.active) { const active = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(); if (active.size >= MAX_ACTIVE_PRODUCTS && snap.data().active !== true) return res.status(400).json({ error:"Maximum 8 active products reached." }); }
-    await ref.update({ active:req.body.active, updatedAt:admin.firestore.FieldValue.serverTimestamp() }); res.json({ ok:true });
-  } catch (e) { res.status(500).json({ error:"Could not update offer." }); }
+    const updates = { updatedAt:admin.firestore.FieldValue.serverTimestamp() };
+    if (typeof req.body?.active === "boolean") {
+      if (req.body.active) { const active = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(); if (active.size >= MAX_ACTIVE_PRODUCTS && snap.data().active !== true) return res.status(400).json({ error:"Maximum 8 active products reached." }); }
+      updates.active = req.body.active;
+    }
+    if (req.body?.stock !== undefined) {
+      const stock = Number(req.body.stock);
+      if (!Number.isInteger(stock) || stock < 0 || stock > 100000) return res.status(400).json({ error:"Stock must be a whole number from 0 to 100000." });
+      const reservations = await db.collection(RESERVATIONS_COLLECTION).where("productId", "==", req.params.id).get();
+      const held = reservations.docs.filter(d => d.data().status === "active" && asMillis(d.data().expiresAt) > Date.now()).length;
+      if (stock < held) return res.status(400).json({ error:`${held} item(s) are currently selected by customers. Stock cannot be lower than this.` });
+      updates.stock = stock;
+    }
+    if (Object.keys(updates).length === 1) return res.status(400).json({ error:"No valid product update supplied." });
+    await ref.update(updates);
+    res.json({ ok:true });
+  } catch (e) { console.error("update product", e); res.status(500).json({ error:e.message || "Could not update offer." }); }
 });
 app.get("/api/customer/offers", requireUser, async (_req, res) => {
-  try { const snap = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(); res.json({ products:snap.docs.map(d => { const x=d.data(); return { id:d.id, name:x.name, originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]) }; }) }); }
-  catch (e) { console.error("customer offers", e); res.status(500).json({ error:"Could not load offers." }); }
+  try {
+    const snap = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(), now = Date.now();
+    const products = [];
+    for (const d of snap.docs) {
+      const x = d.data(), heldSnap = await db.collection(RESERVATIONS_COLLECTION).where("productId", "==", d.id).get();
+      const held = heldSnap.docs.filter(r => r.data().status === "active" && asMillis(r.data().expiresAt) > now).length;
+      const stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
+      products.push({ id:d.id, name:x.name, originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), stock, availableStock:Math.max(0, stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]) });
+    }
+    res.json({ products });
+  } catch (e) { console.error("customer offers", e); res.status(500).json({ error:"Could not load offers." }); }
 });
 app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
   try {
@@ -335,17 +358,36 @@ app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
     let result;
     await db.runTransaction(async tx => {
       const product = await tx.get(productRef); if (!product.exists || product.data().active !== true) throw new Error("This offer is no longer available.");
-      const now = Date.now(), expiresAt = now + OFFER_HOLD_MS;
+      const existing = await tx.get(db.collection(RESERVATIONS_COLLECTION).where("productId", "==", productId));
+      const now = Date.now(), stock = Number.isInteger(Number(product.data().stock)) ? Number(product.data().stock) : 0;
+      const held = existing.docs.filter(d => d.data().status === "active" && asMillis(d.data().expiresAt) > now).length;
+      if (held >= stock) throw new Error("Sorry, this product is out of stock or all pieces are currently selected.");
+      const expiresAt = now + OFFER_HOLD_MS;
       tx.create(reservationRef, { customerUid:req.user.uid, productId, productName:product.data().name, offerPrice:moneyNumber(product.data().offerPrice), status:"active", createdAt:admin.firestore.FieldValue.serverTimestamp(), expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt) });
       result = { id:reservationRef.id, expiresAt };
     });
     res.json({ ok:true, reservation:result });
   } catch (e) { res.status(400).json({ error:e.message || "Could not select this offer." }); }
 });
+app.post("/api/customer/cancel-offer", requireUser, async (req, res) => {
+  try {
+    const reservationId = String(req.body?.reservationId || "");
+    if (!reservationId) return res.status(400).json({ error:"Selected offer not found." });
+    const ref = db.collection(RESERVATIONS_COLLECTION).doc(reservationId);
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data().customerUid !== req.user.uid) throw new Error("You cannot cancel this selection.");
+      if (snap.data().status !== "active") throw new Error("This selection is no longer active.");
+      tx.update(ref, { status:"cancelled", cancelledAt:admin.firestore.FieldValue.serverTimestamp() });
+    });
+    res.json({ ok:true });
+  } catch (e) { res.status(400).json({ error:e.message || "Could not cancel selected offer." }); }
+});
+
 app.get("/api/customer/my-offers", requireUser, async (req, res) => {
   try {
     const snap = await db.collection(RESERVATIONS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get(), now = Date.now();
-    const reservations = snap.docs.map(d => { const x=d.data(), expiresAt=asMillis(x.expiresAt); return { id:d.id, productName:x.productName||"Product", offerPrice:moneyNumber(x.offerPrice), expiresAt, status:expiresAt > now ? "active" : "expired" }; }).filter(x => x.expiresAt > now).sort((a,b)=>b.expiresAt-a.expiresAt).slice(0,30);
+    const reservations = snap.docs.map(d => { const x=d.data(), expiresAt=asMillis(x.expiresAt); return { id:d.id, productName:x.productName||"Product", offerPrice:moneyNumber(x.offerPrice), expiresAt, status:x.status || (expiresAt > now ? "active" : "expired") }; }).filter(x => x.expiresAt > now && x.status === "active").sort((a,b)=>b.expiresAt-a.expiresAt).slice(0,30);
     res.json({ reservations });
   } catch (e) { console.error("customer offers history", e); res.status(500).json({ error:"Could not load your selected offers." }); }
 });
