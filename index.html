@@ -63,6 +63,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <div class="stat"><small>Latest bill</small><b id="myBills">₹0</b></div><div class="stat"><small>Gifts redeemed</small><b id="myGifts">0</b></div><div class="stat shop-location"><small>Shop location</small><b style="font-size:14px;line-height:1.45">🎁 TANMAYI STORE AND GIFTS<br>Keelapatla old road,<br>Gangavaram, Palamaneru</b></div></div>
 <div class="card" style="background:#fff8e8;border:1px solid #e4cf9d;margin-top:12px"><strong>🎁 How to Earn Stamps &amp; Redeem Rewards</strong><p style="margin:8px 0 0;line-height:1.6"><strong>₹1 నుంచి ₹800 రూపాయల లోపు విలువైన గిఫ్ట్ 🎁 కొనుగోలు చేస్తే = 1 స్టాంప్ గెలుచుకుంటారు.</strong><br><strong>₹801 రూపాయలు లేదా అంతకంటే ఎక్కువ విలువైన గిఫ్ట్ 🎁 కొనుగోలు చేస్తే = 2 స్టాంపులు గెలుచుకుంటారు.</strong><br><strong>మీ అకౌంట్‌లో 10 స్టాంపులు సేకరించిన తర్వాత ₹800 వరకు విలువ చేసే ఉచిత గిఫ్ట్ 🎁 పొందండి లేదా క్యాష్ 💵💶 రీడీమ్ చేసుకోండి. (నిబంధనలు వర్తిస్తాయి.)</strong></p></div>
 <div id="customerPending" class="card hidden"><h2>Reward ready to collect</h2><p id="pendingText"></p><label id="rewardChoiceLabel" class="hidden">Choose your reward</label><div id="rewardChoices" class="hidden"><label><input type="radio" name="rewardChoice" value="gift" checked style="width:auto"> Free gift</label><label id="pointsChoiceLabel"><input type="radio" name="rewardChoice" value="points" style="width:auto"> Approved points</label></div><div id="approvedPointsInfo" class="card hidden" style="background:#fffaf0;margin:10px 0;padding:14px"><strong>Approved points available to redeem</strong><div style="font-size:26px;font-weight:800;margin-top:6px"><span id="approvedPointsValue">0</span> Points</div><div id="approvedPointsRupees" class="muted">Redeem value: ₹0</div></div><button id="customerTaken" class="gold">REDEEM TAKEN – Confirm collection</button><div id="customerRedeemMsg" class="msg hidden"></div></div>
+<section class="card" id="customerOrdersSection"><div class="row"><h2>📦 My Orders</h2><button type="button" class="secondary" id="refreshMyOrders">Refresh</button></div><div id="customerOrders"><p class="muted">Your confirmed orders will appear here.</p></div></section>
 <section class="card" id="customerOffersSection"><h2>🛍️ Shop Photos &amp; Offers</h2><p class="muted">Select products to add them to your cart. The 1-hour offer timer starts only after you press Confirm to buy.</p><div id="customerProducts" class="product-grid">Loading offers…</div><h2 style="margin-top:20px">My Selected Offers</h2><div id="selectedOfferCount" class="offer-count">Selected items: 0</div><div id="customerReservations"></div></section>
 <button type="button" class="history-toggle" id="toggleCustomerHistory" aria-expanded="false">📋 My Bill History　▼</button>
 <section class="card hidden" id="customerHistoryPanel"><p class="muted">Your bill date, time and bill amount. Scroll to see older bills.</p><div class="history-scroll"><table><thead><tr><th>Date &amp; Time</th><th>Bill Amount</th></tr></thead><tbody id="customerHistory"></tbody></table></div></section>
@@ -71,7 +72,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <div class="card row"><div><h2>Admin Dashboard</h2><small id="adminEmail"></small></div><button class="secondary" id="logout">Logout</button></div>
 <div class="stats"><div class="stat"><small>Total Customers</small><b id="customerCount">0</b></div><div class="stat"><small>Stamp balance</small><b id="stampCount">0</b></div><div class="stat"><small>Gifts redeemed</small><b id="giftCount">0</b></div></div>
 <section class="card"><h2>Manage Shop Photos &amp; Offers</h2><p class="muted">Upload up to 8 active products. Add two photos of each product and set its original and offer prices.</p><label>Product name</label><input id="productName" maxlength="80" placeholder="Product name"><label>Original price (₹)</label><input id="productOriginal" type="number" min="1" step="1" placeholder="Original price"><label>Offer price (₹)</label><input id="productOffer" type="number" min="1" step="1" placeholder="Offer price"><label>Available stock (number of same items)</label><input id="productStock" type="number" min="0" step="1" placeholder="How many pieces are available"><label>Photo 1</label><input id="productPhoto1" type="file" accept="image/*"><label>Photo 2 (different angle)</label><input id="productPhoto2" type="file" accept="image/*"><button id="saveProduct" class="gold">Upload Product &amp; Offer</button><div id="productAdminMsg" class="msg hidden"></div><h3>Uploaded Products</h3><div id="adminProducts" class="product-grid"></div></section>
-<section class="card" id="offerOrdersSection"><div class="row"><h2>Confirmed Offers – Awaiting Collection</h2><button type="button" class="secondary" id="refreshOfferOrders">Refresh</button></div><p class="muted">ఇక్కడ Confirm to buy చేసిన customers కనిపిస్తారు. Customer shopకి వచ్చి product తీసుకున్న తర్వాత మాత్రమే Approve Collection నొక్కండి. Approval అయిన వెంటనే ఆ quantity stock నుంచి తగ్గుతుంది.</p><div id="adminOfferOrders" class="product-grid">Loading confirmed offers…</div><div id="offerOrderMsg" class="msg hidden"></div></section>
+<section class="card" id="offerOrdersSection"><div class="row"><h2>Confirmed Offers – Awaiting Collection</h2><button type="button" class="secondary" id="refreshOfferOrders">Refresh</button></div><p class="muted">Customer Confirm చేసిన వెంటనే CONFIRMED + ORDER READY automatic గా కనిపిస్తాయి. Customer shopకి వచ్చాక మాత్రమే Order Collected, Cash Received, Final Complete actions చేయండి. Final Complete చేసినప్పుడే stock, bill, stamps update అవుతాయి. ప్రతి కొత్త order కి Admin Gmail notification కూడా వస్తుంది.</p><div id="adminOfferOrders" class="product-grid">Loading confirmed offers…</div><div id="offerOrderMsg" class="msg hidden"></div></section>
 <section class="card"><div class="row"><div><h2>Customer Login QR Code</h2><small class="muted">Customers scan this QR to open the login / registration page.</small></div></div>
 <button id="makeQR" class="gold">Generate Customer QR Code</button>
 <div id="qrWrap" class="qr-area hidden"><div id="qrCode"></div><small id="qrUrl" class="muted"></small>
@@ -103,7 +104,7 @@ const cfg={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-
 const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https://tanmayi-pin-reset-api.onrender.com';
 const $=id=>document.getElementById(id),money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),date=v=>v?new Date(v).toLocaleString('en-IN'):'—',customerEmail=m=>`${m}@tanmayi-loyalty.app`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let customers=[],selected=null,pendingId=null,pendingOfferCart=[];
+let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null;
 function msg(id,t){$(id).textContent=t;$(id).classList.remove('hidden')}function clear(id){$(id).classList.add('hidden');$(id).textContent=''}
 function show(id){['adminLogin','customerLogin','customerView','adminApp'].forEach(x=>$(x).classList.toggle('hidden',x!==id))}
 async function api(path,method='GET',body=null){const token=auth.currentUser?await auth.currentUser.getIdToken():'';const r=await fetch(API+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}
@@ -165,28 +166,49 @@ async function loadAdminProducts(){
 async function loadAdminOfferOrders(){
   try{
     const r=await api('/api/admin/offer-orders');
-    $('adminOfferOrders').innerHTML=r.orders.map(x=>`<div class="product-card">
-      <strong>${esc(x.productName)}</strong>
-      <p><b>Customer:</b> ${esc(x.customerName)}</p>
-      <p><b>Mobile:</b> ${esc(x.mobile)}</p>
-      <p><b>Confirmed quantity:</b> ${Number(x.quantity)} piece(s)</p>
-      <p><b>Offer price:</b> ${moneyPrice(x.offerPrice)} each</p>
-      <p><b>Total:</b> ${moneyPrice(x.total)}</p>
-      <p class="countdown">Hold expires: ${date(x.expiresAt)}</p>
-      <button class="gold" data-approve-collection data-customer="${esc(x.customerUid)}" data-product="${esc(x.productId)}">Approve collected (${Number(x.quantity)})</button>
-    </div>`).join('')||'<p class="muted">No confirmed offers are waiting for collection.</p>';
-    document.querySelectorAll('[data-approve-collection]').forEach(b=>b.onclick=async()=>{
-      if(!confirm('Confirm that this customer physically collected the product? Stock will be reduced.'))return;
-      b.disabled=true;
-      try{
-        const result=await api('/api/admin/offer-orders/approve','POST',{customerUid:b.dataset.customer,productId:b.dataset.product});
-        msg('offerOrderMsg',result.message);
-        await Promise.all([loadAdminOfferOrders(),loadAdminProducts(),loadCustomers(),loadRewardEligible()]);
-      }catch(e){msg('offerOrderMsg',e.message);b.disabled=false}
-    });
-  }catch(e){$('adminOfferOrders').textContent=e.message||'Could not load confirmed offers.'}
+    $('adminOfferOrders').innerHTML=r.orders.map(x=>{
+      const items=(x.items||[]).map(i=>`<li>${esc(i.productName)} × ${Number(i.quantity)} — ${moneyPrice(i.lineTotal)}</li>`).join('');
+      const collected=x.collectionStatus==='collected',paid=x.paymentStatus==='received';
+      return `<div class="product-card">
+        <strong>ORDER #${esc(x.orderNumber)}</strong><p><span class="tag">CONFIRMED · READY</span></p>
+        <p><b>Customer:</b> ${esc(x.customerName)}</p><p><b>Mobile:</b> ${esc(x.mobile)}</p><p><b>Village:</b> ${esc(x.village)}</p>
+        <p><b>Products:</b></p><ul>${items}</ul><p><b>Total:</b> ${moneyPrice(x.total)}</p>
+        <p><b>Payment:</b> CASH ON DELIVERY · <b>Payment status:</b> ${paid?'RECEIVED':'PENDING'}</p>
+        <p><b>Collection:</b> ${collected?'COLLECTED':'PENDING'} · <b>Stamps:</b> ${x.stampsStatus==='added'?'UPDATED':'PENDING'}</p>
+        <p class="countdown">Order time: ${date(x.confirmedAt)} · Collect before: ${date(x.expiresAt)}</p>
+        <p class="muted">Admin email: ${x.emailStatus==='sent'?'Notification sent':'Email '+esc(x.emailStatus||'pending')}</p>
+        ${!collected?`<button class="gold" data-order-collect="${esc(x.id)}">MARK ORDER COLLECTED</button>`:''}
+        ${collected&&!paid?`<button class="gold" data-order-payment="${esc(x.id)}">CONFIRM CASH RECEIVED</button>`:''}
+        ${collected&&paid?`<button class="gold" data-order-complete="${esc(x.id)}">FINAL APPROVAL · UPDATE STAMPS</button>`:''}
+        ${x.emailStatus!=='sent'?`<button class="secondary" data-order-email="${esc(x.id)}">Resend Admin Email</button>`:''}
+      </div>`;
+    }).join('')||'<p class="muted">No active customer orders are waiting for collection.</p>';
+    document.querySelectorAll('[data-order-collect]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderCollect)+'/collect','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
+    document.querySelectorAll('[data-order-payment]').forEach(b=>b.onclick=async()=>{if(!confirm('Confirm that you received the full cash payment for this order?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderPayment)+'/payment','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
+    document.querySelectorAll('[data-order-complete]').forEach(b=>b.onclick=async()=>{if(!confirm('Final approval: cash is received and customer has collected all products. Add bill and stamps now?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderComplete)+'/complete','POST',{});msg('offerOrderMsg',z.message);await Promise.all([loadAdminOfferOrders(),loadAdminProducts(),loadCustomers(),loadRewardEligible()])}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
+    document.querySelectorAll('[data-order-email]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderEmail)+'/resend-email','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
+  }catch(e){$('adminOfferOrders').textContent=e.message||'Could not load customer orders.'}
 }
 $('refreshOfferOrders').onclick=loadAdminOfferOrders;
+
+async function loadCustomerOrders(){
+  try{
+    const r=await api('/api/customer/my-orders');
+    $('customerOrders').innerHTML=r.orders.map(x=>{
+      const completed=x.orderStatus==='completed';
+      const cancelled=x.orderStatus==='cancelled';
+      const expired=x.orderStatus==='expired';
+      const items=(x.items||[]).map(i=>`<li>${esc(i.productName)} × ${Number(i.quantity)} — ${moneyPrice(i.lineTotal)}</li>`).join('');
+      return `<div class="product-card" style="border:1px solid #d8c28c;background:#fffdf7">
+        <strong>ORDER #${esc(x.orderNumber)}</strong>
+        <p><b>Confirmed</b> · ${date(x.confirmedAt)}</p>
+        ${completed?`<p class="price-offer">✓ ORDER COMPLETED</p><h3>Your Billing Stamps Updated 🙏</h3><p>Thank you for shopping. Please visit once again 🙏</p><p>Stamps added: ${Number(x.stampsAdded)}</p>`:cancelled?`<p class="muted">ORDER CANCELLED</p>`:expired?`<p class="muted">OFFER TIME EXPIRED · Please contact the shop if you still want this order.</p>`:`<p class="muted"><b>CONFIRMED</b><br>We're preparing these products for gifting packing.</p><div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><h3 style="margin:0;color:#8a641d">🎁 ORDER READY FOR COLLECTION</h3><p>Please visit TANMAYI STORE AND GIFTS and collect your order. We will prepare your gifting pack when you arrive.</p></div><p><b>Payment:</b> CASH ON DELIVERY · <b>Status:</b> Pending at shop</p><p><b>Products:</b></p><ul>${items}</ul><p><b>Total:</b> ${moneyPrice(x.total)}</p><p class="countdown">Collect before: ${date(x.expiresAt)}</p><button class="cancel-reservation" data-cancel-order="${esc(x.id)}">Cancel Order</button>`}
+      </div>`;
+    }).join('')||'<p class="muted">No orders yet. Your confirmed orders will appear here.</p>';
+    document.querySelectorAll('[data-cancel-order]').forEach(b=>b.onclick=async()=>{if(!confirm('Cancel this order?'))return;b.disabled=true;try{await api('/api/customer/cancel-order','POST',{orderId:b.dataset.cancelOrder});await loadCustomerOrders();await loadCustomerProducts()}catch(e){alert(e.message);b.disabled=false}});
+  }catch(e){$('customerOrders').textContent=e.message||'Could not load your orders.'}
+}
+$('refreshMyOrders').onclick=loadCustomerOrders;
 
 async function loadCustomerProducts(){
   try{
@@ -233,9 +255,11 @@ function renderReservations(items){
     btn.onclick=async()=>{
       btn.disabled=true;
       try{
-        await api('/api/customer/confirm-offers','POST',{productIds:pendingOfferCart.map(x=>x.productId)});
-        pendingOfferCart=[];
-        await loadCustomerProducts();
+        if(!pendingOrderRequestId)pendingOrderRequestId=(crypto.randomUUID?crypto.randomUUID():('req_'+Date.now()+'_'+Math.random().toString(36).slice(2)));
+        const orderResult=await api('/api/customer/confirm-offers','POST',{productIds:pendingOfferCart.map(x=>x.productId),clientRequestId:pendingOrderRequestId});
+        pendingOrderRequestId=null;pendingOfferCart=[];
+        await loadCustomerOrders();await loadCustomerProducts();
+        if(!orderResult.emailSent)alert('Your order is confirmed. Admin email notification is not configured or could not be sent; the order is safely saved.');
       }catch(e){alert(e.message);btn.disabled=false;await loadCustomerProducts()}
     };
     $('customerReservations').appendChild(btn);
@@ -267,7 +291,7 @@ $('showRegister').onclick=()=>$('registerFields').classList.toggle('hidden');
 $('customerSignIn').onclick=async()=>{clear('phoneMsg');const m=$('phone').value.trim(),p=$('customerPassword').value;if(!/^\d{10}$/.test(m)||!/^\d{6}$/.test(p))return msg('phoneMsg','Enter valid 10-digit mobile and 6-digit PIN.');try{await signInWithEmailAndPassword(auth,customerEmail(m),p)}catch(e){msg('phoneMsg',e.code==='auth/invalid-credential'?'Mobile number or password is incorrect.':e.message)}};
 $('register').onclick=async()=>{clear('phoneMsg');const mobile=$('phone').value.trim(),password=$('customerPassword').value,name=$('name').value.trim(),village=$('village').value.trim();if(!/^\d{10}$/.test(mobile)||!/^\d{6}$/.test(password)||!name||!village)return msg('phoneMsg','Enter name, village, valid mobile and 6-digit PIN.');try{await createUserWithEmailAndPassword(auth,customerEmail(mobile),password);await api('/api/customer/register','POST',{name,mobile,village});await loadCustomer()}catch(e){msg('phoneMsg',e.code==='auth/email-already-in-use'?'This mobile number is already registered. Please login.':e.message)}};
 onAuthStateChanged(auth,async u=>{if(!u){show(adminRoute?'adminLogin':'customerLogin');return}try{const a=await getDoc(doc(db,'admins',u.uid));if(a.exists()&&a.data().role==='admin'&&a.data().active===true){if(!adminRoute){await signOut(auth);show('customerLogin');return}show('adminApp');$('adminEmail').textContent=u.email||'';await loadCustomers();await loadAdminProducts();await loadAdminOfferOrders();await loadRewardEligible()}else if(adminRoute){await signOut(auth);show('adminLogin')}else {await loadCustomer();await loadCustomerProducts()}}catch(e){show(adminRoute?'adminLogin':'customerLogin');msg(adminRoute?'adminMsg':'phoneMsg',e.message)}});
-async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.village}`;$('myStamps').textContent=h.stamps;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}
+async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.village}`;$('myStamps').textContent=h.stamps;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>';await loadCustomerOrders()}
 $('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
 document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventListener('change',()=>{$('approvedPointsInfo').classList.toggle('hidden',el.value!=='points'||!el.checked)}));
 $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemMsg');$('customerTaken').disabled=true;try{const choice=document.querySelector('input[name="rewardChoice"]:checked')?.value||'gift';await api('/api/customer/redeem-taken','POST',{redemptionId:pendingId,choice});msg('customerRedeemMsg','Redemption completed. Stamps and current cycle reset successfully.');await loadCustomer()}catch(e){msg('customerRedeemMsg',e.message)}finally{$('customerTaken').disabled=false}};
