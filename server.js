@@ -569,13 +569,17 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 app.get("/api/customer/my-orders", requireUser, async (req, res) => {
   try {
     const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get();
-    const orders = snap.docs.map(d => {
+    const mapped = snap.docs.map(d => {
       const x=d.data();
       return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH ON DELIVERY",
         orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending", paymentStatus:x.paymentStatus || "pending",
         stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
         readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
     }).sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
+    const latestCancelled = mapped.find(x => x.orderStatus === "cancelled");
+    const orders = mapped.filter(x => x.orderStatus !== "cancelled");
+    if (latestCancelled) orders.push(latestCancelled);
+    orders.sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
     res.json({ orders });
   } catch (e) { console.error("customer orders", e); res.status(500).json({ error:"Could not load your orders." }); }
 });
@@ -614,7 +618,8 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
     const todayKey=dayKey(now);
     const all=snap.docs.map(d=>{const x=d.data(),expiresAt=asMillis(x.expiresAt);const status=(x.orderStatus==="ready" && expiresAt>0 && expiresAt<=now)?"expired":(x.orderStatus||"ready");return {id:d.id,...x,orderStatus:status,confirmedAt:safeDate(x.confirmedAt || x.createdAt),expiresAt,_dayKey:dayKey(x.confirmedAt || x.createdAt)};});
     const active=all.filter(x=>x.orderStatus==="ready" || x.orderStatus==="collected");
-    const today=all.filter(x=>x._dayKey===todayKey);
+    const counted=all.filter(x=>x.orderStatus!=="cancelled");
+    const today=counted.filter(x=>x._dayKey===todayKey);
     const customerMap=new Map();
     today.forEach(x=>{
       const key=x.customerUid||x.mobile||x.customerName;
@@ -623,7 +628,7 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
     });
     const stats={
       newOrders:active.length,
-      oldOrders:all.filter(x=>x._dayKey!==todayKey && x.orderStatus!=="completed" && x.orderStatus!=="cancelled").length,
+      oldOrders:counted.length,
       completedOrders:all.filter(x=>x.orderStatus==="completed").length,
       todayOrders:today.length,
       pendingToday:today.filter(x=>x.orderStatus!=="completed" && x.orderStatus!=="cancelled" && x.orderStatus!=="expired").length,
