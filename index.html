@@ -36,6 +36,8 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #qrCode{background:#fff;padding:12px;min-height:24px}
 #qrCode img,#qrCode canvas{display:block;max-width:100%;height:auto}
 @media(max-width:520px){.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:span 2}}
+
+.order-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.order-stat{background:#fffaf0;border:1px solid #eadfc9;border-radius:10px;padding:10px;min-width:0}.order-stat small{display:block;color:#6b6254;font-size:12px}.order-stat b{display:block;font-size:23px;margin-top:3px}.order-stat.today{border-color:#c49a45;background:#fff3d2}.today-customer-list{display:grid;gap:6px}.today-customer-row{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;background:#faf8f2;border-radius:8px;font-size:13px}.compact-orders{display:grid;gap:8px}.compact-order{border:1px solid #e5ddcf;border-radius:11px;background:#fffdf8;padding:10px}.compact-order-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px}.compact-order-head strong{font-size:14px}.compact-order-meta{font-size:11px;color:#706657}.compact-order-customer{font-size:14px;font-weight:750;margin:4px 0}.compact-order-phone{font-size:13px;color:#554d42}.compact-order-product{display:flex;align-items:center;gap:9px;margin:8px 0;padding:7px;background:#faf7ef;border-radius:8px}.compact-order-product img{width:54px;height:54px;object-fit:cover;border-radius:7px;border:1px solid #e2d7c5;background:#fff}.compact-order-product .no-photo{width:54px;height:54px;display:grid;place-items:center;background:#eee8dc;border-radius:7px;font-size:10px;color:#777}.compact-order-product b{display:block;font-size:13px}.compact-order-product small{font-size:12px;color:#6b6254}.compact-order-status{font-size:11px;font-weight:800;border-radius:14px;padding:4px 8px;background:#f5e8c8;color:#694a13}.compact-order-actions{display:flex;gap:6px;flex-wrap:wrap}.compact-order-actions button{font-size:12px;padding:8px 10px;margin:4px 4px 0 0}.compact-order-details{font-size:12px;color:#665e53;margin:4px 0}.order-empty{padding:12px;color:#6b6254;text-align:center}@media(max-width:520px){.order-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.order-stat b{font-size:21px}.compact-order{padding:9px}}
 </style></head><body>
 <header><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System</p></header>
 <main class="wrap">
@@ -71,8 +73,9 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <section id="adminApp" class="hidden">
 <div class="card row"><div><h2>Admin Dashboard</h2><small id="adminEmail"></small></div><button class="secondary" id="logout">Logout</button></div>
 <div class="stats"><div class="stat"><small>Total Customers</small><b id="customerCount">0</b></div><div class="stat"><small>Stamp balance</small><b id="stampCount">0</b></div><div class="stat"><small>Gifts redeemed</small><b id="giftCount">0</b></div></div>
+<section class="card" id="orderDashboard"><div class="row"><h2>📦 Orders Dashboard</h2><button type="button" class="secondary" id="refreshOrderDashboard">Refresh</button></div><div class="order-stats"><div class="order-stat"><small>New Orders</small><b id="newOrderCount">0</b></div><div class="order-stat"><small>Old Orders</small><b id="oldOrderCount">0</b></div><div class="order-stat"><small>Completed Orders</small><b id="completedOrderCount">0</b></div><div class="order-stat today"><small>Today's Orders</small><b id="todayOrderCount">0</b></div><div class="order-stat"><small>Pending Today</small><b id="pendingTodayCount">0</b></div><div class="order-stat"><small>Completed Today</small><b id="completedTodayCount">0</b></div></div><h3>Today's Customer Orders</h3><div id="todayCustomerOrders" class="today-customer-list">No orders today.</div></section>
 <section class="card"><h2>Manage Shop Photos &amp; Offers</h2><p class="muted">Upload up to 8 active products. Add two photos of each product and set its original and offer prices.</p><label>Product name</label><input id="productName" maxlength="80" placeholder="Product name"><label>Original price (₹)</label><input id="productOriginal" type="number" min="1" step="1" placeholder="Original price"><label>Offer price (₹)</label><input id="productOffer" type="number" min="1" step="1" placeholder="Offer price"><label>Available stock (number of same items)</label><input id="productStock" type="number" min="0" step="1" placeholder="How many pieces are available"><label>Photo 1</label><input id="productPhoto1" type="file" accept="image/*"><label>Photo 2 (different angle)</label><input id="productPhoto2" type="file" accept="image/*"><button id="saveProduct" class="gold">Upload Product &amp; Offer</button><div id="productAdminMsg" class="msg hidden"></div><h3>Uploaded Products</h3><div id="adminProducts" class="product-grid"></div></section>
-<section class="card" id="offerOrdersSection"><div class="row"><h2>Confirmed Offers – Awaiting Collection</h2><button type="button" class="secondary" id="refreshOfferOrders">Refresh</button></div><p class="muted">Customer Confirm చేసిన వెంటనే CONFIRMED + ORDER READY automatic గా కనిపిస్తాయి. Customer shopకి వచ్చాక మాత్రమే Order Collected, Cash Received, Final Complete actions చేయండి. Final Complete చేసినప్పుడే stock, bill, stamps update అవుతాయి. ప్రతి కొత్త order కి Admin Gmail notification కూడా వస్తుంది.</p><div id="adminOfferOrders" class="product-grid">Loading confirmed offers…</div><div id="offerOrderMsg" class="msg hidden"></div></section>
+<section class="card" id="offerOrdersSection"><div class="row"><h2>Customer Orders</h2><button type="button" class="secondary" id="refreshOfferOrders">Refresh</button></div><p class="muted">Order details, selected product photo, collection and cash status. Final approval చేసినప్పుడే bill & stamps update అవుతాయి.</p><div id="adminOfferOrders" class="compact-orders">Loading customer orders…</div><div id="offerOrderMsg" class="msg hidden"></div></section>
 <section class="card"><div class="row"><div><h2>Customer Login QR Code</h2><small class="muted">Customers scan this QR to open the login / registration page.</small></div></div>
 <button id="makeQR" class="gold">Generate Customer QR Code</button>
 <div id="qrWrap" class="qr-area hidden"><div id="qrCode"></div><small id="qrUrl" class="muted"></small>
@@ -166,30 +169,36 @@ async function loadAdminProducts(){
 async function loadAdminOfferOrders(){
   try{
     const r=await api('/api/admin/offer-orders');
-    $('adminOfferOrders').innerHTML=r.orders.map(x=>{
-      const items=(x.items||[]).map(i=>`<li>${esc(i.productName)} × ${Number(i.quantity)} — ${moneyPrice(i.lineTotal)}</li>`).join('');
-      const collected=x.collectionStatus==='collected',paid=x.paymentStatus==='received';
-      return `<div class="product-card">
-        <strong>ORDER #${esc(x.orderNumber)}</strong><p><span class="tag">CONFIRMED · READY</span></p>
-        <p><b>Customer:</b> ${esc(x.customerName)}</p><p><b>Mobile:</b> ${esc(x.mobile)}</p><p><b>Village:</b> ${esc(x.village)}</p>
-        <p><b>Products:</b></p><ul>${items}</ul><p><b>Total:</b> ${moneyPrice(x.total)}</p>
-        <p><b>Payment:</b> CASH ON DELIVERY · <b>Payment status:</b> ${paid?'RECEIVED':'PENDING'}</p>
-        <p><b>Collection:</b> ${collected?'COLLECTED':'PENDING'} · <b>Stamps:</b> ${x.stampsStatus==='added'?'UPDATED':'PENDING'}</p>
-        <p class="countdown">Order time: ${date(x.confirmedAt)} · Collect before: ${date(x.expiresAt)}</p>
-        <p class="muted">Admin email: ${x.emailStatus==='sent'?'Notification sent':'Email '+esc(x.emailStatus||'pending')}</p>
-        ${!collected?`<button class="gold" data-order-collect="${esc(x.id)}">MARK ORDER COLLECTED</button>`:''}
-        ${collected&&!paid?`<button class="gold" data-order-payment="${esc(x.id)}">CONFIRM CASH RECEIVED</button>`:''}
-        ${collected&&paid?`<button class="gold" data-order-complete="${esc(x.id)}">FINAL APPROVAL · UPDATE STAMPS</button>`:''}
-        ${x.emailStatus!=='sent'?`<button class="secondary" data-order-email="${esc(x.id)}">Resend Admin Email</button>`:''}
-      </div>`;
-    }).join('')||'<p class="muted">No active customer orders are waiting for collection.</p>';
+    const s=r.stats||{};
+    $('newOrderCount').textContent=s.newOrders||0;
+    $('oldOrderCount').textContent=s.oldOrders||0;
+    $('completedOrderCount').textContent=s.completedOrders||0;
+    $('todayOrderCount').textContent=s.todayOrders||0;
+    $('pendingTodayCount').textContent=s.pendingToday||0;
+    $('completedTodayCount').textContent=s.completedToday||0;
+    const todayCustomers=r.todayCustomers||[];
+    $('todayCustomerOrders').innerHTML=todayCustomers.length?todayCustomers.map(c=>`<div class="today-customer-row"><span>${esc(c.name)} · ${esc(c.mobile)}</span><b>${Number(c.count)} order(s)</b></div>`).join(''):'<p class="muted">No customer orders received today.</p>';
+    $('adminOfferOrders').innerHTML=(r.orders||[]).map(x=>{
+      const items=(x.items||[]).map(i=>{
+        const photo=(i.photoUrls||[])[0];
+        return `<div class="compact-order-product">${photo?`<img src="${photo}" alt="Selected product">`:'<div class="no-photo">NO PHOTO</div>'}<div><b>${esc(i.productName)} × ${Number(i.quantity)}</b><small>${moneyPrice(i.offerPrice||i.lineTotal)}${Number(i.quantity)>1?' each':''} · Line ${moneyPrice(i.lineTotal)}</small></div></div>`;
+      }).join('');
+      const collected=x.collectionStatus==='collected',paid=x.paymentStatus==='received',completed=x.orderStatus==='completed';
+      const status=completed?'COMPLETED':x.orderStatus==='cancelled'?'CANCELLED':x.orderStatus==='expired'?'EXPIRED':paid?'CASH RECEIVED':collected?'COLLECTED':'NEW ORDER';
+      return `<article class="compact-order"><div class="compact-order-head"><strong>ORDER #${esc(x.orderNumber)}</strong><span class="compact-order-status">${status}</span></div>
+        <div class="compact-order-meta">${date(x.confirmedAt)}</div>
+        <div class="compact-order-customer">${esc(x.customerName)}</div><div class="compact-order-phone">📞 ${esc(x.mobile)}</div>
+        ${items}<div class="compact-order-details"><b>Total: ${moneyPrice(x.total)}</b> · CASH ON DELIVERY · Payment: ${paid?'RECEIVED':'PENDING'}</div>
+        <div class="compact-order-details">Collection: ${collected?'COLLECTED':'PENDING'} · Stamps: ${x.stampsStatus==='added'?'UPDATED':'PENDING'}</div>
+        <div class="compact-order-actions">${!completed&&x.orderStatus==='ready'&&!collected?`<button class="gold" data-order-collect="${esc(x.id)}">COLLECTED</button>`:''}${!completed&&collected&&!paid?`<button class="gold" data-order-payment="${esc(x.id)}">CASH RECEIVED</button>`:''}${!completed&&collected&&paid?`<button class="gold" data-order-complete="${esc(x.id)}">FINAL APPROVAL · ADD STAMPS</button>`:''}</div></article>`;
+    }).join('')||'<div class="order-empty">No customer orders found.</div>';
     document.querySelectorAll('[data-order-collect]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderCollect)+'/collect','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
     document.querySelectorAll('[data-order-payment]').forEach(b=>b.onclick=async()=>{if(!confirm('Confirm that you received the full cash payment for this order?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderPayment)+'/payment','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
     document.querySelectorAll('[data-order-complete]').forEach(b=>b.onclick=async()=>{if(!confirm('Final approval: cash is received and customer has collected all products. Add bill and stamps now?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderComplete)+'/complete','POST',{});msg('offerOrderMsg',z.message);await Promise.all([loadAdminOfferOrders(),loadAdminProducts(),loadCustomers(),loadRewardEligible()])}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
-    document.querySelectorAll('[data-order-email]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderEmail)+'/resend-email','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
   }catch(e){$('adminOfferOrders').textContent=e.message||'Could not load customer orders.'}
 }
 $('refreshOfferOrders').onclick=loadAdminOfferOrders;
+$('refreshOrderDashboard').onclick=loadAdminOfferOrders;
 
 async function loadCustomerOrders(){
   try{

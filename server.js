@@ -599,18 +599,44 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
   } catch(e) { res.status(400).json({error:e.message || "Could not cancel this order."}); }
 });
 
-// Admin order queue. Orders are automatically CONFIRMED and READY on customer submission.
+// Admin order queue + dashboard summaries. All dates are grouped by India local date.
 app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   try {
     const snap=await db.collection(ORDERS_COLLECTION).get();
     const now=Date.now();
-    const orders=snap.docs.map(d=>({id:d.id,...d.data(),confirmedAt:safeDate(d.data().confirmedAt || d.data().createdAt),expiresAt:asMillis(d.data().expiresAt)}))
-      .filter(x=>(x.orderStatus === "ready" && x.expiresAt > now) || x.orderStatus === "collected")
-      .sort((a,b)=>new Date(a.confirmedAt || 0)-new Date(b.confirmedAt || 0));
-    res.json({orders});
+    const dayKey=(value)=>{
+      const ms=asMillis(value);
+      if(!ms) return "";
+      const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(ms));
+      const o=Object.fromEntries(parts.map(p=>[p.type,p.value]));
+      return `${o.year}-${o.month}-${o.day}`;
+    };
+    const todayKey=dayKey(now);
+    const all=snap.docs.map(d=>{const x=d.data(),expiresAt=asMillis(x.expiresAt);const status=(x.orderStatus==="ready" && expiresAt>0 && expiresAt<=now)?"expired":(x.orderStatus||"ready");return {id:d.id,...x,orderStatus:status,confirmedAt:safeDate(x.confirmedAt || x.createdAt),expiresAt,_dayKey:dayKey(x.confirmedAt || x.createdAt)};});
+    const active=all.filter(x=>x.orderStatus==="ready" || x.orderStatus==="collected");
+    const today=all.filter(x=>x._dayKey===todayKey);
+    const customerMap=new Map();
+    today.forEach(x=>{
+      const key=x.customerUid||x.mobile||x.customerName;
+      const prev=customerMap.get(key)||{name:x.customerName||"Customer",mobile:x.mobile||"",count:0};
+      prev.count+=1; customerMap.set(key,prev);
+    });
+    const stats={
+      newOrders:active.length,
+      oldOrders:all.filter(x=>x._dayKey!==todayKey && x.orderStatus!=="completed" && x.orderStatus!=="cancelled").length,
+      completedOrders:all.filter(x=>x.orderStatus==="completed").length,
+      todayOrders:today.length,
+      pendingToday:today.filter(x=>x.orderStatus!=="completed" && x.orderStatus!=="cancelled" && x.orderStatus!=="expired").length,
+      completedToday:today.filter(x=>x.orderStatus==="completed").length
+    };
+    const productIds=[...new Set(all.flatMap(o=>(o.items||[]).map(i=>i.productId).filter(Boolean)))];
+    const productMap=new Map();
+    await Promise.all(productIds.map(async id=>{const p=await db.collection(PRODUCTS_COLLECTION).doc(id).get();if(p.exists){const d=p.data();productMap.set(id,Array.isArray(d.photoData)?d.photoData:Array.isArray(d.photoUrls)?d.photoUrls:[]);}}));
+    const orders=all.map(x=>({...x,items:(x.items||[]).map(i=>({...i,photoUrls:Array.isArray(i.photoUrls)&&i.photoUrls.length?i.photoUrls:(productMap.get(i.productId)||[])}))}))
+      .sort((a,b)=>new Date(b.confirmedAt||0)-new Date(a.confirmedAt||0));
+    res.json({orders,stats,todayCustomers:[...customerMap.values()].sort((a,b)=>b.count-a.count)});
   } catch(e) { console.error("admin offer orders",e); res.status(500).json({error:"Could not load customer orders."}); }
 });
-
 app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
   try {
     const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id);
