@@ -32,28 +32,55 @@ function emailEscape(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 }
 async function sendOrderNotification(order) {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
-    return { sent:false, reason:"SMTP_NOT_CONFIGURED" };
-  }
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
+  const missing = [];
+  if (!SMTP_HOST) missing.push('SMTP_HOST');
+  if (!SMTP_PORT) missing.push('SMTP_PORT');
+  if (!SMTP_USER) missing.push('SMTP_USER');
+  if (!SMTP_PASS) missing.push('SMTP_PASS');
+  if (missing.length) throw new Error(`Missing SMTP environment variables: ${missing.join(', ')}`);
+
+  const port = Number(SMTP_PORT);
+  if (!Number.isInteger(port) || port <= 0) throw new Error('SMTP_PORT must be a valid port number.');
   const transporter = nodemailer.createTransport({
-    host:SMTP_HOST,
-    port:Number(SMTP_PORT),
-    secure:String(process.env.SMTP_SECURE || "true").toLowerCase() === "true",
-    auth:{ user:SMTP_USER, pass:SMTP_PASS }
+    host: SMTP_HOST,
+    port,
+    secure: String(SMTP_SECURE || (port === 465 ? 'true' : 'false')).toLowerCase() === 'true',
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000
   });
+
   const itemRows = (order.items || []).map(item =>
-    `<tr><td style="padding:8px;border-bottom:1px solid #eee">${emailEscape(item.productName)}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${Number(item.quantity || 0)}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">₹${Number(item.offerPrice || 0).toLocaleString("en-IN")}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">₹${Number(item.lineTotal || 0).toLocaleString("en-IN")}</td></tr>`
-  ).join("");
-  const textItems = (order.items || []).map(x => `${x.productName} | Qty ${x.quantity} | ₹${x.lineTotal}`).join("\n");
-  await transporter.sendMail({
-    from:process.env.MAIL_FROM || `TANMAYI STORE AND GIFTS <${SMTP_USER}>`,
-    to:process.env.ORDER_NOTIFICATION_EMAIL || "srivinayakadthhome@gmail.com",
-    subject:`New customer order #${order.orderNumber} – TANMAYI STORE AND GIFTS`,
-    text:`New order received\nOrder: #${order.orderNumber}\nCustomer: ${order.customerName}\nMobile: ${order.mobile}\nVillage: ${order.village}\nPayment: CASH ON DELIVERY\nOrder status: CONFIRMED / READY\n\n${textItems}\n\nTotal: ₹${order.total}\nOrder time: ${order.confirmedAtText || "Just now"}`,
-    html:`<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><div style="background:#171717;color:#d9b45b;padding:22px;border-radius:12px 12px 0 0;text-align:center"><h2 style="margin:0">TANMAYI STORE AND GIFTS</h2><p style="margin:8px 0 0;color:#fff">NEW CUSTOMER ORDER RECEIVED</p></div><div style="border:1px solid #e8dfc9;padding:20px;border-radius:0 0 12px 12px"><h2>Order #${emailEscape(order.orderNumber)}</h2><p><b>Customer:</b> ${emailEscape(order.customerName)}<br><b>Mobile:</b> ${emailEscape(order.mobile)}<br><b>Village:</b> ${emailEscape(order.village)}<br><b>Payment:</b> CASH ON DELIVERY<br><b>Status:</b> CONFIRMED / READY</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px">Product</th><th>Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemRows}</tbody></table><h2 style="text-align:right">Total: ₹${Number(order.total || 0).toLocaleString("en-IN")}</h2><p style="color:#666">Order time: ${emailEscape(order.confirmedAtText || "Just now")}</p></div></div>`
-  });
-  return { sent:true };
+    `<tr><td style="padding:8px;border-bottom:1px solid #eee">${emailEscape(item.productName)}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${Number(item.quantity || 0)}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">₹${Number(item.offerPrice || 0).toLocaleString('en-IN')}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">₹${Number(item.lineTotal || 0).toLocaleString('en-IN')}</td></tr>`
+  ).join('');
+  const textItems = (order.items || []).map(item => `${item.productName} | Qty ${item.quantity} | ₹${item.lineTotal}`).join('\n');
+  const message = {
+    from: MAIL_FROM || `TANMAYI STORE AND GIFTS <${SMTP_USER}>`,
+    to: ORDER_NOTIFICATION_EMAIL || SMTP_USER,
+    subject: `New customer order #${order.orderNumber} – TANMAYI STORE AND GIFTS`,
+    text: `New order received\nOrder: #${order.orderNumber}\nCustomer: ${order.customerName}\nMobile: ${order.mobile}\nVillage: ${order.village}\nPayment: CASH ON DELIVERY\nOrder status: CONFIRMED / READY\n\n${textItems}\n\nTotal: ₹${order.total}\nOrder time: ${order.confirmedAtText || 'Just now'}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><div style="background:#171717;color:#d9b45b;padding:22px;border-radius:12px 12px 0 0;text-align:center"><h2 style="margin:0">TANMAYI STORE AND GIFTS</h2><p style="margin:8px 0 0;color:#fff">NEW CUSTOMER ORDER RECEIVED</p></div><div style="border:1px solid #e8dfc9;padding:20px;border-radius:0 0 12px 12px"><h2>Order #${emailEscape(order.orderNumber)}</h2><p><b>Customer:</b> ${emailEscape(order.customerName)}<br><b>Mobile:</b> ${emailEscape(order.mobile)}<br><b>Village:</b> ${emailEscape(order.village)}<br><b>Payment:</b> CASH ON DELIVERY<br><b>Status:</b> CONFIRMED / READY</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px">Product</th><th>Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemRows}</tbody></table><h2 style="text-align:right">Total: ₹${Number(order.total || 0).toLocaleString('en-IN')}</h2><p style="color:#666">Order time: ${emailEscape(order.confirmedAtText || 'Just now')}</p></div></div>`
+  };
+
+  try {
+    await transporter.verify();
+    const info = await transporter.sendMail(message);
+    console.info('ORDER_EMAIL_SENT', { orderNumber: order.orderNumber, messageId: info.messageId, accepted: info.accepted, rejected: info.rejected });
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('ORDER_EMAIL_FAILED', {
+      orderNumber: order.orderNumber,
+      code: error.code || 'UNKNOWN',
+      responseCode: error.responseCode || null,
+      command: error.command || null,
+      message: String(error.message || 'Email send failed').slice(0, 300)
+    });
+    throw error;
+  } finally {
+    transporter.close();
+  }
 }
 
 
@@ -82,7 +109,7 @@ async function requireAdmin(req, res, next) {
   }
 }
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "tanmayi-pin-reset" }));
+app.get("/health", (_req, res) => res.json({ ok: true, service: "tanmayi-loyalty-web" }));
 
 // Admin-only: create/replace the one pending authorization for this customer.
 app.post("/api/admin/issue-reset", requireAdmin, async (req, res) => {
@@ -335,7 +362,7 @@ app.get("/api/admin/summary", requireAdmin, async (_req,res)=>{
 // ---------------- ADMIN PRODUCT PHOTOS & CUSTOMER OFFERS ----------------
 const PRODUCTS_COLLECTION = "shopProducts";
 const RESERVATIONS_COLLECTION = "offerReservations";
-const OFFER_HOLD_MS = 2 * 60 * 60 * 1000;
+const OFFER_HOLD_MS = 60 * 60 * 1000;
 const MAX_ACTIVE_PRODUCTS = 8;
 function decodeImage(dataUrl) {
   if (typeof dataUrl !== "string") throw new Error("Both product photos are required.");
@@ -561,7 +588,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         createdOrder.emailStatus = "failed";
       }
     }
-    res.json({ ok:true, order:{ id:createdOrder.id, orderNumber:createdOrder.orderNumber, total:createdOrder.total, expiresAt:asMillis(createdOrder.expiresAt), orderStatus:createdOrder.orderStatus }, duplicateRequest:isDuplicateRequest });
+    res.json({ ok:true, order:{ id:createdOrder.id, orderNumber:createdOrder.orderNumber, total:createdOrder.total, expiresAt:asMillis(createdOrder.expiresAt), orderStatus:createdOrder.orderStatus }, emailSent, emailStatus:createdOrder.emailStatus, duplicateRequest:isDuplicateRequest });
   } catch (e) { console.error("confirm offers", e); res.status(400).json({ error:e.message || "Could not confirm your order." }); }
 });
 
@@ -569,17 +596,13 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 app.get("/api/customer/my-orders", requireUser, async (req, res) => {
   try {
     const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get();
-    const mapped = snap.docs.map(d => {
+    const orders = snap.docs.map(d => {
       const x=d.data();
       return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH ON DELIVERY",
         orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending", paymentStatus:x.paymentStatus || "pending",
         stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
         readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
     }).sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
-    const latestCancelled = mapped.find(x => x.orderStatus === "cancelled");
-    const orders = mapped.filter(x => x.orderStatus !== "cancelled");
-    if (latestCancelled) orders.push(latestCancelled);
-    orders.sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
     res.json({ orders });
   } catch (e) { console.error("customer orders", e); res.status(500).json({ error:"Could not load your orders." }); }
 });
@@ -603,55 +626,18 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
   } catch(e) { res.status(400).json({error:e.message || "Could not cancel this order."}); }
 });
 
-// Admin order queue + dashboard summaries. All dates are grouped by India local date.
+// Admin order queue. Orders are automatically CONFIRMED and READY on customer submission.
 app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   try {
-    const orderCollection=db.collection(ORDERS_COLLECTION);
-    const snap=await orderCollection.get();
+    const snap=await db.collection(ORDERS_COLLECTION).get();
     const now=Date.now();
-    const dayKey=(value)=>{
-      const ms=asMillis(value); if(!ms) return "";
-      const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(ms));
-      const o=Object.fromEntries(parts.map(p=>[p.type,p.value])); return `${o.year}-${o.month}-${o.day}`;
-    };
-    const todayKey=dayKey(now);
-    const raw=snap.docs.map(d=>{const x=d.data(),expiresAt=asMillis(x.expiresAt);const status=(x.orderStatus==="ready" && expiresAt>0 && expiresAt<=now)?"expired":(x.orderStatus||"ready");return {id:d.id,...x,orderStatus:status,confirmedAt:safeDate(x.confirmedAt || x.createdAt),expiresAt,_dayKey:dayKey(x.confirmedAt || x.createdAt)};});
-
-    // Retain only the two most recent cancelled order records. Completed and running orders are never pruned.
-    const cancelledSorted=raw.filter(x=>x.orderStatus==="cancelled").sort((a,b)=>new Date(b.confirmedAt||0)-new Date(a.confirmedAt||0));
-    const obsoleteCancelled=cancelledSorted.slice(2);
-    for(let i=0;i<obsoleteCancelled.length;i+=400){
-      const batch=db.batch();
-      obsoleteCancelled.slice(i,i+400).forEach(x=>batch.delete(orderCollection.doc(x.id)));
-      await batch.commit();
-    }
-    const keepCancelled=cancelledSorted.slice(0,2);
-    const all=raw.filter(x=>x.orderStatus!=="cancelled").concat(keepCancelled);
-    const running=all.filter(x=>["ready","collected","expired"].includes(x.orderStatus));
-    const completed=all.filter(x=>x.orderStatus==="completed");
-    const counted=all;
-    const today=counted.filter(x=>x._dayKey===todayKey);
-    const customerMap=new Map();
-    today.forEach(x=>{const key=x.customerUid||x.mobile||x.customerName;const prev=customerMap.get(key)||{name:x.customerName||"Customer",mobile:x.mobile||"",count:0};prev.count+=1;customerMap.set(key,prev);});
-    const stats={
-      newOrders:running.filter(x=>x.orderStatus!=="expired").length,
-      oldOrders:counted.length,
-      completedOrders:completed.length,
-      todayOrders:today.length,
-      pendingToday:today.filter(x=>["ready","collected"].includes(x.orderStatus)).length,
-      completedToday:today.filter(x=>x.orderStatus==="completed").length
-    };
-    const productIds=[...new Set(all.flatMap(o=>(o.items||[]).map(i=>i.productId).filter(Boolean)))];
-    const productMap=new Map();
-    await Promise.all(productIds.map(async id=>{const p=await db.collection(PRODUCTS_COLLECTION).doc(id).get();if(p.exists){const d=p.data();productMap.set(id,Array.isArray(d.photoData)?d.photoData:Array.isArray(d.photoUrls)?d.photoUrls:[]);}}));
-    const withPhotos=x=>({...x,items:(x.items||[]).map(i=>({...i,photoUrls:Array.isArray(i.photoUrls)&&i.photoUrls.length?i.photoUrls:(productMap.get(i.productId)||[])}))});
-    const sortRecent=(a,b)=>new Date(b.confirmedAt||0)-new Date(a.confirmedAt||0);
-    const runningOrders=running.map(withPhotos).sort(sortRecent);
-    const completedOrdersList=completed.map(withPhotos).sort(sortRecent);
-    const cancelledOrders=keepCancelled.map(withPhotos).sort(sortRecent);
-    res.json({orders:[...runningOrders,...completedOrdersList,...cancelledOrders].sort(sortRecent),runningOrders,completedOrdersList,cancelledOrders,stats,todayCustomers:[...customerMap.values()].sort((a,b)=>b.count-a.count)});
+    const orders=snap.docs.map(d=>({id:d.id,...d.data(),confirmedAt:safeDate(d.data().confirmedAt || d.data().createdAt),expiresAt:asMillis(d.data().expiresAt)}))
+      .filter(x=>(x.orderStatus === "ready" && x.expiresAt > now) || x.orderStatus === "collected")
+      .sort((a,b)=>new Date(a.confirmedAt || 0)-new Date(b.confirmedAt || 0));
+    res.json({orders});
   } catch(e) { console.error("admin offer orders",e); res.status(500).json({error:"Could not load customer orders."}); }
 });
+
 app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
   try {
     const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id);
@@ -864,4 +850,4 @@ app.get("/api/customer/my-offers", requireUser, async (req, res) => {
 });
 
 const port = process.env.PORT || 10000;
-app.listen(port, "0.0.0.0", () => console.log(`TANMAYI PIN reset API listening on ${port}`));
+app.listen(port, "0.0.0.0", () => console.log(`TANMAYI LOYALTY WEB listening on ${port}`));
