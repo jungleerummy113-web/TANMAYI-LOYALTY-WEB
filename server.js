@@ -733,7 +733,7 @@ app.post("/api/customer/cancel-offer", requireUser, async (req, res) => {
 });
 
 // Admin view: confirmed reservations waiting for the customer to collect in-store.
-app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
+app.get("/api/admin/offer-reservations", requireAdmin, async (_req, res) => {
   try {
     const snap = await db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get();
     const now = Date.now();
