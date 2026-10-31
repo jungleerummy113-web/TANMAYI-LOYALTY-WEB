@@ -335,7 +335,7 @@ app.get("/api/admin/summary", requireAdmin, async (_req,res)=>{
 // ---------------- ADMIN PRODUCT PHOTOS & CUSTOMER OFFERS ----------------
 const PRODUCTS_COLLECTION = "shopProducts";
 const RESERVATIONS_COLLECTION = "offerReservations";
-const OFFER_HOLD_MS = 60 * 60 * 1000;
+const OFFER_HOLD_MS = 2 * 60 * 60 * 1000;
 const MAX_ACTIVE_PRODUCTS = 8;
 function decodeImage(dataUrl) {
   if (typeof dataUrl !== "string") throw new Error("Both product photos are required.");
@@ -561,7 +561,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         createdOrder.emailStatus = "failed";
       }
     }
-    res.json({ ok:true, order:{ id:createdOrder.id, orderNumber:createdOrder.orderNumber, total:createdOrder.total, expiresAt:asMillis(createdOrder.expiresAt), orderStatus:createdOrder.orderStatus }, emailSent, emailStatus:createdOrder.emailStatus, duplicateRequest:isDuplicateRequest });
+    res.json({ ok:true, order:{ id:createdOrder.id, orderNumber:createdOrder.orderNumber, total:createdOrder.total, expiresAt:asMillis(createdOrder.expiresAt), orderStatus:createdOrder.orderStatus }, duplicateRequest:isDuplicateRequest });
   } catch (e) { console.error("confirm offers", e); res.status(400).json({ error:e.message || "Could not confirm your order." }); }
 });
 

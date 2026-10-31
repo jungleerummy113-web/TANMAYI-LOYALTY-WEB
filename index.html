@@ -259,7 +259,6 @@ function renderReservations(items){
         const orderResult=await api('/api/customer/confirm-offers','POST',{productIds:pendingOfferCart.map(x=>x.productId),clientRequestId:pendingOrderRequestId});
         pendingOrderRequestId=null;pendingOfferCart=[];
         await loadCustomerOrders();await loadCustomerProducts();
-        if(!orderResult.emailSent)alert('Your order is confirmed. Admin email notification is not configured or could not be sent; the order is safely saved.');
       }catch(e){alert(e.message);btn.disabled=false;await loadCustomerProducts()}
     };
     $('customerReservations').appendChild(btn);
