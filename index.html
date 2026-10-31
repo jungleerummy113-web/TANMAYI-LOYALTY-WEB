@@ -75,7 +75,10 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <div class="stats"><div class="stat"><small>Total Customers</small><b id="customerCount">0</b></div><div class="stat"><small>Stamp balance</small><b id="stampCount">0</b></div><div class="stat"><small>Gifts redeemed</small><b id="giftCount">0</b></div></div>
 <section class="card" id="orderDashboard"><div class="row"><h2>📦 Orders Dashboard</h2><button type="button" class="secondary" id="refreshOrderDashboard">Refresh</button></div><div class="order-stats"><div class="order-stat"><small>New Orders</small><b id="newOrderCount">0</b></div><div class="order-stat"><small>Old Orders</small><b id="oldOrderCount">0</b></div><div class="order-stat"><small>Completed Orders</small><b id="completedOrderCount">0</b></div><div class="order-stat today"><small>Today's Orders</small><b id="todayOrderCount">0</b></div><div class="order-stat"><small>Pending Today</small><b id="pendingTodayCount">0</b></div><div class="order-stat"><small>Completed Today</small><b id="completedTodayCount">0</b></div></div><h3>Today's Customer Orders</h3><div id="todayCustomerOrders" class="today-customer-list">No orders today.</div></section>
 <section class="card"><h2>Manage Shop Photos &amp; Offers</h2><p class="muted">Upload up to 8 active products. Add two photos of each product and set its original and offer prices.</p><label>Product name</label><input id="productName" maxlength="80" placeholder="Product name"><label>Original price (₹)</label><input id="productOriginal" type="number" min="1" step="1" placeholder="Original price"><label>Offer price (₹)</label><input id="productOffer" type="number" min="1" step="1" placeholder="Offer price"><label>Available stock (number of same items)</label><input id="productStock" type="number" min="0" step="1" placeholder="How many pieces are available"><label>Photo 1</label><input id="productPhoto1" type="file" accept="image/*"><label>Photo 2 (different angle)</label><input id="productPhoto2" type="file" accept="image/*"><button id="saveProduct" class="gold">Upload Product &amp; Offer</button><div id="productAdminMsg" class="msg hidden"></div><h3>Uploaded Products</h3><div id="adminProducts" class="product-grid"></div></section>
-<section class="card" id="offerOrdersSection"><div class="row"><h2>Customer Orders</h2><button type="button" class="secondary" id="refreshOfferOrders">Refresh</button></div><p class="muted">Order details, selected product photo, collection and cash status. Final approval చేసినప్పుడే bill & stamps update అవుతాయి.</p><div id="adminOfferOrders" class="compact-orders">Loading customer orders…</div><div id="offerOrderMsg" class="msg hidden"></div></section>
+<section class="card" id="offerOrdersSection"><div class="row"><h2>Customer Orders</h2><button type="button" class="secondary" id="refreshOfferOrders">Refresh</button></div><p class="muted">Order details, selected product photo, collection and cash status. Final approval చేసినప్పుడే bill & stamps update అవుతాయి.</p><h3>🟡 Running Orders</h3><div id="adminRunningOrders" class="compact-orders">Loading running orders…</div>
+<h3>✅ Completed Orders</h3><div id="adminCompletedOrders" class="compact-orders">Loading completed orders…</div>
+<h3>❌ Cancelled Orders <small class="muted">(Latest 2 only)</small></h3><div id="adminCancelledOrders" class="compact-orders">Loading cancelled orders…</div>
+<div id="offerOrderMsg" class="msg hidden"></div></section>
 <section class="card"><div class="row"><div><h2>Customer Login QR Code</h2><small class="muted">Customers scan this QR to open the login / registration page.</small></div></div>
 <button id="makeQR" class="gold">Generate Customer QR Code</button>
 <div id="qrWrap" class="qr-area hidden"><div id="qrCode"></div><small id="qrUrl" class="muted"></small>
@@ -178,7 +181,7 @@ async function loadAdminOfferOrders(){
     $('completedTodayCount').textContent=s.completedToday||0;
     const todayCustomers=r.todayCustomers||[];
     $('todayCustomerOrders').innerHTML=todayCustomers.length?todayCustomers.map(c=>`<div class="today-customer-row"><span>${esc(c.name)} · ${esc(c.mobile)}</span><b>${Number(c.count)} order(s)</b></div>`).join(''):'<p class="muted">No customer orders received today.</p>';
-    $('adminOfferOrders').innerHTML=(r.orders||[]).map(x=>{
+    const card=x=>{
       const items=(x.items||[]).map(i=>{
         const photo=(i.photoUrls||[])[0];
         return `<div class="compact-order-product">${photo?`<img src="${photo}" alt="Selected product">`:'<div class="no-photo">NO PHOTO</div>'}<div><b>${esc(i.productName)} × ${Number(i.quantity)}</b><small>${moneyPrice(i.offerPrice||i.lineTotal)}${Number(i.quantity)>1?' each':''} · Line ${moneyPrice(i.lineTotal)}</small></div></div>`;
@@ -191,11 +194,17 @@ async function loadAdminOfferOrders(){
         ${items}<div class="compact-order-details"><b>Total: ${moneyPrice(x.total)}</b> · CASH ON DELIVERY · Payment: ${paid?'RECEIVED':'PENDING'}</div>
         <div class="compact-order-details">Collection: ${collected?'COLLECTED':'PENDING'} · Stamps: ${x.stampsStatus==='added'?'UPDATED':'PENDING'}</div>
         <div class="compact-order-actions">${!completed&&x.orderStatus==='ready'&&!collected?`<button class="gold" data-order-collect="${esc(x.id)}">COLLECTED</button>`:''}${!completed&&collected&&!paid?`<button class="gold" data-order-payment="${esc(x.id)}">CASH RECEIVED</button>`:''}${!completed&&collected&&paid?`<button class="gold" data-order-complete="${esc(x.id)}">FINAL APPROVAL · ADD STAMPS</button>`:''}</div></article>`;
-    }).join('')||'<div class="order-empty">No customer orders found.</div>';
+    };
+    const running=r.runningOrders||[];
+    const completed=r.completedOrdersList||[];
+    const cancelled=r.cancelledOrders||[];
+    $('adminRunningOrders').innerHTML=running.map(card).join('')||'<div class="order-empty">No running orders.</div>';
+    $('adminCompletedOrders').innerHTML=completed.map(card).join('')||'<div class="order-empty">No completed orders.</div>';
+    $('adminCancelledOrders').innerHTML=cancelled.map(card).join('')||'<div class="order-empty">No cancelled orders.</div>';
     document.querySelectorAll('[data-order-collect]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderCollect)+'/collect','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
     document.querySelectorAll('[data-order-payment]').forEach(b=>b.onclick=async()=>{if(!confirm('Confirm that you received the full cash payment for this order?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderPayment)+'/payment','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
     document.querySelectorAll('[data-order-complete]').forEach(b=>b.onclick=async()=>{if(!confirm('Final approval: cash is received and customer has collected all products. Add bill and stamps now?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderComplete)+'/complete','POST',{});msg('offerOrderMsg',z.message);await Promise.all([loadAdminOfferOrders(),loadAdminProducts(),loadCustomers(),loadRewardEligible()])}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
-  }catch(e){$('adminOfferOrders').textContent=e.message||'Could not load customer orders.'}
+  }catch(e){['adminRunningOrders','adminCompletedOrders','adminCancelledOrders'].forEach(id=>{const el=$(id);if(el)el.textContent=e.message||'Could not load customer orders.'})}
 }
 $('refreshOfferOrders').onclick=loadAdminOfferOrders;
 $('refreshOrderDashboard').onclick=loadAdminOfferOrders;

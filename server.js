@@ -606,40 +606,50 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
 // Admin order queue + dashboard summaries. All dates are grouped by India local date.
 app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   try {
-    const snap=await db.collection(ORDERS_COLLECTION).get();
+    const orderCollection=db.collection(ORDERS_COLLECTION);
+    const snap=await orderCollection.get();
     const now=Date.now();
     const dayKey=(value)=>{
-      const ms=asMillis(value);
-      if(!ms) return "";
+      const ms=asMillis(value); if(!ms) return "";
       const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(ms));
-      const o=Object.fromEntries(parts.map(p=>[p.type,p.value]));
-      return `${o.year}-${o.month}-${o.day}`;
+      const o=Object.fromEntries(parts.map(p=>[p.type,p.value])); return `${o.year}-${o.month}-${o.day}`;
     };
     const todayKey=dayKey(now);
-    const all=snap.docs.map(d=>{const x=d.data(),expiresAt=asMillis(x.expiresAt);const status=(x.orderStatus==="ready" && expiresAt>0 && expiresAt<=now)?"expired":(x.orderStatus||"ready");return {id:d.id,...x,orderStatus:status,confirmedAt:safeDate(x.confirmedAt || x.createdAt),expiresAt,_dayKey:dayKey(x.confirmedAt || x.createdAt)};});
-    const active=all.filter(x=>x.orderStatus==="ready" || x.orderStatus==="collected");
-    const counted=all.filter(x=>x.orderStatus!=="cancelled");
+    const raw=snap.docs.map(d=>{const x=d.data(),expiresAt=asMillis(x.expiresAt);const status=(x.orderStatus==="ready" && expiresAt>0 && expiresAt<=now)?"expired":(x.orderStatus||"ready");return {id:d.id,...x,orderStatus:status,confirmedAt:safeDate(x.confirmedAt || x.createdAt),expiresAt,_dayKey:dayKey(x.confirmedAt || x.createdAt)};});
+
+    // Retain only the two most recent cancelled order records. Completed and running orders are never pruned.
+    const cancelledSorted=raw.filter(x=>x.orderStatus==="cancelled").sort((a,b)=>new Date(b.confirmedAt||0)-new Date(a.confirmedAt||0));
+    const obsoleteCancelled=cancelledSorted.slice(2);
+    for(let i=0;i<obsoleteCancelled.length;i+=400){
+      const batch=db.batch();
+      obsoleteCancelled.slice(i,i+400).forEach(x=>batch.delete(orderCollection.doc(x.id)));
+      await batch.commit();
+    }
+    const keepCancelled=cancelledSorted.slice(0,2);
+    const all=raw.filter(x=>x.orderStatus!=="cancelled").concat(keepCancelled);
+    const running=all.filter(x=>["ready","collected","expired"].includes(x.orderStatus));
+    const completed=all.filter(x=>x.orderStatus==="completed");
+    const counted=all;
     const today=counted.filter(x=>x._dayKey===todayKey);
     const customerMap=new Map();
-    today.forEach(x=>{
-      const key=x.customerUid||x.mobile||x.customerName;
-      const prev=customerMap.get(key)||{name:x.customerName||"Customer",mobile:x.mobile||"",count:0};
-      prev.count+=1; customerMap.set(key,prev);
-    });
+    today.forEach(x=>{const key=x.customerUid||x.mobile||x.customerName;const prev=customerMap.get(key)||{name:x.customerName||"Customer",mobile:x.mobile||"",count:0};prev.count+=1;customerMap.set(key,prev);});
     const stats={
-      newOrders:active.length,
+      newOrders:running.filter(x=>x.orderStatus!=="expired").length,
       oldOrders:counted.length,
-      completedOrders:all.filter(x=>x.orderStatus==="completed").length,
+      completedOrders:completed.length,
       todayOrders:today.length,
-      pendingToday:today.filter(x=>x.orderStatus!=="completed" && x.orderStatus!=="cancelled" && x.orderStatus!=="expired").length,
+      pendingToday:today.filter(x=>["ready","collected"].includes(x.orderStatus)).length,
       completedToday:today.filter(x=>x.orderStatus==="completed").length
     };
     const productIds=[...new Set(all.flatMap(o=>(o.items||[]).map(i=>i.productId).filter(Boolean)))];
     const productMap=new Map();
     await Promise.all(productIds.map(async id=>{const p=await db.collection(PRODUCTS_COLLECTION).doc(id).get();if(p.exists){const d=p.data();productMap.set(id,Array.isArray(d.photoData)?d.photoData:Array.isArray(d.photoUrls)?d.photoUrls:[]);}}));
-    const orders=all.map(x=>({...x,items:(x.items||[]).map(i=>({...i,photoUrls:Array.isArray(i.photoUrls)&&i.photoUrls.length?i.photoUrls:(productMap.get(i.productId)||[])}))}))
-      .sort((a,b)=>new Date(b.confirmedAt||0)-new Date(a.confirmedAt||0));
-    res.json({orders,stats,todayCustomers:[...customerMap.values()].sort((a,b)=>b.count-a.count)});
+    const withPhotos=x=>({...x,items:(x.items||[]).map(i=>({...i,photoUrls:Array.isArray(i.photoUrls)&&i.photoUrls.length?i.photoUrls:(productMap.get(i.productId)||[])}))});
+    const sortRecent=(a,b)=>new Date(b.confirmedAt||0)-new Date(a.confirmedAt||0);
+    const runningOrders=running.map(withPhotos).sort(sortRecent);
+    const completedOrdersList=completed.map(withPhotos).sort(sortRecent);
+    const cancelledOrders=keepCancelled.map(withPhotos).sort(sortRecent);
+    res.json({orders:[...runningOrders,...completedOrdersList,...cancelledOrders].sort(sortRecent),runningOrders,completedOrdersList,cancelledOrders,stats,todayCustomers:[...customerMap.values()].sort((a,b)=>b.count-a.count)});
   } catch(e) { console.error("admin offer orders",e); res.status(500).json({error:"Could not load customer orders."}); }
 });
 app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
