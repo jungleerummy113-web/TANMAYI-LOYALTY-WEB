@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
+const nodemailer = require("nodemailer");
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -20,10 +21,41 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const auth = admin.auth();
 const RESET_COLLECTION = "pinResetAuthorizations";
+const ORDERS_COLLECTION = "customerOrders";
+const ORDER_REQUEST_KEYS = "orderRequestKeys";
 const CODE_TTL_MS = 10 * 60 * 1000;
 
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const makeCode = () => crypto.randomInt(0, 1000000).toString().padStart(6, "0");
+
+function emailEscape(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+async function sendOrderNotification(order) {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+    return { sent:false, reason:"SMTP_NOT_CONFIGURED" };
+  }
+  const transporter = nodemailer.createTransport({
+    host:SMTP_HOST,
+    port:Number(SMTP_PORT),
+    secure:String(process.env.SMTP_SECURE || "true").toLowerCase() === "true",
+    auth:{ user:SMTP_USER, pass:SMTP_PASS }
+  });
+  const itemRows = (order.items || []).map(item =>
+    `<tr><td style="padding:8px;border-bottom:1px solid #eee">${emailEscape(item.productName)}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${Number(item.quantity || 0)}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">₹${Number(item.offerPrice || 0).toLocaleString("en-IN")}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">₹${Number(item.lineTotal || 0).toLocaleString("en-IN")}</td></tr>`
+  ).join("");
+  const textItems = (order.items || []).map(x => `${x.productName} | Qty ${x.quantity} | ₹${x.lineTotal}`).join("\n");
+  await transporter.sendMail({
+    from:process.env.MAIL_FROM || `TANMAYI STORE AND GIFTS <${SMTP_USER}>`,
+    to:process.env.ORDER_NOTIFICATION_EMAIL || "srivinayakadthhome@gmail.com",
+    subject:`New customer order #${order.orderNumber} – TANMAYI STORE AND GIFTS`,
+    text:`New order received\nOrder: #${order.orderNumber}\nCustomer: ${order.customerName}\nMobile: ${order.mobile}\nVillage: ${order.village}\nPayment: CASH ON DELIVERY\nOrder status: CONFIRMED / READY\n\n${textItems}\n\nTotal: ₹${order.total}\nOrder time: ${order.confirmedAtText || "Just now"}`,
+    html:`<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><div style="background:#171717;color:#d9b45b;padding:22px;border-radius:12px 12px 0 0;text-align:center"><h2 style="margin:0">TANMAYI STORE AND GIFTS</h2><p style="margin:8px 0 0;color:#fff">NEW CUSTOMER ORDER RECEIVED</p></div><div style="border:1px solid #e8dfc9;padding:20px;border-radius:0 0 12px 12px"><h2>Order #${emailEscape(order.orderNumber)}</h2><p><b>Customer:</b> ${emailEscape(order.customerName)}<br><b>Mobile:</b> ${emailEscape(order.mobile)}<br><b>Village:</b> ${emailEscape(order.village)}<br><b>Payment:</b> CASH ON DELIVERY<br><b>Status:</b> CONFIRMED / READY</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px">Product</th><th>Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemRows}</tbody></table><h2 style="text-align:right">Total: ₹${Number(order.total || 0).toLocaleString("en-IN")}</h2><p style="color:#666">Order time: ${emailEscape(order.confirmedAtText || "Just now")}</p></div></div>`
+  });
+  return { sent:true };
+}
+
 
 function requireFields(body, fields) {
   for (const field of fields) {
@@ -430,27 +462,46 @@ app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
   } catch (e) { res.status(400).json({ error:e.message || "Could not select this offer." }); }
 });
 
-// Customer confirms the staged cart: only now create one-hour stock holds.
+// Customer confirms the staged cart. A single order is created with an automatic
+// CONFIRMED + READY status and a one-hour collection window. Packing is done in-store
+// when the customer arrives; the website does not mark cash paid or award stamps here.
 app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
+  let createdOrder = null;
+  let isDuplicateRequest = false;
   try {
     const productIds = Array.isArray(req.body?.productIds) ? req.body.productIds.map(x => String(x || "")).filter(Boolean) : [];
+    const clientRequestId = String(req.body?.clientRequestId || "");
     if (!productIds.length) return res.status(400).json({ error:"Add at least one product before confirming." });
     if (productIds.length > 30) return res.status(400).json({ error:"You can confirm up to 30 items at a time." });
+    if (!/^[A-Za-z0-9_-]{10,120}$/.test(clientRequestId)) return res.status(400).json({ error:"Please retry confirming your order." });
 
     const quantities = new Map();
     for (const id of productIds) quantities.set(id, (quantities.get(id) || 0) + 1);
     const productRefs = new Map([...quantities.keys()].map(id => [id, db.collection(PRODUCTS_COLLECTION).doc(id)]));
     const reservationRefs = productIds.map(() => db.collection(RESERVATIONS_COLLECTION).doc());
-    const confirmed = [];
+    const orderRef = db.collection(ORDERS_COLLECTION).doc();
+    const requestKey = sha256(`${req.user.uid}:${clientRequestId}`);
+    const requestRef = db.collection(ORDER_REQUEST_KEYS).doc(requestKey);
+    const counterRef = db.collection("systemCounters").doc("customerOrderNumber");
 
     await db.runTransaction(async tx => {
+      const priorRequest = await tx.get(requestRef);
+      if (priorRequest.exists) {
+        const priorOrder = await tx.get(db.collection(ORDERS_COLLECTION).doc(priorRequest.data().orderId));
+        if (!priorOrder.exists) throw new Error("Your previous order request could not be found. Please contact the shop.");
+        createdOrder = { id:priorOrder.id, ...priorOrder.data() };
+        isDuplicateRequest = true;
+        return;
+      }
+
+      const counterSnap = await tx.get(counterRef);
+      const customerSnap = await tx.get(customerRef(req.user.uid));
+      if (!customerSnap.exists) throw new Error("Customer profile not found. Please login again.");
       const productSnaps = new Map();
       for (const [id, ref] of productRefs) productSnaps.set(id, await tx.get(ref));
-
       const existingByProduct = new Map();
       for (const id of quantities.keys()) {
-        const query = db.collection(RESERVATIONS_COLLECTION).where("productId", "==", id);
-        existingByProduct.set(id, await tx.get(query));
+        existingByProduct.set(id, await tx.get(db.collection(RESERVATIONS_COLLECTION).where("productId", "==", id)));
       }
 
       const now = Date.now();
@@ -464,19 +515,179 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
       }
 
       const expiresAt = now + OFFER_HOLD_MS;
+      const customer = customerSnap.data();
+      const items = [...quantities.entries()].map(([id, quantity]) => {
+        const product = productSnaps.get(id).data();
+        const offerPrice = moneyNumber(product.offerPrice);
+        return { productId:id, productName:product.name || "Product", quantity, offerPrice, lineTotal:offerPrice * quantity };
+      });
+      const total = items.reduce((sum, item) => sum + item.lineTotal, 0);
+      const orderNumber = Number(counterSnap.exists ? counterSnap.data().lastOrderNumber || 10000 : 10000) + 1;
+      const confirmedAt = admin.firestore.FieldValue.serverTimestamp();
+      const orderData = {
+        orderNumber, customerUid:req.user.uid,
+        customerName:String(customer.name || "Customer"), mobile:String(customer.mobile || ""), village:String(customer.village || ""),
+        items, total, paymentMethod:"CASH ON DELIVERY",
+        orderStatus:"ready", collectionStatus:"pending", paymentStatus:"pending", stampsStatus:"pending",
+        createdAt:confirmedAt, confirmedAt, readyAt:confirmedAt,
+        expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt),
+        emailStatus:"pending", createdByCustomer:true
+      };
+      tx.create(orderRef, orderData);
+      tx.set(counterRef, { lastOrderNumber:orderNumber, updatedAt:admin.firestore.FieldValue.serverTimestamp() }, { merge:true });
+      tx.create(requestRef, { orderId:orderRef.id, customerUid:req.user.uid, createdAt:admin.firestore.FieldValue.serverTimestamp() });
       productIds.forEach((id, index) => {
         const product = productSnaps.get(id).data();
         tx.create(reservationRefs[index], {
           customerUid:req.user.uid, productId:id, productName:product.name || "Product",
-          offerPrice:moneyNumber(product.offerPrice), status:"active",
-          createdAt:admin.firestore.FieldValue.serverTimestamp(),
+          offerPrice:moneyNumber(product.offerPrice), orderId:orderRef.id, orderNumber,
+          status:"active", createdAt:confirmedAt,
           expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt)
         });
-        confirmed.push({ id:reservationRefs[index].id, productId:id, productName:product.name || "Product", offerPrice:moneyNumber(product.offerPrice), expiresAt });
       });
+      createdOrder = { id:orderRef.id, ...orderData, confirmedAtText:new Date(now).toLocaleString("en-IN", { timeZone:"Asia/Kolkata" }) };
     });
-    res.json({ ok:true, reservations:confirmed });
-  } catch (e) { res.status(400).json({ error:e.message || "Could not confirm your selected offers." }); }
+
+    let emailSent = createdOrder.emailStatus === "sent";
+    if (!isDuplicateRequest && !emailSent) {
+      try {
+        const mailResult = await sendOrderNotification(createdOrder);
+        emailSent = mailResult.sent;
+        await orderRef.update({ emailStatus:emailSent ? "sent" : "not_configured", emailUpdatedAt:admin.firestore.FieldValue.serverTimestamp() });
+        createdOrder.emailStatus = emailSent ? "sent" : "not_configured";
+      } catch (mailError) {
+        console.error("order notification email failed:", mailError);
+        await orderRef.update({ emailStatus:"failed", emailError:String(mailError.message || "Email failed").slice(0,250), emailUpdatedAt:admin.firestore.FieldValue.serverTimestamp() }).catch(()=>{});
+        createdOrder.emailStatus = "failed";
+      }
+    }
+    res.json({ ok:true, order:{ id:createdOrder.id, orderNumber:createdOrder.orderNumber, total:createdOrder.total, expiresAt:asMillis(createdOrder.expiresAt), orderStatus:createdOrder.orderStatus }, emailSent, emailStatus:createdOrder.emailStatus, duplicateRequest:isDuplicateRequest });
+  } catch (e) { console.error("confirm offers", e); res.status(400).json({ error:e.message || "Could not confirm your order." }); }
+});
+
+// Customer order history, including the completed order and stamp confirmation.
+app.get("/api/customer/my-orders", requireUser, async (req, res) => {
+  try {
+    const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get();
+    const orders = snap.docs.map(d => {
+      const x=d.data();
+      return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH ON DELIVERY",
+        orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending", paymentStatus:x.paymentStatus || "pending",
+        stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
+        readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
+    }).sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
+    res.json({ orders });
+  } catch (e) { console.error("customer orders", e); res.status(500).json({ error:"Could not load your orders." }); }
+});
+
+// Customer can cancel an order while it is still waiting for collection/payment.
+app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
+  try {
+    const orderId=String(req.body?.orderId || "");
+    if (!orderId) return res.status(400).json({ error:"Order not found." });
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(orderId);
+    await db.runTransaction(async tx => {
+      const orderSnap=await tx.get(orderRef);
+      if (!orderSnap.exists || orderSnap.data().customerUid !== req.user.uid) throw new Error("You cannot cancel this order.");
+      const order=orderSnap.data();
+      if (order.orderStatus !== "ready" || order.collectionStatus !== "pending" || order.paymentStatus !== "pending") throw new Error("This order can no longer be cancelled online. Please contact the shop.");
+      const reservations=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",orderId));
+      reservations.docs.filter(d=>d.data().status === "active").forEach(d=>tx.update(d.ref,{status:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp()}));
+      tx.update(orderRef,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp()});
+    });
+    res.json({ok:true});
+  } catch(e) { res.status(400).json({error:e.message || "Could not cancel this order."}); }
+});
+
+// Admin order queue. Orders are automatically CONFIRMED and READY on customer submission.
+app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
+  try {
+    const snap=await db.collection(ORDERS_COLLECTION).get();
+    const now=Date.now();
+    const orders=snap.docs.map(d=>({id:d.id,...d.data(),confirmedAt:safeDate(d.data().confirmedAt || d.data().createdAt),expiresAt:asMillis(d.data().expiresAt)}))
+      .filter(x=>(x.orderStatus === "ready" && x.expiresAt > now) || x.orderStatus === "collected")
+      .sort((a,b)=>new Date(a.confirmedAt || 0)-new Date(b.confirmedAt || 0));
+    res.json({orders});
+  } catch(e) { console.error("admin offer orders",e); res.status(500).json({error:"Could not load customer orders."}); }
+});
+
+app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
+  try {
+    const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id);
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref);
+      if(!snap.exists) throw new Error("Order not found.");
+      const x=snap.data();
+      if(x.orderStatus !== "ready" || asMillis(x.expiresAt) <= Date.now()) throw new Error("This order is expired or no longer awaiting collection.");
+      if(x.collectionStatus === "collected") return;
+      tx.update(ref,{collectionStatus:"collected",orderStatus:"collected",collectedAt:admin.firestore.FieldValue.serverTimestamp(),collectedBy:req.adminUid});
+    });
+    res.json({ok:true,message:"Order collection marked. Next, confirm cash payment."});
+  } catch(e) { res.status(400).json({error:e.message || "Could not update collection status."}); }
+});
+
+app.post("/api/admin/orders/:id/payment", requireAdmin, async (req,res)=>{
+  try {
+    const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id);
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref);
+      if(!snap.exists) throw new Error("Order not found.");
+      const x=snap.data();
+      if(x.collectionStatus !== "collected") throw new Error("Mark the order collected before receiving payment.");
+      if(x.paymentStatus === "received") return;
+      tx.update(ref,{paymentStatus:"received",paymentReceivedAt:admin.firestore.FieldValue.serverTimestamp(),paymentReceivedBy:req.adminUid});
+    });
+    res.json({ok:true,message:"Cash payment received. Final approval will add the billing stamps."});
+  } catch(e) { res.status(400).json({error:e.message || "Could not update payment status."}); }
+});
+
+app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
+  try {
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(req.params.id);
+    let result={};
+    await db.runTransaction(async tx=>{
+      const orderSnap=await tx.get(orderRef);
+      if(!orderSnap.exists) throw new Error("Order not found.");
+      const order=orderSnap.data();
+      if(order.orderStatus === "completed") throw new Error("This order is already completed. Stamps cannot be added twice.");
+      if(order.collectionStatus !== "collected" || order.paymentStatus !== "received") throw new Error("Complete collection and cash payment first.");
+      const cRef=customerRef(order.customerUid), customerSnap=await tx.get(cRef);
+      if(!customerSnap.exists) throw new Error("Customer account not found.");
+      const reservationSnap=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",req.params.id));
+      const activeReservations=reservationSnap.docs.filter(d=>d.data().status === "active");
+      if(!activeReservations.length) throw new Error("No active order items found. Please contact support.");
+      const qtyByProduct=new Map();
+      for(const d of activeReservations){const pid=d.data().productId;qtyByProduct.set(pid,(qtyByProduct.get(pid)||0)+1);}
+      const productSnaps=new Map();
+      for(const pid of qtyByProduct.keys()) productSnaps.set(pid,await tx.get(db.collection(PRODUCTS_COLLECTION).doc(pid)));
+      for(const [pid,qty] of qtyByProduct){const ps=productSnaps.get(pid);if(!ps?.exists)throw new Error("An order product no longer exists.");const stock=Number(ps.data().stock||0);if(stock<qty)throw new Error("Physical stock is lower than this order quantity. Please correct stock before completing.");}
+      const amount=moneyNumber(order.total);
+      if(!(amount>0)) throw new Error("Order total is invalid.");
+      const stampsAdded=amount<=800?1:2;
+      const c=customerSnap.data(),cycle=moneyNumber(c.cycleBillTotal ?? c.billTotal),life=moneyNumber(c.lifetimeBillTotal ?? cycle);
+      const billRef=cRef.collection("bills").doc();
+      for(const [pid,qty] of qtyByProduct){const ps=productSnaps.get(pid);tx.update(ps.ref,{stock:Number(ps.data().stock||0)-qty,updatedAt:admin.firestore.FieldValue.serverTimestamp(),lastCollectedAt:admin.firestore.FieldValue.serverTimestamp()});}
+      tx.update(cRef,{stamps:moneyNumber(c.stamps)+stampsAdded,billTotal:cycle+amount,cycleBillTotal:cycle+amount,lifetimeBillTotal:life+amount});
+      tx.create(billRef,{billTotal:amount,stampsAdded,source:"shop-order",productName:(order.items||[]).map(x=>x.productName).join(", "),orderNumber:order.orderNumber,items:order.items||[],date:admin.firestore.FieldValue.serverTimestamp(),enteredBy:req.adminUid});
+      activeReservations.forEach(d=>tx.update(d.ref,{status:"collected",collectedAt:admin.firestore.FieldValue.serverTimestamp(),collectedBy:req.adminUid}));
+      tx.update(orderRef,{orderStatus:"completed",stampsStatus:"added",stampsAdded,completedAt:admin.firestore.FieldValue.serverTimestamp(),completedBy:req.adminUid});
+      result={orderNumber:order.orderNumber,amount,stampsAdded};
+    });
+    res.json({ok:true,...result,message:`Order #${result.orderNumber} completed. Cash received, stock updated, bill ₹${result.amount} added and ${result.stampsAdded} stamp(s) awarded.`});
+  } catch(e) { console.error("complete customer order",e); res.status(400).json({error:e.message || "Could not complete this order."}); }
+});
+
+app.post("/api/admin/orders/:id/resend-email", requireAdmin, async (req,res)=>{
+  try {
+    const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id),snap=await ref.get();
+    if(!snap.exists) return res.status(404).json({error:"Order not found."});
+    const x=snap.data();
+    if(x.emailStatus === "sent") return res.json({ok:true,message:"Order email was already sent."});
+    const sent=await sendOrderNotification({...x,id:snap.id,confirmedAtText:safeDate(x.confirmedAt)});
+    await ref.update({emailStatus:sent.sent?"sent":"not_configured",emailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    if(!sent.sent) return res.status(400).json({error:"Gmail SMTP is not configured in Render environment variables."});
+    res.json({ok:true,message:"Order notification email sent."});
+  } catch(e) { console.error("resend order email",e); res.status(500).json({error:"Could not send order notification email."}); }
 });
 
 app.post("/api/customer/cancel-offer", requireUser, async (req, res) => {
