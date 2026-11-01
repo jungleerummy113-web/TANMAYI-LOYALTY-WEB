@@ -43,6 +43,9 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 .install-choice-card{width:min(420px,100%);background:#fffdf7;border:2px solid #d6ad55;border-radius:18px;padding:22px;text-align:center;box-shadow:0 18px 50px #0005}
 .install-choice-card h2{color:#5a3510;margin:0 0 10px}.install-choice-card p{color:#6b6254;line-height:1.5}
 .install-choice-actions{display:flex;gap:10px;justify-content:center}.install-choice-actions button{min-width:110px}
+
+.install-choice-card{position:relative}
+.install-choice-close{position:absolute;top:10px;right:12px;width:38px;height:38px;min-width:38px;padding:0;border:0;border-radius:50%;background:#eee;color:#333;font-size:28px;line-height:1;cursor:pointer;z-index:2}
 </style></head><body>
 <header><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System</p></header>
 <main class="wrap">
@@ -370,6 +373,7 @@ window.addEventListener("unhandledrejection", function (event) {
 
 <div id="installChoicePopup" class="install-choice-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="installChoiceTitle">
  <div class="install-choice-card">
+  <button type="button" id="installChoiceClose" class="install-choice-close" aria-label="Close install popup">×</button>
   <h2 id="installChoiceTitle">INSTALL TANMAYI STORE AND GIFTS APP</h2>
   <p>Would you like to add TANMAYI to your Android Home Screen?</p>
   <div class="install-choice-actions">
@@ -383,68 +387,98 @@ window.addEventListener("unhandledrejection", function (event) {
 
 <script>
 (() => {
-  let deferredInstallPrompt = null;
   const popup = document.getElementById('installChoicePopup');
   const yes = document.getElementById('installChoiceYes');
   const no = document.getElementById('installChoiceNo');
-  const installCompletedKey = 'tanmayi_app_install_completed_v2';
-  const installDismissedKey = 'tanmayi_app_install_dismissed_v2';
-  const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches ||
-    window.matchMedia('(display-mode: minimal-ui)').matches || window.navigator.standalone === true;
-  const isAdminPage = () => {
-    const adminParam = new URLSearchParams(window.location.search).get('admin') === '1';
+  const close = document.getElementById('installChoiceClose');
+  let deferredInstallPrompt = null;
+  let popupShown = false;
+  const dismissedKey = 'tanmayi_install_choice_dismissed_v2';
+  const installedKey = 'tanmayi_app_install_completed_v2';
+
+  function hidePopup(remember = true) {
+    if (popup) popup.classList.add('hidden');
+    if (remember) {
+      try { localStorage.setItem(dismissedKey, 'yes'); } catch (_) {}
+    }
+  }
+
+  function adminPageIsVisible() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('admin') === '1') return true;
+
     const adminLogin = document.getElementById('adminLogin');
     const adminApp = document.getElementById('adminApp');
-    return adminParam || (adminLogin && !adminLogin.classList.contains('hidden')) ||
-      (adminApp && !adminApp.classList.contains('hidden'));
-  };
-  const closePopup = () => { if (popup) popup.classList.add('hidden'); };
-  const wasInstalledOrDismissed = () => isStandalone() ||
-    localStorage.getItem(installCompletedKey) === 'yes' ||
-    localStorage.getItem(installDismissedKey) === 'yes';
+    const isVisible = el => !!el && !el.classList.contains('hidden');
+    return isVisible(adminLogin) || isVisible(adminApp);
+  }
 
-  // If the app is already installed, permanently suppress this choice on this browser.
-  if (isStandalone()) localStorage.setItem(installCompletedKey, 'yes');
-  window.addEventListener('appinstalled', () => {
-    localStorage.setItem(installCompletedKey, 'yes');
-    closePopup();
-  });
+  function isInstalled() {
+    let remembered = false;
+    try {
+      remembered = localStorage.getItem(installedKey) === 'yes';
+    } catch (_) {}
+    return remembered ||
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: minimal-ui)').matches ||
+      window.navigator.standalone === true;
+  }
+
+  function maybeShowPopup() {
+    if (!popup || popupShown || adminPageIsVisible() || isInstalled()) return;
+    try {
+      if (localStorage.getItem(dismissedKey) === 'yes') return;
+    } catch (_) {}
+    popupShown = true;
+    popup.classList.remove('hidden');
+  }
+
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
     deferredInstallPrompt = event;
   });
 
-  function showInstallChoice() {
-    // Admin route/dashboard must never display this popup.
-    if (!popup || isAdminPage() || wasInstalledOrDismissed()) {
-      closePopup();
-      return;
-    }
-    popup.classList.remove('hidden');
-  }
-  window.addEventListener('load', () => setTimeout(showInstallChoice, 900));
-
-  if (yes) yes.addEventListener('click', async () => {
-    // Close our custom popup immediately. The browser's own install sheet may follow.
-    closePopup();
-    localStorage.setItem(installDismissedKey, 'yes');
-    if (!deferredInstallPrompt) return;
-    const installEvent = deferredInstallPrompt;
-    deferredInstallPrompt = null;
-    try {
-      await installEvent.prompt();
-      const choice = await installEvent.userChoice;
-      if (choice && choice.outcome === 'accepted') {
-        localStorage.setItem(installCompletedKey, 'yes');
-      }
-    } catch (_) {
-      // Keep the custom popup closed; do not show a second message.
-    }
+  window.addEventListener('appinstalled', () => {
+    try { localStorage.setItem(installedKey, 'yes'); } catch (_) {}
+    hidePopup(true);
   });
 
-  if (no) no.addEventListener('click', () => {
-    closePopup();
-    localStorage.setItem(installDismissedKey, 'yes');
+  if (yes) yes.addEventListener('click', async () => {
+    // Close our custom popup immediately, even if the browser has no install prompt.
+    hidePopup(true);
+    if (!deferredInstallPrompt) return;
+    const promptEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    try {
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        try { localStorage.setItem(installedKey, 'yes'); } catch (_) {}
+      }
+    } catch (_) {}
+  });
+
+  if (no) no.addEventListener('click', () => hidePopup(true));
+  if (close) close.addEventListener('click', () => hidePopup(true));
+
+  // Admin authentication can finish after page load. Watch the admin panels so
+  // the popup is hidden immediately when the Admin UI appears.
+  const adminLogin = document.getElementById('adminLogin');
+  const adminApp = document.getElementById('adminApp');
+  if (window.MutationObserver) {
+    const observer = new MutationObserver(() => {
+      if (adminPageIsVisible()) hidePopup(false);
+    });
+    [adminLogin, adminApp].filter(Boolean).forEach(el =>
+      observer.observe(el, { attributes: true, attributeFilter: ['class', 'style'] })
+    );
+  }
+
+  window.addEventListener('load', () => {
+    // Give the existing login/auth routing time to reveal the correct page.
+    window.setTimeout(() => {
+      if (!adminPageIsVisible()) maybeShowPopup();
+    }, 1800);
   });
 })();
 </script>
