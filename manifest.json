@@ -1,9 +1,9 @@
 {
   "id": "./",
-  "name": "TANMAYI STORE AND GIFTS Admin",
-  "short_name": "Tanmayi Admin",
+  "name": "TANMAYI STORE AND GIFTS",
+  "short_name": "TANMAYI",
   "description": "TANMAYI STORE AND GIFTS Digital Loyalty System",
-  "start_url": "./?admin=1",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
