@@ -101,7 +101,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <button type="button" class="customer-tile" data-customer-panel="myList"><span>🛍️</span><small>My List</small></button>
 <button type="button" class="customer-tile stamp-tile" data-customer-panel="stamps"><span>🎟️</span><small>My Stamps</small><strong id="dashboardStamps">0 / 10</strong></button>
 </div>
-<section class="customer-panel hidden" id="customerPanel-orders"><h3>📦 Orders &amp; Order History</h3><p class="muted">Running, completed and cancelled orders are shown separately.</p><div id="customerOrders"><p class="muted">Loading orders…</p></div></section>
+<section class="customer-panel hidden" id="customerPanel-orders"><div class="row"><h3>📦 Orders &amp; Order History</h3><button type="button" class="secondary" id="refreshMyOrders">Refresh Orders</button></div><p class="muted">Running, completed and cancelled orders are shown separately.</p><div id="customerOrders"><p class="muted">Loading orders…</p></div></section>
 <section class="customer-panel hidden" id="customerPanel-buyAgain"><h3>🔁 Buy Again</h3><p class="muted">Products you ordered before. Only currently active products with available stock can be selected.</p><div id="customerBuyAgain" class="customer-product-grid">Loading previous purchases…</div></section>
 <section class="customer-panel hidden" id="customerPanel-account"><h3>👤 Account Details</h3><label>Customer Name</label><input id="profileName" maxlength="80" autocomplete="name"><label>Registered Mobile Number</label><input id="profileMobile" readonly><label>Address / Village</label><textarea id="profileAddress" rows="3" maxlength="250" placeholder="Enter your address"></textarea><div class="profile-actions"><button type="button" id="saveCustomerAddress">Save Address</button></div><div id="profileMsg" class="msg hidden"></div></section>
 <section class="customer-panel hidden" id="customerPanel-myList"><h3>🛍️ My List – Shop Products</h3><p class="muted">Products uploaded by TANMAYI STORE AND GIFTS, with current offer price and stock.</p><div id="customerProducts" class="customer-product-grid">Loading products…</div><h3 style="margin-top:18px">My Selected Offers</h3><div id="selectedOfferCount" class="offer-count">Selected items: 0</div><div id="customerReservations"></div></section>
@@ -138,8 +138,8 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 </section></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-/* Immediately select the Admin login on the Admin URL, before Firebase modules load. */
-(function () {
+/* Keep the Admin route separate from the customer login while Firebase loads. */
+(function(){
   if (new URLSearchParams(window.location.search).get('admin') === '1') {
     var adminLogin = document.getElementById('adminLogin');
     var customerLogin = document.getElementById('customerLogin');
@@ -401,7 +401,7 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
-\n
+
 <script>
 /* Display otherwise-silent JavaScript failures on the customer page. */
 window.addEventListener("error", function (event) {
