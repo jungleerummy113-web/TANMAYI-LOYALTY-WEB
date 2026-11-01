@@ -595,31 +595,14 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 // Customer order history, including the completed order and stamp confirmation.
 app.get("/api/customer/my-orders", requireUser, async (req, res) => {
   try {
-    const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).get();
-    const cancelledDocs = snap.docs
-      .filter(d => String(d.data().orderStatus || "").toLowerCase() === "cancelled")
-      .sort((a,b) => {
-        const av = asMillis(a.data().cancelledAt) || asMillis(a.data().confirmedAt || a.data().createdAt);
-        const bv = asMillis(b.data().cancelledAt) || asMillis(b.data().confirmedAt || b.data().createdAt);
-        return bv - av;
-      });
-    // Keep the newest cancelled order for this customer; permanently remove older cancelled order documents only.
-    const olderCancelled = cancelledDocs.slice(1);
-    for (let i = 0; i < olderCancelled.length; i += 450) {
-      const batch = db.batch();
-      olderCancelled.slice(i, i + 450).forEach(d => batch.delete(d.ref));
-      await batch.commit();
-    }
-    const latestCancelledId = cancelledDocs[0]?.id;
-    const orders = snap.docs
-      .filter(d => String(d.data().orderStatus || "").toLowerCase() !== "cancelled" || d.id === latestCancelledId)
-      .map(d => {
-        const x=d.data();
-        return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH ON DELIVERY",
-          orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending", paymentStatus:x.paymentStatus || "pending",
-          stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
-          cancelledAt:safeDate(x.cancelledAt), readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
-      }).sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
+    const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get();
+    const orders = snap.docs.map(d => {
+      const x=d.data();
+      return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH ON DELIVERY",
+        orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending", paymentStatus:x.paymentStatus || "pending",
+        stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
+        cancelledAt:safeDate(x.cancelledAt), readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
+    }).sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
     res.json({ orders });
   } catch (e) { console.error("customer orders", e); res.status(500).json({ error:"Could not load your orders." }); }
 });
@@ -634,10 +617,12 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
       const orderSnap=await tx.get(orderRef);
       if (!orderSnap.exists || orderSnap.data().customerUid !== req.user.uid) throw new Error("You cannot cancel this order.");
       const order=orderSnap.data();
-      if (order.orderStatus !== "ready" || order.collectionStatus !== "pending" || order.paymentStatus !== "pending") throw new Error("This order can no longer be cancelled online. Please contact the shop.");
+      if (order.orderStatus === "cancelled") return;
       const reservations=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",orderId));
       reservations.docs.filter(d=>d.data().status === "active").forEach(d=>tx.update(d.ref,{status:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp()}));
-      tx.update(orderRef,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp()});
+      // Customer cancellation changes only this order's status. Admin cash collection,
+      // stamp approval, redemption and billing workflows are intentionally untouched.
+      tx.update(orderRef,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),customerCancelled:true});
     });
     res.json({ok:true});
   } catch(e) { res.status(400).json({error:e.message || "Could not cancel this order."}); }
@@ -647,21 +632,6 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
 app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   try {
     const snap = await db.collection(ORDERS_COLLECTION).get();
-    const cancelledDocs = snap.docs
-      .filter(d => String(d.data().orderStatus || "").toLowerCase() === "cancelled")
-      .sort((a,b) => {
-        const av = asMillis(a.data().cancelledAt) || asMillis(a.data().confirmedAt || a.data().createdAt);
-        const bv = asMillis(b.data().cancelledAt) || asMillis(b.data().confirmedAt || b.data().createdAt);
-        return bv - av;
-      });
-    // Admin view retains only the newest cancelled order globally; older cancelled order documents are permanently deleted.
-    const olderCancelled = cancelledDocs.slice(1);
-    for (let i = 0; i < olderCancelled.length; i += 450) {
-      const batch = db.batch();
-      olderCancelled.slice(i, i + 450).forEach(d => batch.delete(d.ref));
-      await batch.commit();
-    }
-    const latestCancelledId = cancelledDocs[0]?.id;
     const now = Date.now();
     const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
     const all = snap.docs.map(d => {
@@ -677,8 +647,7 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
     const today = all.filter(x => keyOf(x) === todayKey);
     const runningOrders = all.filter(x => ["ready", "collected"].includes(x.orderStatus));
     const completedOrdersList = all.filter(x => x.orderStatus === "completed");
-    const cancelledOrders = all.filter(x => x.orderStatus === "cancelled" && x.id === latestCancelledId);
-    const visibleOrders = all.filter(x => x.orderStatus !== "cancelled" || x.id === latestCancelledId);
+    const cancelledOrders = all.filter(x => ["cancelled", "expired"].includes(x.orderStatus)).slice(0, 2);
     const todayCustomersMap = new Map();
     for (const x of today) {
       const key = x.customerUid || x.mobile || x.customerName;
@@ -687,7 +656,7 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
       todayCustomersMap.set(key, current);
     }
     res.json({
-      orders:visibleOrders, runningOrders, completedOrdersList, cancelledOrders,
+      orders:all, runningOrders, completedOrdersList, cancelledOrders,
       todayCustomers:[...todayCustomersMap.values()],
       stats:{ newOrders:runningOrders.filter(x=>x.collectionStatus !== "collected").length,
         oldOrders:all.filter(x=>["expired", "cancelled"].includes(x.orderStatus)).length,
