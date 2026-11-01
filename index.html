@@ -387,50 +387,64 @@ window.addEventListener("unhandledrejection", function (event) {
   const popup = document.getElementById('installChoicePopup');
   const yes = document.getElementById('installChoiceYes');
   const no = document.getElementById('installChoiceNo');
-  const message = document.getElementById('installChoiceMessage');
-  let popupShown = false;
-  const installCompletedKey = 'tanmayi_app_install_completed_v1';
-  function isAppInstalled() {
-    return window.matchMedia('(display-mode: standalone)').matches ||
-      window.matchMedia('(display-mode: minimal-ui)').matches ||
-      window.navigator.standalone === true ||
-      localStorage.getItem(installCompletedKey) === 'yes';
-  }
+  const installCompletedKey = 'tanmayi_app_install_completed_v2';
+  const installDismissedKey = 'tanmayi_app_install_dismissed_v2';
+  const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: minimal-ui)').matches || window.navigator.standalone === true;
+  const isAdminPage = () => {
+    const adminParam = new URLSearchParams(window.location.search).get('admin') === '1';
+    const adminLogin = document.getElementById('adminLogin');
+    const adminApp = document.getElementById('adminApp');
+    return adminParam || (adminLogin && !adminLogin.classList.contains('hidden')) ||
+      (adminApp && !adminApp.classList.contains('hidden'));
+  };
+  const closePopup = () => { if (popup) popup.classList.add('hidden'); };
+  const wasInstalledOrDismissed = () => isStandalone() ||
+    localStorage.getItem(installCompletedKey) === 'yes' ||
+    localStorage.getItem(installDismissedKey) === 'yes';
+
+  // If the app is already installed, permanently suppress this choice on this browser.
+  if (isStandalone()) localStorage.setItem(installCompletedKey, 'yes');
   window.addEventListener('appinstalled', () => {
     localStorage.setItem(installCompletedKey, 'yes');
-    if (popup) popup.classList.add('hidden');
+    closePopup();
   });
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
     deferredInstallPrompt = event;
   });
+
   function showInstallChoice() {
-    // Never show the install-choice popup on the Admin route.
-    const isAdminPage = new URLSearchParams(window.location.search).get('admin') === '1';
-    if (isAdminPage || !popup || popupShown || isAppInstalled()) return;
-    popupShown = true;
+    // Admin route/dashboard must never display this popup.
+    if (!popup || isAdminPage() || wasInstalledOrDismissed()) {
+      closePopup();
+      return;
+    }
     popup.classList.remove('hidden');
   }
-  // Show the install choice only on the customer page.
-  window.addEventListener('load', () => setTimeout(showInstallChoice, 700));
-  if (yes) yes.addEventListener('click', () => {
-    // Close our popup immediately, whether or not the browser supports installation.
-    if (popup) popup.classList.add('hidden');
-    if (deferredInstallPrompt) {
-      const installEvent = deferredInstallPrompt;
-      deferredInstallPrompt = null;
-      installEvent.prompt();
-      installEvent.userChoice.then(choice => {
-        if (choice && choice.outcome === 'accepted') {
-          localStorage.setItem(installCompletedKey, 'yes');
-        }
-      }).catch(() => {});
+  window.addEventListener('load', () => setTimeout(showInstallChoice, 900));
+
+  if (yes) yes.addEventListener('click', async () => {
+    // Close our custom popup immediately. The browser's own install sheet may follow.
+    closePopup();
+    localStorage.setItem(installDismissedKey, 'yes');
+    if (!deferredInstallPrompt) return;
+    const installEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    try {
+      await installEvent.prompt();
+      const choice = await installEvent.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        localStorage.setItem(installCompletedKey, 'yes');
+      }
+    } catch (_) {
+      // Keep the custom popup closed; do not show a second message.
     }
-    // If no native prompt is available, do not leave another message or popup open.
   });
+
   if (no) no.addEventListener('click', () => {
-    if (popup) popup.classList.add('hidden');
-    // NO closes the popup and does not initiate installation.
+    closePopup();
+    localStorage.setItem(installDismissedKey, 'yes');
   });
 })();
 </script>
