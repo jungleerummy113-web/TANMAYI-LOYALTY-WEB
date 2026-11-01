@@ -137,6 +137,17 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <div class="scroll"><table><thead><tr><th>Date</th><th>Gift</th><th>Stamps used</th></tr></thead><tbody id="redRows"></tbody></table></div></section>
 </section></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+/* Immediately select the Admin login on the Admin URL, before Firebase modules load. */
+(function () {
+  if (new URLSearchParams(window.location.search).get('admin') === '1') {
+    var adminLogin = document.getElementById('adminLogin');
+    var customerLogin = document.getElementById('customerLogin');
+    if (adminLogin) adminLogin.classList.remove('hidden');
+    if (customerLogin) customerLogin.classList.add('hidden');
+  }
+})();
+</script>
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -335,7 +346,7 @@ function updateCountdowns(){document.querySelectorAll('[data-countdown]').forEac
 setInterval(updateCountdowns,1000);
 $('saveProduct').onclick=async()=>{clear('productAdminMsg');const name=$('productName').value.trim(),originalPrice=Number($('productOriginal').value),offerPrice=Number($('productOffer').value),stock=Number($('productStock').value),f1=$('productPhoto1').files[0],f2=$('productPhoto2').files[0];if(!name||!Number.isFinite(originalPrice)||originalPrice<=0||!Number.isFinite(offerPrice)||offerPrice<=0||offerPrice>=originalPrice||!Number.isInteger(stock)||stock<0||!f1||!f2)return msg('productAdminMsg','Enter product name, valid prices, stock (whole number) and both photos.');$('saveProduct').disabled=true;try{const photo1=await imageData(f1),photo2=await imageData(f2);await api('/api/admin/products','POST',{name,originalPrice,offerPrice,stock,photo1,photo2});$('productName').value=$('productOriginal').value=$('productOffer').value=$('productStock').value='';$('productPhoto1').value=$('productPhoto2').value='';msg('productAdminMsg','Product and offer uploaded successfully.');await loadAdminProducts()}catch(e){msg('productAdminMsg',e.message)}finally{$('saveProduct').disabled=false}};
 
-const adminRoute=new URLSearchParams(location.search).get('admin')==='1';if(adminRoute)$('adminLogin').classList.remove('hidden');
+const adminRoute=new URLSearchParams(location.search).get('admin')==='1';if(adminRoute)show('adminLogin');
 $('toggleCustomerHistory').onclick=()=>{const panel=$('customerHistoryPanel'),opening=panel.classList.contains('hidden');panel.classList.toggle('hidden',!opening);$('toggleCustomerHistory').setAttribute('aria-expanded',String(opening));$('toggleCustomerHistory').textContent=opening?'📋 My Bill History　▲':'📋 My Bill History　▼'};
 function openCustomerPanel(name){document.querySelectorAll('[id^="customerPanel-"]').forEach(p=>p.classList.add('hidden'));const panel=$('customerPanel-'+name);if(panel)panel.classList.remove('hidden');if(name==='orders')loadCustomerOrders();if(name==='buyAgain')renderBuyAgain();if(name==='myList')loadCustomerProducts();if(name==='stamps'){} }
 document.querySelectorAll('[data-customer-panel]').forEach(b=>b.onclick=()=>openCustomerPanel(b.dataset.customerPanel));
