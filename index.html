@@ -137,17 +137,6 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <div class="scroll"><table><thead><tr><th>Date</th><th>Gift</th><th>Stamps used</th></tr></thead><tbody id="redRows"></tbody></table></div></section>
 </section></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
-/* Keep the Admin route separate from the customer login while Firebase loads. */
-(function(){
-  if (new URLSearchParams(window.location.search).get('admin') === '1') {
-    var adminLogin = document.getElementById('adminLogin');
-    var customerLogin = document.getElementById('customerLogin');
-    if (adminLogin) adminLogin.classList.remove('hidden');
-    if (customerLogin) customerLogin.classList.add('hidden');
-  }
-})();
-</script>
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -346,7 +335,7 @@ function updateCountdowns(){document.querySelectorAll('[data-countdown]').forEac
 setInterval(updateCountdowns,1000);
 $('saveProduct').onclick=async()=>{clear('productAdminMsg');const name=$('productName').value.trim(),originalPrice=Number($('productOriginal').value),offerPrice=Number($('productOffer').value),stock=Number($('productStock').value),f1=$('productPhoto1').files[0],f2=$('productPhoto2').files[0];if(!name||!Number.isFinite(originalPrice)||originalPrice<=0||!Number.isFinite(offerPrice)||offerPrice<=0||offerPrice>=originalPrice||!Number.isInteger(stock)||stock<0||!f1||!f2)return msg('productAdminMsg','Enter product name, valid prices, stock (whole number) and both photos.');$('saveProduct').disabled=true;try{const photo1=await imageData(f1),photo2=await imageData(f2);await api('/api/admin/products','POST',{name,originalPrice,offerPrice,stock,photo1,photo2});$('productName').value=$('productOriginal').value=$('productOffer').value=$('productStock').value='';$('productPhoto1').value=$('productPhoto2').value='';msg('productAdminMsg','Product and offer uploaded successfully.');await loadAdminProducts()}catch(e){msg('productAdminMsg',e.message)}finally{$('saveProduct').disabled=false}};
 
-const adminRoute=new URLSearchParams(location.search).get('admin')==='1';if(adminRoute)show('adminLogin');
+const adminRoute=new URLSearchParams(location.search).get('admin')==='1';if(adminRoute)$('adminLogin').classList.remove('hidden');
 $('toggleCustomerHistory').onclick=()=>{const panel=$('customerHistoryPanel'),opening=panel.classList.contains('hidden');panel.classList.toggle('hidden',!opening);$('toggleCustomerHistory').setAttribute('aria-expanded',String(opening));$('toggleCustomerHistory').textContent=opening?'📋 My Bill History　▲':'📋 My Bill History　▼'};
 function openCustomerPanel(name){document.querySelectorAll('[id^="customerPanel-"]').forEach(p=>p.classList.add('hidden'));const panel=$('customerPanel-'+name);if(panel)panel.classList.remove('hidden');if(name==='orders')loadCustomerOrders();if(name==='buyAgain')renderBuyAgain();if(name==='myList')loadCustomerProducts();if(name==='stamps'){} }
 document.querySelectorAll('[data-customer-panel]').forEach(b=>b.onclick=()=>openCustomerPanel(b.dataset.customerPanel));
@@ -356,12 +345,45 @@ $('saveCustomerAddress').onclick=async()=>{clear('profileMsg');const name=$('pro
 $('showPinReset').onclick=()=>$('pinResetFields').classList.toggle('hidden');
 $('submitPinReset').onclick=async()=>{clear('pinResetMsg');const mobile=$('resetMobile').value.trim(),code=$('resetCode').value.trim(),newPin=$('newPin').value;if(!/^\d{10}$/.test(mobile)||!/^\d{6}$/.test(code)||!/^\d{6}$/.test(newPin))return msg('pinResetMsg','Enter valid mobile, reset code and new 6-digit PIN.');try{await pinApi('/api/customer/reset-pin',{mobile,code,newPin});msg('pinResetMsg','PIN reset successful. Please login with your new PIN.');$('phone').value=mobile;$('customerPassword').value='';$('resetCode').value='';$('newPin').value=''}catch(e){msg('pinResetMsg',e.message)}};
 $('issuePinReset').onclick=async()=>{clear('adminPinResetMsg');try{const r=await api('/api/admin/issue-reset','POST',{customerUid:selected.id});$('adminPinResetMsg').textContent=`ONE-TIME CODE: ${r.code} — valid for 10 minutes. Share privately.`;$('adminPinResetMsg').classList.remove('hidden')}catch(e){msg('adminPinResetMsg',e.message)}};
-$('loginBtn').onclick=async()=>{clear('adminMsg');try{await signInWithEmailAndPassword(auth,$('email').value.trim(),$('password').value)}catch(e){msg('adminMsg',e.message)}};
+$('loginBtn').onclick=async()=>{
+  clear('adminMsg');
+  const email=$('email').value.trim(),password=$('password').value;
+  if(!email||!password)return msg('adminMsg','Enter both Admin email and password.');
+  const button=$('loginBtn');button.disabled=true;button.textContent='Checking login…';
+  try{await signInWithEmailAndPassword(auth,email,password);}
+  catch(e){
+    const messages={
+      'auth/invalid-credential':'Email or password is incorrect. Please check and try again.',
+      'auth/user-not-found':'This Admin email is not registered in Firebase Authentication.',
+      'auth/wrong-password':'Incorrect Admin password.',
+      'auth/too-many-requests':'Too many attempts. Please wait a few minutes and try again.',
+      'auth/network-request-failed':'Network error. Check your internet connection and try again.',
+      'auth/operation-not-allowed':'Email/Password sign-in is disabled in Firebase Authentication.'
+    };
+    msg('adminMsg',messages[e.code]||('Admin login failed: '+(e.message||e.code||'Unknown error')));
+  }finally{button.disabled=false;button.textContent='Admin Login';}
+};
 $('logout').onclick=$('customerLogout').onclick=()=>signOut(auth);
 $('showRegister').onclick=()=>$('registerFields').classList.toggle('hidden');
 $('customerSignIn').onclick=async()=>{clear('phoneMsg');const m=$('phone').value.trim(),p=$('customerPassword').value;if(!/^\d{10}$/.test(m)||!/^\d{6}$/.test(p))return msg('phoneMsg','Enter valid 10-digit mobile and 6-digit PIN.');try{await signInWithEmailAndPassword(auth,customerEmail(m),p)}catch(e){msg('phoneMsg',e.code==='auth/invalid-credential'?'Mobile number or password is incorrect.':e.message)}};
 $('register').onclick=async()=>{clear('phoneMsg');const mobile=$('phone').value.trim(),password=$('customerPassword').value,name=$('name').value.trim(),village=$('village').value.trim();if(!/^\d{10}$/.test(mobile)||!/^\d{6}$/.test(password)||!name||!village)return msg('phoneMsg','Enter name, village, valid mobile and 6-digit PIN.');try{await createUserWithEmailAndPassword(auth,customerEmail(mobile),password);await api('/api/customer/register','POST',{name,mobile,village});await loadCustomer()}catch(e){msg('phoneMsg',e.code==='auth/email-already-in-use'?'This mobile number is already registered. Please login.':e.message)}};
-onAuthStateChanged(auth,async u=>{if(!u){show(adminRoute?'adminLogin':'customerLogin');return}try{const a=await getDoc(doc(db,'admins',u.uid));if(a.exists()&&a.data().role==='admin'&&a.data().active===true){if(!adminRoute){await signOut(auth);show('customerLogin');return}show('adminApp');$('adminEmail').textContent=u.email||'';await loadCustomers();await loadAdminProducts();await loadAdminOfferOrders();await loadRewardEligible()}else if(adminRoute){await signOut(auth);show('adminLogin')}else {await loadCustomer();await loadCustomerProducts()}}catch(e){show(adminRoute?'adminLogin':'customerLogin');msg(adminRoute?'adminMsg':'phoneMsg',e.message)}});
+onAuthStateChanged(auth,async u=>{
+  if(!u){show(adminRoute?'adminLogin':'customerLogin');return;}
+  try{
+    const a=await getDoc(doc(db,'admins',u.uid));
+    if(a.exists()&&a.data().role==='admin'&&a.data().active===true){
+      if(!adminRoute){await signOut(auth);show('customerLogin');return;}
+      show('adminApp');$('adminEmail').textContent=u.email||'';
+      await loadCustomers();await loadAdminProducts();await loadAdminOfferOrders();await loadRewardEligible();
+    }else if(adminRoute){
+      await signOut(auth);show('adminLogin');
+      msg('adminMsg','Email and password were accepted, but this Firebase account is NOT enabled as an active shop admin. The Firestore admins/'+u.uid+' document must exist with role: "admin" and active: true.');
+    }else{await loadCustomer();await loadCustomerProducts();}
+  }catch(e){
+    show(adminRoute?'adminLogin':'customerLogin');
+    msg(adminRoute?'adminMsg':'phoneMsg',adminRoute?('Admin verification failed: '+(e.message||'Could not read the admin permission record. Check Firestore access and network.')):e.message);
+  }
+});
 async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>';await loadCustomerOrders()}
 $('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
 document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventListener('change',()=>{$('approvedPointsInfo').classList.toggle('hidden',el.value!=='points'||!el.checked)}));
@@ -405,14 +427,14 @@ if ("serviceWorker" in navigator) {
 <script>
 /* Display otherwise-silent JavaScript failures on the customer page. */
 window.addEventListener("error", function (event) {
-  const panel = document.getElementById("phoneMsg");
+  const panel = document.getElementById(new URLSearchParams(location.search).get("admin") === "1" ? "adminMsg" : "phoneMsg");
   if (panel && event.message) {
     panel.textContent = "Page script error: " + event.message + ". Please refresh and try again.";
     panel.classList.remove("hidden");
   }
 });
 window.addEventListener("unhandledrejection", function (event) {
-  const panel = document.getElementById("phoneMsg");
+  const panel = document.getElementById(new URLSearchParams(location.search).get("admin") === "1" ? "adminMsg" : "phoneMsg");
   if (panel) {
     const reason = event.reason && (event.reason.message || String(event.reason));
     panel.textContent = "App error: " + (reason || "Please refresh and try again.");
