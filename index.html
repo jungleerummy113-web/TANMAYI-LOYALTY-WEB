@@ -221,7 +221,12 @@ async function loadAdminOfferOrders(){
     $('completedTodayCount').textContent=s.completedToday||0;
     const todayCustomers=r.todayCustomers||[];
     $('todayCustomerOrders').innerHTML=todayCustomers.length?todayCustomers.map(c=>`<div class="today-customer-row"><span>${esc(c.name)} · ${esc(c.mobile)}</span><b>${Number(c.count)} order(s)</b></div>`).join(''):'<p class="muted">No customer orders received today.</p>';
-    $('adminOfferOrders').innerHTML=(r.orders||[]).map(x=>{
+    const adminOrders=r.orders||[];
+    const latestCompletedOrder=adminOrders
+      .filter(x=>x.orderStatus==='completed')
+      .sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0))[0];
+    const visibleAdminOrders=adminOrders.filter(x=>x.orderStatus!=='completed'||x.id===latestCompletedOrder?.id);
+    $('adminOfferOrders').innerHTML=visibleAdminOrders.map(x=>{
       const items=(x.items||[]).map(i=>{
         const photo=(i.photoUrls||[])[0];
         return `<div class="compact-order-product">${photo?`<img src="${photo}" alt="Selected product">`:'<div class="no-photo">NO PHOTO</div>'}<div><b>${esc(i.productName)} × ${Number(i.quantity)}</b><small>${moneyPrice(i.offerPrice||i.lineTotal)}${Number(i.quantity)>1?' each':''} · Line ${moneyPrice(i.lineTotal)}</small></div></div>`;
