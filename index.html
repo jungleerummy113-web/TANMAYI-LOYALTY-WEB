@@ -389,32 +389,48 @@ window.addEventListener("unhandledrejection", function (event) {
   const no = document.getElementById('installChoiceNo');
   const message = document.getElementById('installChoiceMessage');
   let popupShown = false;
+  const installCompletedKey = 'tanmayi_app_install_completed_v1';
+  function isAppInstalled() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: minimal-ui)').matches ||
+      window.navigator.standalone === true ||
+      localStorage.getItem(installCompletedKey) === 'yes';
+  }
+  window.addEventListener('appinstalled', () => {
+    localStorage.setItem(installCompletedKey, 'yes');
+    if (popup) popup.classList.add('hidden');
+  });
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
     deferredInstallPrompt = event;
   });
   function showInstallChoice() {
-    if (!popup || popupShown || window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) return;
+    // Never show the install-choice popup on the Admin route.
+    const isAdminPage = new URLSearchParams(window.location.search).get('admin') === '1';
+    if (isAdminPage || !popup || popupShown || isAppInstalled()) return;
     popupShown = true;
     popup.classList.remove('hidden');
   }
-  // Display the choice after the customer login/register screen is loaded.
+  // Show the install choice only on the customer page.
   window.addEventListener('load', () => setTimeout(showInstallChoice, 700));
-  if (yes) yes.addEventListener('click', async () => {
+  if (yes) yes.addEventListener('click', () => {
+    // Close our popup immediately, whether or not the browser supports installation.
+    if (popup) popup.classList.add('hidden');
     if (deferredInstallPrompt) {
-      deferredInstallPrompt.prompt();
-      const result = await deferredInstallPrompt.userChoice;
+      const installEvent = deferredInstallPrompt;
       deferredInstallPrompt = null;
-      popup.classList.add('hidden');
-      if (result && result.outcome !== 'accepted') message.textContent = 'Install was not completed.';
-      return;
+      installEvent.prompt();
+      installEvent.userChoice.then(choice => {
+        if (choice && choice.outcome === 'accepted') {
+          localStorage.setItem(installCompletedKey, 'yes');
+        }
+      }).catch(() => {});
     }
-    popup.classList.add('hidden');
-    message.textContent = 'Chrome menu (⋮) → Install app / Add to Home screen. Installation is available only when supported by your browser.';
+    // If no native prompt is available, do not leave another message or popup open.
   });
   if (no) no.addEventListener('click', () => {
-    popup.classList.add('hidden');
-    // NO means no install action is initiated.
+    if (popup) popup.classList.add('hidden');
+    // NO closes the popup and does not initiate installation.
   });
 })();
 </script>
