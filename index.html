@@ -112,7 +112,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <div class="card row"><div><h2>Admin Dashboard</h2><small id="adminEmail"></small></div><button class="secondary" id="logout">Logout</button></div>
 <div class="stats"><div class="stat"><small>Total Customers</small><b id="customerCount">0</b></div><div class="stat"><small>Stamp balance</small><b id="stampCount">0</b></div><div class="stat"><small>Gifts redeemed</small><b id="giftCount">0</b></div></div>
 <section class="card" id="orderDashboard"><div class="row"><h2>📦 Orders Dashboard</h2><button type="button" class="secondary" id="refreshOrderDashboard">Refresh</button></div><div class="order-stats"><div class="order-stat"><small>New Orders</small><b id="newOrderCount">0</b></div><div class="order-stat"><small>Old Orders</small><b id="oldOrderCount">0</b></div><div class="order-stat"><small>Completed Orders</small><b id="completedOrderCount">0</b></div><div class="order-stat today"><small>Today's Orders</small><b id="todayOrderCount">0</b></div><div class="order-stat"><small>Pending Today</small><b id="pendingTodayCount">0</b></div><div class="order-stat"><small>Completed Today</small><b id="completedTodayCount">0</b></div></div><h3>Today's Customer Orders</h3><div id="todayCustomerOrders" class="today-customer-list">No orders today.</div></section>
-<section class="card"><h2>Manage Shop Photos &amp; Offers</h2><p class="muted">Upload up to 8 active products. Add two photos of each product and set its original and offer prices.</p><label>Product name</label><input id="productName" maxlength="80" placeholder="Product name"><label>Original price (₹)</label><input id="productOriginal" type="number" min="1" step="1" placeholder="Original price"><label>Offer price (₹)</label><input id="productOffer" type="number" min="1" step="1" placeholder="Offer price"><label>Available stock (number of same items)</label><input id="productStock" type="number" min="0" step="1" placeholder="How many pieces are available"><label>Photo 1</label><input id="productPhoto1" type="file" accept="image/*"><label>Photo 2 (different angle)</label><input id="productPhoto2" type="file" accept="image/*"><button id="saveProduct" class="gold">Upload Product &amp; Offer</button><div id="productAdminMsg" class="msg hidden"></div><h3>Uploaded Products</h3><div id="adminProducts" class="product-grid"></div></section>
+<section class="card"><h2>Manage Shop Photos &amp; Offers</h2><p class="muted">Upload up to 8 active products. Add two photos of each product and set its original and offer prices.</p><label>Product name</label><input id="productName" maxlength="80" placeholder="Product name"><label>Product size (example: 10 × 24 inch)</label><input id="productSize" maxlength="80" placeholder="10 × 24 inch"><label>Product description / details</label><textarea id="productDescription" rows="4" maxlength="1200" placeholder="Enter product material, colour, design and other details"></textarea><label>Original price (₹)</label><input id="productOriginal" type="number" min="1" step="1" placeholder="Original price"><label>Offer price (₹)</label><input id="productOffer" type="number" min="1" step="1" placeholder="Offer price"><label>Available stock (number of same items)</label><input id="productStock" type="number" min="0" step="1" placeholder="How many pieces are available"><label>Photo 1</label><input id="productPhoto1" type="file" accept="image/*"><label>Photo 2 (different angle)</label><input id="productPhoto2" type="file" accept="image/*"><button id="saveProduct" class="gold">Upload Product &amp; Offer</button><div id="productAdminMsg" class="msg hidden"></div><h3>Uploaded Products</h3><div id="adminProducts" class="product-grid"></div></section>
 <section class="card" id="offerOrdersSection"><div class="row"><h2>Customer Orders</h2><button type="button" class="secondary" id="refreshOfferOrders">Refresh</button></div><p class="muted">Order details, selected product photo, collection and cash status. Final approval చేసినప్పుడే bill & stamps update అవుతాయి.</p><div id="adminOfferOrders" class="compact-orders">Loading customer orders…</div><div id="offerOrderMsg" class="msg hidden"></div></section>
 <section class="card"><div class="row"><div><h2>Customer Login QR Code</h2><small class="muted">Customers scan this QR to open the login / registration page.</small></div></div>
 <button id="makeQR" class="gold">Generate Customer QR Code</button>
@@ -160,6 +160,8 @@ async function loadAdminProducts(){
       <strong>${esc(x.name)}</strong>
       <div class="product-photos">${x.photoUrls.map(u=>`<img src="${esc(u)}" alt="${esc(x.name)}">`).join('')}</div>
       <p><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>
+      ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
+      ${x.description?`<p style="white-space:pre-wrap"><b>Description:</b> ${esc(x.description)}</p>`:''}
       <p class="stock-line">Total physical stock: ${Number(x.stock??0)} pieces</p>
       <p class="stock-line">Confirmed / held by customers: ${Number(x.reservedCount??0)} pieces</p>
       <p class="stock-line">Available for other customers: ${Number(x.availableStock??x.stock??0)} pieces</p>
@@ -168,6 +170,8 @@ async function loadAdminProducts(){
         <label>Product name</label><input id="edit-name-${esc(x.id)}" maxlength="80" value="${esc(x.name)}">
         <label>Original price (₹)</label><input id="edit-original-${esc(x.id)}" type="number" min="1" step="1" value="${Number(x.originalPrice)}">
         <label>Offer price (₹)</label><input id="edit-offer-${esc(x.id)}" type="number" min="1" step="1" value="${Number(x.offerPrice)}">
+        <label>Product size (example: 10 × 24 inch)</label><input id="edit-size-${esc(x.id)}" maxlength="80" value="${esc(x.size||'')}" placeholder="10 × 24 inch">
+        <label>Product description / details</label><textarea id="edit-description-${esc(x.id)}" rows="4" maxlength="1200" placeholder="Enter product details">${esc(x.description||'')}</textarea>
         <label>Available stock</label><input id="edit-stock-${esc(x.id)}" type="number" min="0" step="1" value="${Number(x.stock??0)}">
         <label>Replace Photo 1 (optional)</label><input id="edit-photo1-${esc(x.id)}" type="file" accept="image/*">
         <label>Replace Photo 2 (optional)</label><input id="edit-photo2-${esc(x.id)}" type="file" accept="image/*">
@@ -180,12 +184,13 @@ async function loadAdminProducts(){
     document.querySelectorAll('[data-product-save]').forEach(b=>b.onclick=async()=>{
       const id=b.dataset.productSave, name=$('edit-name-'+id).value.trim(),
         originalPrice=Number($('edit-original-'+id).value),offerPrice=Number($('edit-offer-'+id).value),
+        size=$('edit-size-'+id).value.trim(),description=$('edit-description-'+id).value.trim(),
         stock=Number($('edit-stock-'+id).value),f1=$('edit-photo1-'+id).files[0],f2=$('edit-photo2-'+id).files[0];
       if(!name||!Number.isFinite(originalPrice)||originalPrice<=0||!Number.isFinite(offerPrice)||offerPrice<=0||offerPrice>=originalPrice||!Number.isInteger(stock)||stock<0)
         return msg('productAdminMsg','Enter a product name, valid prices and whole-number stock. Offer price must be below original price.');
       b.disabled=true;
       try{
-        const body={name,originalPrice,offerPrice,stock};
+        const body={name,originalPrice,offerPrice,stock,size,description};
         if(f1)body.photo1=await imageData(f1);
         if(f2)body.photo2=await imageData(f2);
         await api('/api/admin/products/'+encodeURIComponent(id),'PATCH',body);
@@ -275,6 +280,8 @@ async function loadCustomerProducts(){
       return `<div class="product-card"><strong>${esc(x.name)}</strong>
         <div class="product-photos">${x.photoUrls.map(u=>`<img src="${esc(u)}" alt="${esc(x.name)}">`).join('')}</div>
         <p><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>
+        ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
+        ${x.description?`<p style="white-space:pre-wrap"><b>Description:</b> ${esc(x.description)}</p>`:''}
         <p class="stock-line">Available: ${available} pieces${pendingCount?` · Added to cart: ${pendingCount}`:''}</p>
         <button data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${available<=0?'disabled':''}>${available<=0?'No more stock available':'Select &amp; Add'}</button>
       </div>`;
@@ -333,7 +340,7 @@ function renderReservations(items){
 }
 function updateCountdowns(){document.querySelectorAll('[data-countdown]').forEach(el=>{const left=Number(el.dataset.countdown)-Date.now();if(left<=0){el.textContent='Offer expired';el.closest('[data-expiry]')?.classList.add('muted')}else{const h=Math.floor(left/3600000),m=Math.floor(left%3600000/60000),s=Math.floor(left%60000/1000);el.textContent=` · Expires in ${h}h ${m}m ${s}s`}})}
 setInterval(updateCountdowns,1000);
-$('saveProduct').onclick=async()=>{clear('productAdminMsg');const name=$('productName').value.trim(),originalPrice=Number($('productOriginal').value),offerPrice=Number($('productOffer').value),stock=Number($('productStock').value),f1=$('productPhoto1').files[0],f2=$('productPhoto2').files[0];if(!name||!Number.isFinite(originalPrice)||originalPrice<=0||!Number.isFinite(offerPrice)||offerPrice<=0||offerPrice>=originalPrice||!Number.isInteger(stock)||stock<0||!f1||!f2)return msg('productAdminMsg','Enter product name, valid prices, stock (whole number) and both photos.');$('saveProduct').disabled=true;try{const photo1=await imageData(f1),photo2=await imageData(f2);await api('/api/admin/products','POST',{name,originalPrice,offerPrice,stock,photo1,photo2});$('productName').value=$('productOriginal').value=$('productOffer').value=$('productStock').value='';$('productPhoto1').value=$('productPhoto2').value='';msg('productAdminMsg','Product and offer uploaded successfully.');await loadAdminProducts()}catch(e){msg('productAdminMsg',e.message)}finally{$('saveProduct').disabled=false}};
+$('saveProduct').onclick=async()=>{clear('productAdminMsg');const name=$('productName').value.trim(),size=$('productSize').value.trim(),description=$('productDescription').value.trim(),originalPrice=Number($('productOriginal').value),offerPrice=Number($('productOffer').value),stock=Number($('productStock').value),f1=$('productPhoto1').files[0],f2=$('productPhoto2').files[0];if(!name||!Number.isFinite(originalPrice)||originalPrice<=0||!Number.isFinite(offerPrice)||offerPrice<=0||offerPrice>=originalPrice||!Number.isInteger(stock)||stock<0||!f1||!f2)return msg('productAdminMsg','Enter product name, valid prices, stock (whole number) and both photos.');$('saveProduct').disabled=true;try{const photo1=await imageData(f1),photo2=await imageData(f2);await api('/api/admin/products','POST',{name,size,description,originalPrice,offerPrice,stock,photo1,photo2});$('productName').value=$('productSize').value=$('productDescription').value=$('productOriginal').value=$('productOffer').value=$('productStock').value='';$('productPhoto1').value=$('productPhoto2').value='';msg('productAdminMsg','Product and offer uploaded successfully.');await loadAdminProducts()}catch(e){msg('productAdminMsg',e.message)}finally{$('saveProduct').disabled=false}};
 
 const adminRoute=new URLSearchParams(location.search).get('admin')==='1';if(adminRoute)$('adminLogin').classList.remove('hidden');
 $('toggleCustomerHistory').onclick=()=>{const panel=$('customerHistoryPanel'),opening=panel.classList.contains('hidden');panel.classList.toggle('hidden',!opening);$('toggleCustomerHistory').setAttribute('aria-expanded',String(opening));$('toggleCustomerHistory').textContent=opening?'📋 My Bill History　▲':'📋 My Bill History　▼'};

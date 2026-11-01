@@ -260,23 +260,9 @@ app.get("/api/customer/home", requireUser, async (req,res)=>{
     const latestBillIsCurrent=!!latestBillData && (!d.lastRedeemedAt || asMillis(latestBillData.date)>asMillis(d.lastRedeemedAt));
     const pending=await customerRef(req.user.uid).collection("redemptions").where("status","==","pending").limit(1).get();
     const allRed=await customerRef(req.user.uid).collection("redemptions").where("status","==","taken").get();
-    res.json({profile:{name:d.name||"",mobile:d.mobile||"",village:d.village||"",address:d.address||d.village||""},stamps:moneyNumber(d.stamps),latestBill:latestBillIsCurrent?safeDate(latestBillData.date):null,latestBillAmount:latestBillIsCurrent?moneyNumber(latestBillData.billTotal):0,giftsRedeemed:allRed.size,pendingRedemption:pending.empty?null:(()=>{const x=pending.docs[0];const a=x.data();return{id:x.id,type:a.type,approvedPoints:moneyNumber(a.approvedPoints),status:a.status,createdAt:safeDate(a.date)}})()});
+    res.json({profile:{name:d.name||"",mobile:d.mobile||"",village:d.village||""},stamps:moneyNumber(d.stamps),latestBill:latestBillIsCurrent?safeDate(latestBillData.date):null,latestBillAmount:latestBillIsCurrent?moneyNumber(latestBillData.billTotal):0,giftsRedeemed:allRed.size,pendingRedemption:pending.empty?null:(()=>{const x=pending.docs[0];const a=x.data();return{id:x.id,type:a.type,approvedPoints:moneyNumber(a.approvedPoints),status:a.status,createdAt:safeDate(a.date)}})()});
   }catch(e){console.error("customer home",e);res.status(500).json({error:"Could not load customer account."});}
 });
-app.patch("/api/customer/profile", requireUser, async (req,res)=>{
-  try {
-    const name=String(req.body?.name||"").trim();
-    const address=String(req.body?.address||"").trim();
-    if(!name || name.length>80) return res.status(400).json({error:"Enter a valid customer name (up to 80 characters)."});
-    if(!address || address.length>250) return res.status(400).json({error:"Enter a valid address (up to 250 characters)."});
-    const ref=customerRef(req.user.uid), snap=await ref.get();
-    if(!snap.exists) return res.status(404).json({error:"Customer profile not found."});
-    await ref.update({name,address,updatedAt:admin.firestore.FieldValue.serverTimestamp()});
-    const current=snap.data();
-    res.json({ok:true,profile:{name,mobile:current.mobile||"",village:current.village||"",address}});
-  } catch(e) { console.error("customer profile update",e); res.status(500).json({error:"Could not save your profile details."}); }
-});
-
 app.get("/api/customer/history", requireUser, async (req,res)=>{
   try {
     const s=await customerRef(req.user.uid).collection("bills").orderBy("date","desc").limit(100).get().catch(()=>({docs:[]}));
@@ -400,7 +386,7 @@ app.get("/api/admin/products", requireAdmin, async (_req, res) => {
     res.json({ products: snap.docs.map(d => {
       const x=d.data(), stock=Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const reservedCount=heldByProduct.get(d.id) || 0;
-      return { id:d.id, ...x, stock, reservedCount, availableStock:Math.max(0, stock-reservedCount),
+      return { id:d.id, ...x, size:String(x.size||""), description:String(x.description||""), stock, reservedCount, availableStock:Math.max(0, stock-reservedCount),
         photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]), createdAt:safeDate(x.createdAt) };
     }) });
   } catch (e) { console.error("admin products", e); res.status(500).json({ error:"Could not load products." }); }
@@ -408,14 +394,15 @@ app.get("/api/admin/products", requireAdmin, async (_req, res) => {
 app.post("/api/admin/products", requireAdmin, async (req, res) => {
   let productRef;
   try {
-    const name = String(req.body?.name || "").trim(), originalPrice = Number(req.body?.originalPrice), offerPrice = Number(req.body?.offerPrice), stock = Number(req.body?.stock);
+    const name = String(req.body?.name || "").trim(), size = String(req.body?.size || "").trim(), description = String(req.body?.description || "").trim(), originalPrice = Number(req.body?.originalPrice), offerPrice = Number(req.body?.offerPrice), stock = Number(req.body?.stock);
+    if (size.length > 80 || description.length > 1200) return res.status(400).json({ error:"Product size must be within 80 characters and description within 1200 characters." });
     if (!name || name.length > 80 || !Number.isFinite(originalPrice) || originalPrice <= 0 || !Number.isFinite(offerPrice) || offerPrice <= 0 || offerPrice >= originalPrice || !Number.isInteger(stock) || stock < 0) return res.status(400).json({ error:"Enter a product name and valid prices. Offer price must be below original price." });
     const active = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get();
     if (active.size >= MAX_ACTIVE_PRODUCTS) return res.status(400).json({ error:"You can keep a maximum of 8 active products. Pause an existing offer first." });
     decodeImage(req.body?.photo1); decodeImage(req.body?.photo2);
     productRef = db.collection(PRODUCTS_COLLECTION).doc();
     const photoData = [decodeImage(req.body.photo1), decodeImage(req.body.photo2)];
-    await productRef.set({ name, originalPrice, offerPrice, stock, photoData, active:true, createdAt:admin.firestore.FieldValue.serverTimestamp(), updatedAt:admin.firestore.FieldValue.serverTimestamp(), createdBy:req.adminUid });
+    await productRef.set({ name, size, description, originalPrice, offerPrice, stock, photoData, active:true, createdAt:admin.firestore.FieldValue.serverTimestamp(), updatedAt:admin.firestore.FieldValue.serverTimestamp(), createdBy:req.adminUid });
     res.json({ ok:true, id:productRef.id });
   } catch (e) { console.error("create product", e); res.status(400).json({ error:e.message || "Could not upload product." }); }
 });
@@ -435,7 +422,7 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
       updates.active = req.body.active;
     }
 
-    const hasProductEdit = ["name", "originalPrice", "offerPrice"].some(k => req.body?.[k] !== undefined);
+    const hasProductEdit = ["name", "size", "description", "originalPrice", "offerPrice"].some(k => req.body?.[k] !== undefined);
     if (hasProductEdit) {
       const name = String(req.body?.name ?? current.name ?? "").trim();
       const originalPrice = Number(req.body?.originalPrice ?? current.originalPrice);
@@ -447,6 +434,16 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
       updates.name = name;
       updates.originalPrice = originalPrice;
       updates.offerPrice = offerPrice;
+    }
+    if (req.body?.size !== undefined) {
+      const size = String(req.body.size || "").trim();
+      if (size.length > 80) return res.status(400).json({ error:"Product size must be within 80 characters." });
+      updates.size = size;
+    }
+    if (req.body?.description !== undefined) {
+      const description = String(req.body.description || "").trim();
+      if (description.length > 1200) return res.status(400).json({ error:"Product description must be within 1200 characters." });
+      updates.description = description;
     }
 
     if (req.body?.stock !== undefined) {
@@ -479,7 +476,7 @@ app.get("/api/customer/offers", requireUser, async (_req, res) => {
       const x = d.data(), heldSnap = await db.collection(RESERVATIONS_COLLECTION).where("productId", "==", d.id).get();
       const held = heldSnap.docs.filter(r => r.data().status === "active" && asMillis(r.data().expiresAt) > now).length;
       const stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
-      products.push({ id:d.id, name:x.name, originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), stock, availableStock:Math.max(0, stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]) });
+      products.push({ id:d.id, name:x.name, size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), stock, availableStock:Math.max(0, stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]) });
     }
     res.json({ products });
   } catch (e) { console.error("customer offers", e); res.status(500).json({ error:"Could not load offers." }); }
@@ -560,7 +557,8 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
       const items = [...quantities.entries()].map(([id, quantity]) => {
         const product = productSnaps.get(id).data();
         const offerPrice = moneyNumber(product.offerPrice);
-        return { productId:id, productName:product.name || "Product", quantity, offerPrice, lineTotal:offerPrice * quantity };
+        return { productId:id, productName:product.name || "Product", size:String(product.size||""), description:String(product.description||""), quantity, offerPrice, lineTotal:offerPrice * quantity,
+          photoUrls:Array.isArray(product.photoData) ? product.photoData : (Array.isArray(product.photoUrls) ? product.photoUrls : []) };
       });
       const total = items.reduce((sum, item) => sum + item.lineTotal, 0);
       const orderNumber = Number(counterSnap.exists ? counterSnap.data().lastOrderNumber || 10000 : 10000) + 1;
@@ -648,13 +646,31 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
     const snap = await db.collection(ORDERS_COLLECTION).get();
     const now = Date.now();
     const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
-    const all = snap.docs.map(d => {
-      const x = d.data();
+    const rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
+    // Older orders may not contain a photo snapshot. Load their current product photos
+    // as a fallback, while new orders keep the photo snapshot saved at order time.
+    const missingPhotoProductIds = [...new Set(rawOrders.flatMap(({data}) =>
+      (Array.isArray(data.items) ? data.items : [])
+        .filter(item => !Array.isArray(item.photoUrls) || !item.photoUrls.length)
+        .map(item => String(item.productId || "")).filter(Boolean)
+    ))];
+    const photoProductDocs = await Promise.all(missingPhotoProductIds.map(id => db.collection(PRODUCTS_COLLECTION).doc(id).get()));
+    const productPhotos = new Map(photoProductDocs.filter(d => d.exists).map(d => {
+      const p=d.data();
+      return [d.id, Array.isArray(p.photoData) ? p.photoData : (Array.isArray(p.photoUrls) ? p.photoUrls : [])];
+    }));
+    const all = rawOrders.map(({id, data:x}) => {
       const confirmedAt = safeDate(x.confirmedAt || x.createdAt);
       const expiresAt = asMillis(x.expiresAt);
       const effectiveStatus = x.orderStatus === "ready" && expiresAt && expiresAt <= now ? "expired" : (x.orderStatus || "ready");
-      return { id:d.id, ...x, confirmedAt, expiresAt, orderStatus:effectiveStatus,
-        total:moneyNumber(x.total), items:Array.isArray(x.items) ? x.items : [],
+      const items = (Array.isArray(x.items) ? x.items : []).map(item => ({
+        ...item,
+        photoUrls:Array.isArray(item.photoUrls) && item.photoUrls.length
+          ? item.photoUrls
+          : (productPhotos.get(String(item.productId || "")) || [])
+      }));
+      return { id, ...x, confirmedAt, expiresAt, orderStatus:effectiveStatus,
+        total:moneyNumber(x.total), items,
         customerName:x.customerName || "Customer", mobile:x.mobile || "" };
     }).sort((a,b) => new Date(b.confirmedAt || 0) - new Date(a.confirmedAt || 0));
     const keyOf = x => x.confirmedAt ? new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date(x.confirmedAt)) : "";
