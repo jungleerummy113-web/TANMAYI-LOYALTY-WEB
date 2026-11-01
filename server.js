@@ -260,9 +260,23 @@ app.get("/api/customer/home", requireUser, async (req,res)=>{
     const latestBillIsCurrent=!!latestBillData && (!d.lastRedeemedAt || asMillis(latestBillData.date)>asMillis(d.lastRedeemedAt));
     const pending=await customerRef(req.user.uid).collection("redemptions").where("status","==","pending").limit(1).get();
     const allRed=await customerRef(req.user.uid).collection("redemptions").where("status","==","taken").get();
-    res.json({profile:{name:d.name||"",mobile:d.mobile||"",village:d.village||""},stamps:moneyNumber(d.stamps),latestBill:latestBillIsCurrent?safeDate(latestBillData.date):null,latestBillAmount:latestBillIsCurrent?moneyNumber(latestBillData.billTotal):0,giftsRedeemed:allRed.size,pendingRedemption:pending.empty?null:(()=>{const x=pending.docs[0];const a=x.data();return{id:x.id,type:a.type,approvedPoints:moneyNumber(a.approvedPoints),status:a.status,createdAt:safeDate(a.date)}})()});
+    res.json({profile:{name:d.name||"",mobile:d.mobile||"",village:d.village||"",address:d.address||d.village||""},stamps:moneyNumber(d.stamps),latestBill:latestBillIsCurrent?safeDate(latestBillData.date):null,latestBillAmount:latestBillIsCurrent?moneyNumber(latestBillData.billTotal):0,giftsRedeemed:allRed.size,pendingRedemption:pending.empty?null:(()=>{const x=pending.docs[0];const a=x.data();return{id:x.id,type:a.type,approvedPoints:moneyNumber(a.approvedPoints),status:a.status,createdAt:safeDate(a.date)}})()});
   }catch(e){console.error("customer home",e);res.status(500).json({error:"Could not load customer account."});}
 });
+app.patch("/api/customer/profile", requireUser, async (req,res)=>{
+  try {
+    const name=String(req.body?.name||"").trim();
+    const address=String(req.body?.address||"").trim();
+    if(!name || name.length>80) return res.status(400).json({error:"Enter a valid customer name (up to 80 characters)."});
+    if(!address || address.length>250) return res.status(400).json({error:"Enter a valid address (up to 250 characters)."});
+    const ref=customerRef(req.user.uid), snap=await ref.get();
+    if(!snap.exists) return res.status(404).json({error:"Customer profile not found."});
+    await ref.update({name,address,updatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    const current=snap.data();
+    res.json({ok:true,profile:{name,mobile:current.mobile||"",village:current.village||"",address}});
+  } catch(e) { console.error("customer profile update",e); res.status(500).json({error:"Could not save your profile details."}); }
+});
+
 app.get("/api/customer/history", requireUser, async (req,res)=>{
   try {
     const s=await customerRef(req.user.uid).collection("bills").orderBy("date","desc").limit(100).get().catch(()=>({docs:[]}));
