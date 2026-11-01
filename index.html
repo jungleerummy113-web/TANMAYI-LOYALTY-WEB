@@ -2,7 +2,17 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#171717">
 <meta name="description" content="TANMAYI STORE AND GIFTS Digital Loyalty System">
-<link rel="manifest" href="./manifest.json">
+<link id="tanmayiManifestLink" rel="manifest" href="./manifest.json">
+<script>
+/* Admin URL uses its own PWA identity; customer URL keeps manifest.json unchanged. */
+(function () {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('admin') === '1') {
+    var manifestLink = document.getElementById('tanmayiManifestLink');
+    if (manifestLink) manifestLink.href = './manifest-admin.json';
+  }
+})();
+</script>
 <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>TANMAYI STORE AND GIFTS | Loyalty</title>
