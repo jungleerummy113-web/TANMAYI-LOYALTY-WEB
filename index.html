@@ -46,6 +46,13 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 
 .install-choice-card{position:relative}
 .install-choice-close{position:absolute;top:10px;right:12px;width:38px;height:38px;min-width:38px;padding:0;border:0;border-radius:50%;background:#eee;color:#333;font-size:28px;line-height:1;cursor:pointer;z-index:2}
+
+/* TANMAYI install popup visibility fix */
+.install-choice-backdrop.hidden,
+#installChoicePopup.hidden {
+  display: none !important;
+}
+
 </style></head><body>
 <header><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System</p></header>
 <main class="wrap">
@@ -397,7 +404,11 @@ window.addEventListener("unhandledrejection", function (event) {
   const installedKey = 'tanmayi_app_install_completed_v2';
 
   function hidePopup(remember = true) {
-    if (popup) popup.classList.add('hidden');
+    if (popup) {
+      popup.classList.add('hidden');
+      popup.style.setProperty('display', 'none', 'important');
+      popup.setAttribute('aria-hidden', 'true');
+    }
     if (remember) {
       try { localStorage.setItem(dismissedKey, 'yes'); } catch (_) {}
     }
@@ -431,6 +442,8 @@ window.addEventListener("unhandledrejection", function (event) {
     } catch (_) {}
     popupShown = true;
     popup.classList.remove('hidden');
+    popup.style.removeProperty('display');
+    popup.setAttribute('aria-hidden', 'false');
   }
 
   window.addEventListener('beforeinstallprompt', event => {
@@ -474,10 +487,19 @@ window.addEventListener("unhandledrejection", function (event) {
     );
   }
 
+  // Never show the install popup on the Admin route.
+  if (new URLSearchParams(window.location.search).get('admin') === '1') {
+    hidePopup(false);
+  }
+
   window.addEventListener('load', () => {
     // Give the existing login/auth routing time to reveal the correct page.
     window.setTimeout(() => {
-      if (!adminPageIsVisible()) maybeShowPopup();
+      if (adminPageIsVisible()) {
+        hidePopup(false);
+      } else {
+        maybeShowPopup();
+      }
     }, 1800);
   });
 })();
