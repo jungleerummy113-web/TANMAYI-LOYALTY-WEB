@@ -69,6 +69,30 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 .customer-dashboard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0}
 .customer-tile{background:#fff;border:1.5px solid #d8c9ad;border-radius:14px;min-height:94px;padding:16px 10px;text-align:center;color:#241d14;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font-weight:800;box-shadow:0 3px 10px #251a1008}
 .customer-tile span{font-size:26px}.customer-tile small{font-size:13px;color:#6b6254}.customer-profile-top{display:flex;justify-content:flex-end;margin:8px 0 14px}.customer-profile-btn{background:#fff;color:#241d14;border:1.5px solid #cdbb9b;border-radius:12px;padding:10px 14px;font-weight:800}.customer-panel{background:#fff;border:1px solid #e6dfd2;border-radius:14px;padding:15px;margin:12px 0}.customer-panel h3{margin:0 0 12px}.customer-panel[hidden]{display:none!important}.customer-order-group{margin:12px 0}.customer-order-group h4{margin:10px 0}.customer-product-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.customer-product-card{border:1px solid #e6dfd2;border-radius:12px;padding:10px;background:#fff}.customer-product-card img{width:100%;height:130px;object-fit:contain;background:#faf8f3;border-radius:8px}.customer-product-card button{width:100%;margin:6px 0 0}.profile-actions{display:flex;gap:8px;flex-wrap:wrap}.profile-actions button{flex:1}.stamp-tile strong{font-size:23px;color:#8d1d24}@media(min-width:600px){.customer-dashboard{grid-template-columns:repeat(5,minmax(0,1fr))}.customer-product-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Customer order flow: fixed step-by-step panel, no page scrolling */
+.order-flow-backdrop{position:fixed;inset:0;z-index:10020;background:#120e0be8;display:flex;align-items:center;justify-content:center;padding:12px}
+.order-flow-backdrop.hidden{display:none!important}
+.order-flow-backdrop.inline-order-flow{position:static;inset:auto;z-index:auto;background:transparent;display:block;padding:0;margin-top:10px}
+.order-flow-backdrop.inline-order-flow .order-flow-card{width:100%;max-height:none;overflow:visible;border-radius:12px;border:1.5px solid #d6ad55;box-shadow:none}
+.order-flow-backdrop.inline-order-flow .order-flow-head{padding:10px 12px}
+.order-flow-backdrop.inline-order-flow .order-flow-body{padding:10px}
+.order-flow-backdrop.inline-order-flow .order-flow-stage{padding:9px;margin:7px 0}
+.order-flow-backdrop.inline-order-flow .product-card{padding:8px;margin:6px 0}
+.order-flow-card{width:min(560px,100%);max-height:94dvh;overflow:auto;background:#fffdf8;border-radius:20px;border:2px solid #d6ad55;box-shadow:0 20px 60px #0008}
+.customer-order-card{padding:9px!important;margin:8px 0!important;font-size:12px}
+.customer-order-card p{margin:5px 0;font-size:12px;line-height:1.35}
+.customer-order-card ul{margin:4px 0;padding-left:18px;font-size:11px}
+.customer-order-card .payment-admin-proof{padding:6px;margin:6px 0;font-size:11px}
+.customer-order-card .payment-proof-thumb{max-width:110px;max-height:110px;margin:5px 0}
+.customer-order-card h3{font-size:13px;margin:5px 0}
+.compact-order-details{font-size:10.5px;color:#665e53;margin:3px 0;line-height:1.25}.compact-order-product{margin:5px 0;padding:6px;gap:7px}.compact-order-product img,.compact-order-product .no-photo{width:44px;height:44px}.compact-order-product b{font-size:12px}.compact-order-product small{font-size:10.5px}
+.order-flow-head{position:sticky;top:0;z-index:2;padding:15px 16px 12px;background:linear-gradient(120deg,#171717,#49351c);color:#f5d88f;border-bottom:3px solid #d6ad55}
+.order-flow-headline{display:flex;align-items:center;justify-content:space-between;gap:10px}.order-flow-head h2{margin:0;font-size:18px}.order-flow-close{margin:0;background:#fff2d2;color:#332515;padding:5px 12px;font-size:22px}
+.order-flow-progress{display:flex;gap:6px;margin-top:12px}.order-flow-progress span{height:6px;flex:1;border-radius:10px;background:#716653}.order-flow-progress span.active{background:#f2c65e}
+.order-flow-body{padding:16px}.order-flow-step-title{font-size:17px;font-weight:900;margin:0 0 10px;color:#7e2028}.order-flow-stage{border:2px solid #e5d2a8;border-radius:14px;padding:12px;background:#fffaf0;margin:10px 0}.order-flow-stage.payment-stage{border-color:#76a9d2;background:#f1f8ff}.order-flow-stage.confirm-stage{border-color:#62a77b;background:#effaf2}
+.order-flow-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.order-flow-actions button{flex:1;min-width:125px;margin:0}.order-flow-actions .continue-btn{background:#8d1d24}.order-flow-actions .back-btn{background:#4e5965}.order-flow-success{text-align:center;padding:14px 8px}.order-flow-success .success-mark{width:66px;height:66px;margin:0 auto 10px;border-radius:50%;display:grid;place-items:center;background:#d9f4df;color:#16713a;font-size:38px;font-weight:900}.order-flow-success h2{color:#16713a;font-size:22px;margin:8px 0}.order-flow-success .order-number{font-size:24px;font-weight:900;color:#7e2028;margin:8px 0}.order-flow-note{font-size:13px;color:#5c554a;line-height:1.45}.order-flow-card input[type=file]{font-size:13px}
+@media(max-width:520px){.order-flow-backdrop{padding:7px}.order-flow-card{max-height:96dvh;border-radius:16px}.order-flow-body{padding:12px}.order-flow-head{padding:12px}}
 </style></head><body>
 <header><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System</p></header>
 <main class="wrap">
@@ -105,7 +129,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <section class="customer-panel hidden" id="customerPanel-orders"><div class="row"><h3>📦 Orders &amp; Order History</h3><button type="button" class="secondary" id="refreshMyOrders">Refresh Orders</button></div><p class="muted">Running, completed and cancelled orders are shown separately.</p><div id="customerOrders"><p class="muted">Loading orders…</p></div></section>
 <section class="customer-panel hidden" id="customerPanel-buyAgain"><h3>🔁 Buy Again</h3><p class="muted">Products you ordered before. Only currently active products with available stock can be selected.</p><div id="customerBuyAgain" class="customer-product-grid">Loading previous purchases…</div></section>
 <section class="customer-panel hidden" id="customerPanel-account"><h3>👤 Account Details</h3><label>Customer Name</label><input id="profileName" maxlength="80" autocomplete="name"><label>Registered Mobile Number</label><input id="profileMobile" readonly><label>Address / Village</label><textarea id="profileAddress" rows="3" maxlength="250" placeholder="Enter your address"></textarea><div class="profile-actions"><button type="button" id="saveCustomerAddress">Save Address</button></div><div id="profileMsg" class="msg hidden"></div></section>
-<section class="customer-panel hidden" id="customerPanel-myList"><h3>🛍️ My List – Shop Products</h3><p class="muted">Products uploaded by TANMAYI STORE AND GIFTS, with current offer price and stock.</p><div id="customerProducts" class="customer-product-grid">Loading products…</div><h3 style="margin-top:18px">My Selected Offers</h3><div id="selectedOfferCount" class="offer-count">Selected items: 0</div><div id="customerReservations"></div></section>
+<section class="customer-panel hidden" id="customerPanel-myList"><h3>🛍️ My List – Shop Products</h3><p class="muted">Products uploaded by TANMAYI STORE AND GIFTS, with current offer price and stock.</p><div id="customerProducts" class="customer-product-grid">Loading products…</div><div id="selectedOfferCount" class="offer-count" style="margin-top:14px">Selected items: 0</div></section>
 <section class="customer-panel hidden" id="customerPanel-stamps"><h3>🎟️ My Stamps &amp; Rewards</h3><div class="stats"><div class="stat"><small>Current stamps</small><b id="myStamps">0</b></div><div class="stat"><small>Latest bill</small><b id="myBills">₹0</b></div><div class="stat"><small>Gifts redeemed</small><b id="myGifts">0</b></div></div><div id="customerPending" class="card hidden"><h3>🎁 Reward ready to collect</h3><p id="pendingText"></p><label id="rewardChoiceLabel" class="hidden">Choose your reward</label><div id="rewardChoices" class="hidden"><label><input type="radio" name="rewardChoice" value="gift" checked style="width:auto"> Free gift</label><label id="pointsChoiceLabel"><input type="radio" name="rewardChoice" value="points" style="width:auto"> Approved points</label></div><div id="approvedPointsInfo" class="card hidden" style="background:#fffaf0;margin:10px 0;padding:14px"><strong>Approved points available to redeem</strong><div style="font-size:26px;font-weight:800;margin-top:6px"><span id="approvedPointsValue">0</span> Points</div><div id="approvedPointsRupees" class="muted">Redeem value: ₹0</div></div><button id="customerTaken" class="gold">REDEEM TAKEN – Confirm collection</button><div id="customerRedeemMsg" class="msg hidden"></div></div><div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><strong>🎁 Stamp Rules</strong><p>₹1–₹800 purchase = 1 stamp. ₹801 or above = 2 stamps. Collect 10 stamps to redeem a free gift up to ₹800 or approved cash points.</p></div></section>
 <section class="customer-panel hidden" id="customerPanel-profile"><h3>👤 My Profile &amp; History</h3><p id="profileSummary" class="muted"></p><div id="profileOrdersHistory"></div><button type="button" class="history-toggle" id="toggleCustomerHistory" aria-expanded="false">📋 My Bill History　▼</button><section class="card hidden" id="customerHistoryPanel"><p class="muted">Your bill date, time and bill amount. Scroll to see older bills.</p><div class="history-scroll"><table><thead><tr><th>Date &amp; Time</th><th>Bill Amount</th></tr></thead><tbody id="customerHistory"></tbody></table></div></section></section>
 </section>
@@ -138,6 +162,12 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <h2 style="margin-top:18px">Prepare Reward Redemption</h2><p class="muted">Customer collection confirmation resets stamps and current cycle. Admin approval alone does not reset anything.</p><label>Approved points (₹1 = 1 point; enter 0 for gift only)</label><input id="approvedPoints" type="number" min="0" step="1" value="0"><button class="gold" id="redeem">Approve Reward Options</button><div id="redeemMsg" class="msg hidden"></div>
 <div class="scroll"><table><thead><tr><th>Date</th><th>Gift</th><th>Stamps used</th></tr></thead><tbody id="redRows"></tbody></table></div></section>
 </section></main>
+<div id="orderFlowBackdrop" class="order-flow-backdrop hidden" aria-hidden="true">
+ <section class="order-flow-card" role="dialog" aria-modal="true" aria-labelledby="orderFlowTitle">
+  <header class="order-flow-head"><div class="order-flow-headline"><h2 id="orderFlowTitle">TANMAYI STORE AND GIFTS</h2><button type="button" class="order-flow-close" id="orderFlowClose" aria-label="Close">×</button></div><div class="order-flow-progress"><span id="orderProgress1" class="active"></span><span id="orderProgress2"></span><span id="orderProgress3"></span></div></header>
+  <div class="order-flow-body"><div id="customerReservations"></div></div>
+ </section>
+</div>
 <div id="paymentConfirmPopup" class="payment-confirm-backdrop hidden" aria-hidden="true">
  <div class="payment-confirm-card">
   <button type="button" class="payment-confirm-close" id="paymentPopupClose" aria-label="Close">×</button>
@@ -156,7 +186,7 @@ const cfg={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-
 const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https://tanmayi-pin-reset-api.onrender.com';
 const $=id=>document.getElementById(id),money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),date=v=>v?new Date(v).toLocaleString('en-IN'):'—',customerEmail=m=>`${m}@tanmayi-loyalty.app`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null,customerProfile=null,customerOrdersCache=[],customerProductsCache=[],customerPaymentQr="",paymentStepOpen=false,selectedOrderPaymentMethod="CASH_ON_DELIVERY";
+let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null,customerProfile=null,customerOrdersCache=[],customerProductsCache=[],customerPaymentQr="",paymentStepOpen=false,orderConfirmedData=null,selectedOrderPaymentMethod="CASH_ON_DELIVERY";
 function msg(id,t){$(id).textContent=t;$(id).classList.remove('hidden')}function clear(id){$(id).classList.add('hidden');$(id).textContent=''}
 function show(id){['adminLogin','customerLogin','customerView','adminApp'].forEach(x=>$(x).classList.toggle('hidden',x!==id))}
 async function api(path,method='GET',body=null){const token=auth.currentUser?await auth.currentUser.getIdToken():'';const r=await fetch(API+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}
@@ -322,10 +352,10 @@ async function loadCustomerOrders(){
       const cancelled=x.orderStatus==='cancelled';
       const expired=x.orderStatus==='expired';
       const items=(x.items||[]).map(i=>`<li>${esc(i.productName)} × ${Number(i.quantity)} — ${moneyPrice(i.lineTotal)}</li>`).join('');
-      return `<div class="product-card" style="border:1px solid #d8c28c;background:#fffdf7">
+      return `<div class="product-card customer-order-card" style="border:1px solid #d8c28c;background:#fffdf7">
         <strong>ORDER #${esc(x.orderNumber)}</strong>
         <p><b>Confirmed</b> · ${date(x.confirmedAt)}</p>
-        ${completed?`<p class="price-offer">✓ ORDER COMPLETED</p><h3>Your Billing Stamps Updated 🙏</h3><p>Thank you for shopping. Please visit once again 🙏</p><p>Stamps added: ${Number(x.stampsAdded)}</p>`:cancelled?`<p class="muted">ORDER CANCELLED</p>`:expired?`<p class="muted">OFFER TIME EXPIRED · Please contact the shop if you still want this order.</p>`:`<p class="muted"><b>CONFIRMED</b><br>We're preparing these products for gifting packing.</p><div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><h3 style="margin:0;color:#8a641d">🎁 ORDER READY FOR COLLECTION</h3><p>Please visit TANMAYI STORE AND GIFTS and collect your order. We will prepare your gifting pack when you arrive.</p></div>`}
+        ${completed?`<p class="price-offer">✓ ORDER COMPLETED</p><h3>Your Billing Stamps Updated 🙏</h3><p>Thank you for shopping. Please visit once again 🙏</p><p>Stamps added: ${Number(x.stampsAdded)}</p>`:cancelled?`<p class="muted">ORDER CANCELLED</p>`:expired?`<p class="muted">OFFER TIME EXPIRED · Please contact the shop if you still want this order.</p>`:`<p class="muted"><b>CONFIRMED</b><br>Your products are being prepared.</p><div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><h3 style="margin:0;color:#8a641d">🎁 ORDER READY FOR COLLECTION</h3><p>Please collect your order at TANMAYI STORE AND GIFTS.</p></div>`}
         ${x.paymentMethod==='ONLINE_PAYMENT'?`<div class="payment-admin-proof"><b>ONLINE PAYMENT DETAILS</b><p>Payment UTR: ${esc(x.paymentUtr||'—')}</p>${x.paymentScreenshotData?`<a href="${esc(x.paymentScreenshotData)}" target="_blank" rel="noopener"><img class="payment-proof-thumb" src="${esc(x.paymentScreenshotData)}" alt="Your payment screenshot"></a>`:''}<p>Payment status: ${esc(x.paymentStatus||'submitted')}</p>${x.refund?.status?`<p><b>Refund status:</b> ${esc(String(x.refund.status).toUpperCase())}</p><p><b>Refund account:</b> ${esc(x.refund.holderName||'')} · ${esc(x.refund.upiId||'')}</p>${x.refund.refundUtr?`<p><b>Refund UTR:</b> ${esc(x.refund.refundUtr)}</p>`:''}${x.refund.message?`<p><b>Shop message:</b> ${esc(x.refund.message)}</p>`:''}${x.refund.screenshotData?`<p><b>Refund payment / update screenshot:</b></p><a href="${esc(x.refund.screenshotData)}" target="_blank" rel="noopener"><img class="payment-proof-thumb" src="${esc(x.refund.screenshotData)}" alt="Refund payment or issue screenshot"></a>`:''}`:''}</div>`:''}
         <p><b>Products:</b></p><ul>${items}</ul><p><b>Total:</b> ${moneyPrice(x.total)}</p>
         ${!completed&&!cancelled&&!expired?`<p class="countdown">Collect before: ${date(x.expiresAt)}</p>${x.paymentMethod==='ONLINE_PAYMENT'?`<div class="refund-request-box" id="refund-box-${esc(x.id)}"><button class="cancel-reservation" data-show-refund="${esc(x.id)}">Cancel Order / Request Refund</button><div class="hidden" id="refund-fields-${esc(x.id)}"><label>Bank Account Holder Name</label><input id="refund-holder-${esc(x.id)}" maxlength="100" placeholder="Enter account holder name"><label>UPI ID / UPI Number</label><input id="refund-upi-${esc(x.id)}" maxlength="100" placeholder="example@upi or mobile UPI"><button class="gold" data-submit-refund="${esc(x.id)}">Cancel &amp; Submit Refund Request</button></div></div>`:`<button class="cancel-reservation" data-cancel-order="${esc(x.id)}">Cancel Order</button>`}`:''}
@@ -337,8 +367,8 @@ async function loadCustomerOrders(){
     document.querySelectorAll('[data-submit-refund]').forEach(b=>b.onclick=async()=>{const id=b.dataset.submitRefund,holderName=$('refund-holder-'+id).value.trim(),upiId=$('refund-upi-'+id).value.trim();if(!holderName||!upiId){alert('Enter bank account holder name and UPI ID / number.');return}if(!confirm('Cancel this online payment order and submit refund request?'))return;b.disabled=true;try{const result=await api('/api/customer/cancel-order','POST',{orderId:id,holderName,upiId});alert(result.message||'Refund request submitted.');await loadCustomerOrders();await loadCustomerProducts()}catch(e){alert(e.message);b.disabled=false}});
   }catch(e){$('customerOrders').textContent=e.message||'Could not load your orders.'}
 }
-function renderProfileOrders(){const el=$('profileOrdersHistory');if(!el)return;const groups=[['Running',customerOrdersCache.filter(x=>!['completed','cancelled','expired'].includes(x.orderStatus))],['Completed',customerOrdersCache.filter(x=>x.orderStatus==='completed')],['Cancelled',customerOrdersCache.filter(x=>x.orderStatus==='cancelled')],['Expired',customerOrdersCache.filter(x=>x.orderStatus==='expired')]];el.innerHTML=groups.map(([title,items])=>`<div class="customer-order-group"><h4>${title} Orders (${items.length})</h4>${items.map(x=>`<div class="customer-product-card"><b>Order #${esc(x.orderNumber)}</b><p>${date(x.confirmedAt)} · ${esc(x.orderStatus)}</p><p>${(x.items||[]).map(i=>`${esc(i.productName)} × ${Number(i.quantity)}`).join(', ')}</p><b>${moneyPrice(x.total)}</b></div>`).join('')||'<p class="muted">No '+title.toLowerCase()+' orders.</p>'}</div>`).join('');}
-function renderBuyAgain(){const el=$('customerBuyAgain');if(!el)return;const bought=new Map();customerOrdersCache.forEach(o=>(o.items||[]).forEach(i=>{if(i.productId)bought.set(i.productId,i.productName||'Product')}));const matches=customerProductsCache.filter(p=>bought.has(p.id)&&Number(p.availableStock??p.stock??0)>0);el.innerHTML=matches.map(p=>`<div class="customer-product-card"><b>${esc(p.name)}</b><div class="product-photos">${(p.photoUrls||[]).map(u=>`<img src="${esc(u)}" alt="${esc(p.name)}">`).join('')}</div><p><span class="price-old">${moneyPrice(p.originalPrice)}</span> <b class="price-offer">${moneyPrice(p.offerPrice)}</b></p><p class="stock-line">Available: ${Number(p.availableStock??p.stock??0)}</p><button data-buy-again="${esc(p.id)}" data-name="${esc(p.name)}" data-price="${Number(p.offerPrice)}">Buy Again</button></div>`).join('')||'<p class="muted">Your previous products are currently unavailable or out of stock.</p>';el.querySelectorAll('[data-buy-again]').forEach(b=>b.onclick=()=>{pendingOfferCart.push({key:Date.now()+'-'+Math.random().toString(36).slice(2),productId:b.dataset.buyAgain,productName:b.dataset.name,offerPrice:Number(b.dataset.price)});openCustomerPanel('myList');loadCustomerProducts()});}
+function renderProfileOrders(){const el=$('profileOrdersHistory');if(!el)return;const groups=[['Running',customerOrdersCache.filter(x=>!['completed','cancelled','expired'].includes(x.orderStatus))],['Completed',customerOrdersCache.filter(x=>x.orderStatus==='completed')],['Cancelled',customerOrdersCache.filter(x=>x.orderStatus==='cancelled')],['Expired',customerOrdersCache.filter(x=>x.orderStatus==='expired')]];el.innerHTML=groups.map(([title,items])=>`<div class="customer-order-group"><h4>${title} Orders (${items.length})</h4>${items.map(x=>`<div class="customer-product-card customer-order-card"><b>Order #${esc(x.orderNumber)}</b><p>${date(x.confirmedAt)} · ${esc(x.orderStatus)}</p><p>${(x.items||[]).map(i=>`${esc(i.productName)} × ${Number(i.quantity)}`).join(', ')}</p><b>${moneyPrice(x.total)}</b></div>`).join('')||'<p class="muted">No '+title.toLowerCase()+' orders.</p>'}</div>`).join('');}
+function renderBuyAgain(){const el=$('customerBuyAgain');if(!el)return;const bought=new Map();customerOrdersCache.forEach(o=>(o.items||[]).forEach(i=>{if(i.productId)bought.set(i.productId,i.productName||'Product')}));const matches=customerProductsCache.filter(p=>bought.has(p.id)&&Number(p.availableStock??p.stock??0)>0);el.innerHTML=matches.map(p=>`<div class="customer-product-card"><b>${esc(p.name)}</b><div class="product-photos">${(p.photoUrls||[]).map(u=>`<img src="${esc(u)}" alt="${esc(p.name)}">`).join('')}</div><p><span class="price-old">${moneyPrice(p.originalPrice)}</span> <b class="price-offer">${moneyPrice(p.offerPrice)}</b></p><p class="stock-line">Available: ${Number(p.availableStock??p.stock??0)}</p><button data-buy-again="${esc(p.id)}" data-name="${esc(p.name)}" data-price="${Number(p.offerPrice)}">Buy Again</button></div>`).join('')||'<p class="muted">Your previous products are currently unavailable or out of stock.</p>';el.querySelectorAll('[data-buy-again]').forEach(b=>b.onclick=()=>{pendingOfferCart.push({key:Date.now()+'-'+Math.random().toString(36).slice(2),productId:b.dataset.buyAgain,productName:b.dataset.name,offerPrice:Number(b.dataset.price)});orderConfirmedData=null;openCustomerPanel('myList');const flow=$('orderFlowBackdrop');flow.classList.add('inline-order-flow');b.closest('.customer-product-card').appendChild(flow);flow.classList.remove('hidden');flow.setAttribute('aria-hidden','false');renderReservations([])});}
 $('refreshMyOrders').onclick=loadCustomerOrders;
 
 async function loadCustomerProducts(){
@@ -362,96 +392,58 @@ async function loadCustomerProducts(){
     document.querySelectorAll('[data-stage-offer]').forEach(b=>b.onclick=()=>{
       if(!pendingOfferCart.length){paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";}
       pendingOfferCart.push({key:Date.now()+'-'+Math.random().toString(36).slice(2),productId:b.dataset.stageOffer,productName:b.dataset.name,offerPrice:Number(b.dataset.price)});
+      orderConfirmedData=null;
+      const flow=$('orderFlowBackdrop');flow.classList.add('inline-order-flow');b.closest('.product-card').appendChild(flow);flow.classList.remove('hidden');flow.setAttribute('aria-hidden','false');
       renderReservations(m.reservations);
-      loadCustomerProducts();
     });
     renderReservations(m.reservations);renderBuyAgain();
   }catch(e){$('customerProducts').textContent='Could not load offers. Please refresh.'}
 }
 function renderReservations(items){
-  const staged=pendingOfferCart.map(x=>`<div class="product-card pending-cart-card">
-    <strong>${esc(x.productName)}</strong> · ${moneyPrice(x.offerPrice)}
-    <p class="muted">Selected product · Choose how you want to pay below.</p>
-    <button class="cancel-reservation" data-remove-staged="${esc(x.key)}">Remove from cart</button>
-  </div>`).join('');
-  const confirmed=items.map(x=>`<div class="product-card" data-expiry="${Number(x.expiresAt)}">
-    <strong>${esc(x.productName)}</strong> · ${moneyPrice(x.offerPrice)}
-    <span class="countdown" data-countdown="${Number(x.expiresAt)}"></span>
-    <div class="collection-notice">PLEASE VISIT TANMAYI STORE AND GIFTS AND COLLECT YOUR PRODUCT BEFORE EXPIRY OF THIS OFFER TIME.</div>
-    <button class="cancel-reservation" data-cancel-reservation="${esc(x.id)}">Cancel selection</button>
-  </div>`).join('');
-  const total=pendingOfferCart.length+items.length;
-  $('selectedOfferCount').textContent=`Selected items: ${total}`;
-  const paymentChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="payment-choice">
-    <strong>Choose Payment Method for Selected Product(s)</strong>
-    <label><input type="radio" name="orderPaymentMethod" value="CASH_ON_DELIVERY" ${selectedOrderPaymentMethod==='CASH_ON_DELIVERY'?'checked':''}> 1. Cash on Delivery – Visit Shop</label>
-    <label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" ${selectedOrderPaymentMethod==='ONLINE_PAYMENT'?'checked':''}> 2. Online Payment</label>
-    <div id="onlinePaymentFields" class="online-payment-fields hidden">
-      ${customerPaymentQr?`<p><b>Scan Shop Payment QR Code</b></p><img src="${esc(customerPaymentQr)}" alt="Shop UPI QR code">`:'<p class="muted">Shop payment QR code is not uploaded yet. Please contact the shop or choose Cash on Delivery.</p>'}
-      <label>Upload Payment Screenshot</label><input type="file" id="onlinePaymentScreenshot" accept="image/*">
-      <label>Enter 12-digit UTR Number</label><input type="text" id="onlinePaymentUtr" inputmode="numeric" maxlength="12" placeholder="12-digit UTR number">
-      <small class="muted">Payment details will be sent to the shop for verification.</small>
-    </div>
-  </div>`:'';
-  $('customerReservations').innerHTML=(staged+paymentChoice+confirmed)||'<p class="muted">You have not selected any offers.</p>';
-  document.querySelectorAll('input[name="orderPaymentMethod"]').forEach(r=>r.onchange=()=>{
-    selectedOrderPaymentMethod=r.value;
-    const online=selectedOrderPaymentMethod==='ONLINE_PAYMENT';
-    $('onlinePaymentFields')?.classList.toggle('hidden',!online);
-    const finalButton=$('confirmOffersButton');
-    if(finalButton)finalButton.textContent=online?'Confirm Payment & Order':'Confirm Order';
-  });
-  const utrInput=$('onlinePaymentUtr');
-  if(utrInput)utrInput.oninput=()=>{const digits=utrInput.value.replace(/[^0-9]/g,'').slice(0,12);if(utrInput.value!==digits)utrInput.value=digits;};
-  const confirmButton=document.getElementById('confirmOffersButton');
-  if(confirmButton)confirmButton.remove();
-  if(pendingOfferCart.length){
-    const btn=document.createElement('button');
-    btn.id='confirmOffersButton';btn.className='gold';btn.textContent=paymentStepOpen?'Confirm Order':'Confirm to buy ('+pendingOfferCart.length+')';
-    btn.onclick=async()=>{
-      if(!paymentStepOpen){
-        paymentStepOpen=true;
-        try{const latestPaymentSettings=await api('/api/customer/payment-settings');customerPaymentQr=latestPaymentSettings.qrData||"";}catch(_){}
-        renderReservations(items);
-        return;
-      }
-      btn.disabled=true;
-      try{
-        if(!pendingOrderRequestId)pendingOrderRequestId=(crypto.randomUUID?crypto.randomUUID():('req_'+Date.now()+'_'+Math.random().toString(36).slice(2)));
-        const paymentMethod=document.querySelector('input[name="orderPaymentMethod"]:checked')?.value||selectedOrderPaymentMethod||'CASH_ON_DELIVERY';
-        const payload={productIds:pendingOfferCart.map(x=>x.productId),clientRequestId:pendingOrderRequestId,paymentMethod};
-        if(paymentMethod==='ONLINE_PAYMENT'){
-          if(!customerPaymentQr)throw Error('Shop online payment QR is not available yet. Please choose Cash on Delivery or contact the shop.');
-          const utr=String($('onlinePaymentUtr')?.value||'').replace(/[^0-9]/g,'');
-          if($('onlinePaymentUtr'))$('onlinePaymentUtr').value=utr;
-          const screenshotFile=$('onlinePaymentScreenshot')?.files?.[0];
-          if(utr.length!==12)throw Error('UTR must contain exactly 12 digits. Website detected '+utr.length+' digit(s). Please check the UTR field.');
-          if(!screenshotFile)throw Error('Please upload your payment screenshot.');
-          payload.paymentUtr=utr;
-          payload.paymentScreenshot=await imageData(screenshotFile);
-        }
-        const orderResult=await api('/api/customer/confirm-offers','POST',payload);
-        pendingOrderRequestId=null;pendingOfferCart=[];paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";
-        if(paymentMethod==='ONLINE_PAYMENT')showPaymentConfirmationPopup();
-        await loadCustomerOrders();await loadCustomerProducts();
-      }catch(e){alert(e.message);btn.disabled=false}
-    };
-    $('customerReservations').appendChild(btn);
-    if(paymentStepOpen&&selectedOrderPaymentMethod==='ONLINE_PAYMENT')btn.textContent='Confirm Payment & Order';
+  const el=$('customerReservations');if(!el)return;
+  $('orderProgress1').classList.add('active');$('orderProgress2').classList.toggle('active',!!paymentStepOpen);$('orderProgress3').classList.toggle('active',!!orderConfirmedData);
+  if(orderConfirmedData){
+    const o=orderConfirmedData.order||{};
+    const online=orderConfirmedData.paymentMethod==='ONLINE_PAYMENT';
+    $('orderProgress1').classList.add('active');$('orderProgress2').classList.add('active');$('orderProgress3').classList.add('active');
+    el.innerHTML=`<div class="order-flow-success"><div class="success-mark">✓</div><h2>ORDER CONFIRMED SUCCESSFULLY</h2><p class="order-number">ORDER #${esc(o.orderNumber||'—')}</p><div class="order-flow-stage confirm-stage"><p><b>Order Total: ${moneyPrice(o.total||0)}</b></p><p><b>Payment:</b> ${online?'ONLINE PAYMENT – SUBMITTED FOR SHOP VERIFICATION':'CASH ON DELIVERY – PAY AT SHOP'}</p><p><b>Order Status:</b> CONFIRMED</p></div><p class="order-flow-note">${online?'Your payment details have been submitted. Shop verification is pending.':'Your order has been received. Please visit TANMAYI STORE AND GIFTS to collect and pay.'}</p><p class="order-flow-note">Order details are saved. You can view status in My Orders.</p><div class="order-flow-actions"><button type="button" class="continue-btn" id="orderFlowViewOrders">VIEW MY ORDERS</button><button type="button" class="back-btn" id="orderFlowDone">DONE</button></div></div>`;
+    $('orderFlowViewOrders').onclick=()=>{closeOrderFlow();openCustomerPanel('orders')};$('orderFlowDone').onclick=closeOrderFlow;
+    return;
   }
-  document.querySelectorAll('[data-remove-staged]').forEach(b=>b.onclick=()=>{
-    pendingOfferCart=pendingOfferCart.filter(x=>x.key!==b.dataset.removeStaged);
-    if(!pendingOfferCart.length){paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";}
-    renderReservations(items);loadCustomerProducts();
-  });
-  document.querySelectorAll('[data-cancel-reservation]').forEach(b=>b.onclick=async()=>{
-    if(!confirm('Cancel this confirmed offer?'))return;
-    b.disabled=true;
-    try{await api('/api/customer/cancel-offer','POST',{reservationId:b.dataset.cancelReservation});await loadCustomerProducts()}
-    catch(e){alert(e.message);b.disabled=false}
-  });
+  const staged=pendingOfferCart.map(x=>`<div class="product-card pending-cart-card"><strong>${esc(x.productName)}</strong> · ${moneyPrice(x.offerPrice)}<p class="muted">Selected product</p><button class="cancel-reservation" data-remove-staged="${esc(x.key)}">Remove</button></div>`).join('');
+  const confirmed=(items||[]).map(x=>`<div class="product-card" data-expiry="${Number(x.expiresAt)}"><strong>${esc(x.productName)}</strong> · ${moneyPrice(x.offerPrice)}<span class="countdown" data-countdown="${Number(x.expiresAt)}"></span><div class="collection-notice">PLEASE VISIT TANMAYI STORE AND GIFTS AND COLLECT YOUR PRODUCT BEFORE EXPIRY OF THIS OFFER TIME.</div><button class="cancel-reservation" data-cancel-reservation="${esc(x.id)}">Cancel selection</button></div>`).join('');
+  const total=pendingOfferCart.length+(items||[]).length;
+  $('selectedOfferCount').textContent=`Selected items: ${total}`;
+  const paymentChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="order-flow-stage payment-stage"><p class="order-flow-step-title">STEP 2 · CHOOSE PAYMENT</p><strong>Select how you want to pay</strong><div class="payment-choice"><label><input type="radio" name="orderPaymentMethod" value="CASH_ON_DELIVERY" ${selectedOrderPaymentMethod==='CASH_ON_DELIVERY'?'checked':''}> Cash on Delivery – Visit Shop</label><label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" ${selectedOrderPaymentMethod==='ONLINE_PAYMENT'?'checked':''}> Online Payment</label><div id="onlinePaymentFields" class="online-payment-fields hidden">${customerPaymentQr?`<p><b>Scan Shop Payment QR Code</b></p><img src="${esc(customerPaymentQr)}" alt="Shop UPI QR code">`:'<p class="muted">Shop payment QR code is not uploaded yet. Please choose Cash on Delivery or contact the shop.</p>'}<label>Upload Payment Screenshot</label><input type="file" id="onlinePaymentScreenshot" accept="image/*"><label>Enter 12-digit UTR Number</label><input type="text" id="onlinePaymentUtr" inputmode="numeric" maxlength="12" placeholder="12-digit UTR number"><small class="muted">Payment details will be sent to the shop for verification.</small></div></div></div>`:'';
+  el.innerHTML=`<p class="order-flow-step-title">${paymentStepOpen?'STEP 2 · PAYMENT DETAILS':'STEP 1 · YOUR SELECTED PRODUCTS'}</p>${staged?`<div class="order-flow-stage">${staged}<p><b>Selected items: ${pendingOfferCart.length}</b> · Total: ${moneyPrice(pendingOfferCart.reduce((a,x)=>a+Number(x.offerPrice||0),0))}</p></div>`:''}${paymentChoice}${confirmed?`<div class="order-flow-stage"><b>Existing reserved offers</b>${confirmed}</div>`:''}${pendingOfferCart.length?`<div class="order-flow-actions">${paymentStepOpen?'<button type="button" class="back-btn" id="orderFlowBack">BACK</button>':'<button type="button" class="back-btn" id="orderFlowAddMore">ADD MORE PRODUCTS</button>'}<button type="button" class="continue-btn" id="confirmOffersButton">${paymentStepOpen?(selectedOrderPaymentMethod==='ONLINE_PAYMENT'?'CONFIRM PAYMENT & ORDER':'CONFIRM ORDER'):'CONTINUE TO PAYMENT'}</button></div>`:''}${!pendingOfferCart.length&&!confirmed?'<p class="muted">No products selected.</p>':''}`;
+  document.querySelectorAll('input[name="orderPaymentMethod"]').forEach(r=>r.onchange=()=>{selectedOrderPaymentMethod=r.value;const online=r.value==='ONLINE_PAYMENT';$('onlinePaymentFields')?.classList.toggle('hidden',!online);const b=$('confirmOffersButton');if(b)b.textContent=online?'CONFIRM PAYMENT & ORDER':'CONFIRM ORDER';$('orderFlowBackdrop').querySelector('.payment-stage')?.classList.toggle('payment-stage',true)});
+  const onlineFields=$('onlinePaymentFields');if(onlineFields)onlineFields.classList.toggle('hidden',selectedOrderPaymentMethod!=='ONLINE_PAYMENT');
+  const utrInput=$('onlinePaymentUtr');if(utrInput)utrInput.oninput=()=>{const digits=utrInput.value.replace(/[^0-9]/g,'').slice(0,12);if(utrInput.value!==digits)utrInput.value=digits;};
+  const confirmButton=$('confirmOffersButton');if(confirmButton)confirmButton.onclick=async()=>{
+    if(!paymentStepOpen){paymentStepOpen=true;try{const latestPaymentSettings=await api('/api/customer/payment-settings');customerPaymentQr=latestPaymentSettings.qrData||'';}catch(_){}renderReservations(items);return;}
+    confirmButton.disabled=true;
+    try{
+      if(!pendingOrderRequestId)pendingOrderRequestId=(crypto.randomUUID?crypto.randomUUID():('req_'+Date.now()+'_'+Math.random().toString(36).slice(2)));
+      const paymentMethod=document.querySelector('input[name="orderPaymentMethod"]:checked')?.value||selectedOrderPaymentMethod||'CASH_ON_DELIVERY';
+      const payload={productIds:pendingOfferCart.map(x=>x.productId),clientRequestId:pendingOrderRequestId,paymentMethod};
+      if(paymentMethod==='ONLINE_PAYMENT'){
+        if(!customerPaymentQr)throw Error('Shop online payment QR is not available yet. Please choose Cash on Delivery or contact the shop.');
+        const utr=String($('onlinePaymentUtr')?.value||'').replace(/[^0-9]/g,'');if($('onlinePaymentUtr'))$('onlinePaymentUtr').value=utr;
+        const screenshotFile=$('onlinePaymentScreenshot')?.files?.[0];if(utr.length!==12)throw Error('UTR must contain exactly 12 digits. Website detected '+utr.length+' digit(s). Please check the UTR field.');if(!screenshotFile)throw Error('Please upload your payment screenshot.');payload.paymentUtr=utr;payload.paymentScreenshot=await imageData(screenshotFile);
+      }
+      const orderResult=await api('/api/customer/confirm-offers','POST',payload);
+      pendingOrderRequestId=null;pendingOfferCart=[];paymentStepOpen=false;selectedOrderPaymentMethod='CASH_ON_DELIVERY';orderConfirmedData={order:orderResult.order||{},paymentMethod};
+      renderReservations([]);await loadCustomerOrders();
+    }catch(e){alert(e.message);confirmButton.disabled=false}
+  };
+  const back=$('orderFlowBack');if(back)back.onclick=()=>{paymentStepOpen=false;selectedOrderPaymentMethod='CASH_ON_DELIVERY';renderReservations(items)};
+  const addMore=$('orderFlowAddMore');if(addMore)addMore.onclick=closeOrderFlow;
+  document.querySelectorAll('[data-remove-staged]').forEach(b=>b.onclick=()=>{pendingOfferCart=pendingOfferCart.filter(x=>x.key!==b.dataset.removeStaged);if(!pendingOfferCart.length){paymentStepOpen=false;selectedOrderPaymentMethod='CASH_ON_DELIVERY';closeOrderFlow()}else renderReservations(items);loadCustomerProducts()});
+  document.querySelectorAll('[data-cancel-reservation]').forEach(b=>b.onclick=async()=>{if(!confirm('Cancel this confirmed offer?'))return;b.disabled=true;try{await api('/api/customer/cancel-offer','POST',{reservationId:b.dataset.cancelReservation});await loadCustomerProducts()}catch(e){alert(e.message);b.disabled=false}});
   updateCountdowns();
 }
+function closeOrderFlow(){const modal=$('orderFlowBackdrop');if(modal){modal.classList.add('hidden');modal.setAttribute('aria-hidden','true');modal.classList.remove('inline-order-flow');document.body.appendChild(modal)}if(orderConfirmedData){orderConfirmedData=null;pendingOfferCart=[];paymentStepOpen=false;selectedOrderPaymentMethod='CASH_ON_DELIVERY';loadCustomerProducts()}else{paymentStepOpen=false;selectedOrderPaymentMethod='CASH_ON_DELIVERY'}}
+$('orderFlowClose').onclick=closeOrderFlow;
 function showPaymentConfirmationPopup(){
   const popup=$('paymentConfirmPopup');
   popup.classList.remove('hidden');popup.setAttribute('aria-hidden','false');
