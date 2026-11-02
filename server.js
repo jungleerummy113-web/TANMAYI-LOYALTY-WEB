@@ -677,7 +677,7 @@ app.get("/api/customer/my-orders", requireUser, async (req, res) => {
       const x=d.data(),payment=paymentById.get(d.id)||{},refund=refundById.get(d.id)||{};
       return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH_ON_DELIVERY", paymentStatus:x.paymentStatus || "pending", paymentUtr:x.paymentUtr || payment.utr || "",
         paymentScreenshotData:x.orderStatus === "cancelled" ? (payment.screenshotData || "") : "",
-        refund:refund.status ? {status:refund.status,holderName:refund.holderName||"",upiId:refund.upiId||"",customerMessage:refund.customerMessage||"",message:refund.message||"",screenshotData:refund.screenshotData||"",updatedAt:safeDate(refund.updatedAt)} : null,
+        refund:refund.status ? {status:refund.status,holderName:refund.holderName||"",upiId:refund.upiId||"",refundUtr:refund.refundUtr||"",customerMessage:refund.customerMessage||"",message:refund.message||"",screenshotData:refund.screenshotData||"",updatedAt:safeDate(refund.updatedAt)} : null,
         orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending",
         stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
         cancelledAt:safeDate(x.cancelledAt), readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
@@ -724,16 +724,18 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
   } catch(e) { res.status(400).json({error:e.message || "Could not cancel this order."}); }
 });
 
-// Admin records the actual refund result and a customer-facing explanation.
+// Admin records a refund UTR, proof screenshot, or an issue explanation for the customer.
+// No separate FAILED state: a refund becomes SUCCESS only when both UTR and proof are supplied.
 app.post("/api/admin/orders/:id/refund", requireAdmin, async (req,res)=>{
   try{
-    const status=String(req.body?.status||"").toLowerCase();
     const message=String(req.body?.message||"").trim().slice(0,500);
-    if(!["success","failed"].includes(status)) throw new Error("Choose refund success or failed.");
-    if(!message) throw new Error("Enter a message for the customer.");
+    const refundUtr=String(req.body?.refundUtr||"").replace(/\D/g,"").slice(0,12);
     const screenshotData=req.body?.screenshotData||"";
-    if(status==="failed") decodePaymentImage(screenshotData,"Refund failure screenshot");
-    else if(screenshotData) decodePaymentImage(screenshotData,"Refund screenshot");
+    if(!message) throw new Error("Enter a message for the customer.");
+    if(refundUtr && !/^\d{12}$/.test(refundUtr)) throw new Error("Refund UTR must contain exactly 12 digits.");
+    if(screenshotData) decodePaymentImage(screenshotData,"Refund payment / issue screenshot");
+    if(refundUtr && !screenshotData) throw new Error("For a successful refund, provide both the 12-digit refund UTR and refund payment screenshot.");
+    const status=refundUtr && screenshotData ? "success" : "requested";
     const orderRef=db.collection(ORDERS_COLLECTION).doc(req.params.id);
     const refundRef=db.collection(ORDER_REFUNDS_COLLECTION).doc(req.params.id);
     await db.runTransaction(async tx=>{
@@ -741,15 +743,14 @@ app.post("/api/admin/orders/:id/refund", requireAdmin, async (req,res)=>{
       if(!orderSnap.exists) throw new Error("Order not found.");
       const order=orderSnap.data();
       if(order.paymentMethod!=="ONLINE_PAYMENT" || order.orderStatus!=="cancelled") throw new Error("Refund is available only for cancelled online payment orders.");
-      if(status==="success" && order.paymentStatus!=="received") throw new Error("Verify that the online payment was received before marking the refund successful.");
       if(!refundSnap.exists) throw new Error("Customer refund request was not found.");
       const old=refundSnap.data();
       if(old.status==="success") throw new Error("This refund is already marked successful.");
-      tx.set(refundRef,{status,message,screenshotData:status==="failed"?screenshotData:"",updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedBy:req.adminUid,successAt:status==="success"?admin.firestore.FieldValue.serverTimestamp():null,failedAt:status==="failed"?admin.firestore.FieldValue.serverTimestamp():null},{merge:true});
+      tx.set(refundRef,{status,message,refundUtr:refundUtr||old.refundUtr||"",screenshotData:screenshotData||old.screenshotData||"",updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedBy:req.adminUid,successAt:status==="success"?admin.firestore.FieldValue.serverTimestamp():null},{merge:true});
       tx.update(orderRef,{refundStatus:status,refundUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
     });
-    res.json({ok:true,message:status==="success"?"Refund marked successful. Customer can see your message.":"Refund marked failed. Failure screenshot and message are visible to the customer."});
-  }catch(e){res.status(400).json({error:e.message||"Could not update refund status."});}
+    res.json({ok:true,status,message:status==="success"?"Refund marked successful. Refund UTR and screenshot are now visible to the customer.":"Refund update saved. Your message and any issue screenshot are visible to the customer."});
+  }catch(e){res.status(400).json({error:e.message||"Could not update refund details."});}
 });
 
 // Admin dashboard order API. Response fields match the Admin HTML dashboard.
