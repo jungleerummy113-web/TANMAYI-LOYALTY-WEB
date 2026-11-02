@@ -367,6 +367,7 @@ const MAX_ACTIVE_PRODUCTS = 8;
 const PAYMENT_SETTINGS_COLLECTION = "shopPaymentSettings";
 const PAYMENT_SUBMISSIONS_COLLECTION = "orderPaymentSubmissions";
 const PAYMENT_UTR_KEYS_COLLECTION = "paymentUtrKeys";
+const ORDER_REFUNDS_COLLECTION = "orderRefunds";
 function decodePaymentImage(dataUrl, label) {
   if (typeof dataUrl !== "string") throw new Error(`${label} image is required.`);
   const match = dataUrl.match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/i);
@@ -666,10 +667,18 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 app.get("/api/customer/my-orders", requireUser, async (req, res) => {
   try {
     const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get();
+    const [paymentDocs, refundDocs] = await Promise.all([
+      Promise.all(snap.docs.map(d=>db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(d.id).get())),
+      Promise.all(snap.docs.map(d=>db.collection(ORDER_REFUNDS_COLLECTION).doc(d.id).get()))
+    ]);
+    const paymentById=new Map(paymentDocs.filter(d=>d.exists).map(d=>[d.id,d.data()]));
+    const refundById=new Map(refundDocs.filter(d=>d.exists).map(d=>[d.id,d.data()]));
     const orders = snap.docs.map(d => {
-      const x=d.data();
-      return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH_ON_DELIVERY", paymentStatus:x.paymentStatus || "pending", paymentUtr:x.paymentUtr || "",
-        orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending", paymentStatus:x.paymentStatus || "pending",
+      const x=d.data(),payment=paymentById.get(d.id)||{},refund=refundById.get(d.id)||{};
+      return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH_ON_DELIVERY", paymentStatus:x.paymentStatus || "pending", paymentUtr:x.paymentUtr || payment.utr || "",
+        paymentScreenshotData:x.orderStatus === "cancelled" ? (payment.screenshotData || "") : "",
+        refund:refund.status ? {status:refund.status,holderName:refund.holderName||"",upiId:refund.upiId||"",customerMessage:refund.customerMessage||"",message:refund.message||"",screenshotData:refund.screenshotData||"",updatedAt:safeDate(refund.updatedAt)} : null,
+        orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending",
         stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
         cancelledAt:safeDate(x.cancelledAt), readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
     }).sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
@@ -683,29 +692,76 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
     const orderId=String(req.body?.orderId || "");
     if (!orderId) return res.status(400).json({ error:"Order not found." });
     const orderRef=db.collection(ORDERS_COLLECTION).doc(orderId);
+    let refundRequested=false;
     await db.runTransaction(async tx => {
       const orderSnap=await tx.get(orderRef);
       if (!orderSnap.exists || orderSnap.data().customerUid !== req.user.uid) throw new Error("You cannot cancel this order.");
       const order=orderSnap.data();
       if (order.orderStatus === "cancelled") return;
+      if (order.orderStatus === "completed" || order.collectionStatus === "collected") throw new Error("This order can no longer be cancelled online. Please contact the shop.");
+      const online=order.paymentMethod === "ONLINE_PAYMENT";
+      let holderName="",upiId="";
+      if(online){
+        holderName=String(req.body?.holderName||"").trim().slice(0,100);
+        upiId=String(req.body?.upiId||"").trim().slice(0,100);
+        if(!holderName||!upiId) throw new Error("Enter bank account holder name and UPI ID / number to request a refund.");
+        if(!["submitted","received"].includes(order.paymentStatus)) throw new Error("Online payment has not been submitted. Please contact the shop.");
+        const refundRef=db.collection(ORDER_REFUNDS_COLLECTION).doc(orderId);
+        const existingRefund=await tx.get(refundRef);
+        if(existingRefund.exists && ["requested","processing","success"].includes(existingRefund.data().status)) throw new Error("A refund request already exists for this order.");
+      }
+      const refundRef=db.collection(ORDER_REFUNDS_COLLECTION).doc(orderId);
       const reservations=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",orderId));
+      if(online){
+        const holderName=String(req.body?.holderName||"").trim().slice(0,100),upiId=String(req.body?.upiId||"").trim().slice(0,100);
+        tx.set(refundRef,{orderId,orderNumber:order.orderNumber,customerUid:req.user.uid,customerName:order.customerName||"Customer",mobile:order.mobile||"",holderName,upiId,status:"requested",customerMessage:"Refund requested by customer",requestedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+        refundRequested=true;
+      }
       reservations.docs.filter(d=>d.data().status === "active").forEach(d=>tx.update(d.ref,{status:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp()}));
-      // Customer cancellation changes only this order's status. Admin cash collection,
-      // stamp approval, redemption and billing workflows are intentionally untouched.
-      tx.update(orderRef,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),customerCancelled:true});
+      tx.update(orderRef,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),customerCancelled:true,...(online?{refundStatus:"requested"}:{})});
     });
-    res.json({ok:true});
+    res.json({ok:true,refundRequested,message:refundRequested?"Order cancelled. Your refund request has been sent to the shop.":"Order cancelled successfully."});
   } catch(e) { res.status(400).json({error:e.message || "Could not cancel this order."}); }
+});
+
+// Admin records the actual refund result and a customer-facing explanation.
+app.post("/api/admin/orders/:id/refund", requireAdmin, async (req,res)=>{
+  try{
+    const status=String(req.body?.status||"").toLowerCase();
+    const message=String(req.body?.message||"").trim().slice(0,500);
+    if(!["success","failed"].includes(status)) throw new Error("Choose refund success or failed.");
+    if(!message) throw new Error("Enter a message for the customer.");
+    const screenshotData=req.body?.screenshotData||"";
+    if(status==="failed") decodePaymentImage(screenshotData,"Refund failure screenshot");
+    else if(screenshotData) decodePaymentImage(screenshotData,"Refund screenshot");
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(req.params.id);
+    const refundRef=db.collection(ORDER_REFUNDS_COLLECTION).doc(req.params.id);
+    await db.runTransaction(async tx=>{
+      const [orderSnap,refundSnap]=await Promise.all([tx.get(orderRef),tx.get(refundRef)]);
+      if(!orderSnap.exists) throw new Error("Order not found.");
+      const order=orderSnap.data();
+      if(order.paymentMethod!=="ONLINE_PAYMENT" || order.orderStatus!=="cancelled") throw new Error("Refund is available only for cancelled online payment orders.");
+      if(status==="success" && order.paymentStatus!=="received") throw new Error("Verify that the online payment was received before marking the refund successful.");
+      if(!refundSnap.exists) throw new Error("Customer refund request was not found.");
+      const old=refundSnap.data();
+      if(old.status==="success") throw new Error("This refund is already marked successful.");
+      tx.set(refundRef,{status,message,screenshotData:status==="failed"?screenshotData:"",updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedBy:req.adminUid,successAt:status==="success"?admin.firestore.FieldValue.serverTimestamp():null,failedAt:status==="failed"?admin.firestore.FieldValue.serverTimestamp():null},{merge:true});
+      tx.update(orderRef,{refundStatus:status,refundUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    });
+    res.json({ok:true,message:status==="success"?"Refund marked successful. Customer can see your message.":"Refund marked failed. Failure screenshot and message are visible to the customer."});
+  }catch(e){res.status(400).json({error:e.message||"Could not update refund status."});}
 });
 
 // Admin dashboard order API. Response fields match the Admin HTML dashboard.
 app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   try {
-    const [snap, paymentSnap] = await Promise.all([
+    const [snap, paymentSnap, refundSnap] = await Promise.all([
       db.collection(ORDERS_COLLECTION).get(),
-      db.collection(PAYMENT_SUBMISSIONS_COLLECTION).get()
+      db.collection(PAYMENT_SUBMISSIONS_COLLECTION).get(),
+      db.collection(ORDER_REFUNDS_COLLECTION).get()
     ]);
     const paymentByOrder = new Map(paymentSnap.docs.map(d => [d.id, d.data()]));
+    const refundByOrder = new Map(refundSnap.docs.map(d => [d.id, d.data()]));
     const now = Date.now();
     const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
     const rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
@@ -735,8 +791,9 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
       return { id, ...x, confirmedAt, expiresAt, orderStatus:effectiveStatus,
         total:moneyNumber(x.total), items,
         paymentUtr:x.paymentUtr || payment.utr || "",
-        paymentScreenshotData:payment.status === "submitted" ? (payment.screenshotData || "") : "",
+        paymentScreenshotData:(payment.status === "submitted" || refundByOrder.has(id)) ? (payment.screenshotData || "") : "",
         paymentSubmissionStatus:payment.status || "",
+        refund:refundByOrder.get(id) || null,
         customerName:x.customerName || "Customer", mobile:x.mobile || "" };
     }).sort((a,b) => new Date(b.confirmedAt || 0) - new Date(a.confirmedAt || 0));
     const keyOf = x => x.confirmedAt ? new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date(x.confirmedAt)) : "";
