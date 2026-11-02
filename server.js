@@ -454,9 +454,20 @@ app.put("/api/admin/payment-settings", requireAdmin, async (req, res) => {
 // Signed Cloudinary uploads keep large image binaries out of Firestore.
 app.post("/api/admin/promotion-upload-signature", requireAdmin, (req, res) => {
   try {
-    const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
+    let { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
+    // Support Render's standard CLOUDINARY_URL as well as separate variables.
+    if ((!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) && process.env.CLOUDINARY_URL) {
+      try {
+        const cloudinaryUrl = new URL(process.env.CLOUDINARY_URL);
+        CLOUDINARY_CLOUD_NAME = CLOUDINARY_CLOUD_NAME || cloudinaryUrl.hostname;
+        CLOUDINARY_API_KEY = CLOUDINARY_API_KEY || decodeURIComponent(cloudinaryUrl.username);
+        CLOUDINARY_API_SECRET = CLOUDINARY_API_SECRET || decodeURIComponent(cloudinaryUrl.password);
+      } catch {
+        return res.status(503).json({ error: "CLOUDINARY_URL is invalid. Check its cloudinary://API_KEY:API_SECRET@CLOUD_NAME format in Render." });
+      }
+    }
     if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-      return res.status(503).json({ error: "Promotion image storage is not configured yet. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to the Render backend environment." });
+      return res.status(503).json({ error: "Cloudinary is not configured. Add CLOUDINARY_URL or all three separate Cloudinary variables to the Render backend environment." });
     }
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = "tanmayi-promotions";
