@@ -527,19 +527,31 @@ $('customerSignIn').onclick=async()=>{clear('phoneMsg');const m=$('phone').value
 $('register').onclick=async()=>{clear('phoneMsg');const mobile=$('phone').value.trim(),password=$('customerPassword').value,name=$('name').value.trim(),village=$('village').value.trim();if(!/^\d{10}$/.test(mobile)||!/^\d{6}$/.test(password)||!name||!village)return msg('phoneMsg','Enter name, village, valid mobile and 6-digit PIN.');try{await createUserWithEmailAndPassword(auth,customerEmail(mobile),password);await api('/api/customer/register','POST',{name,mobile,village});await loadCustomer()}catch(e){msg('phoneMsg',e.code==='auth/email-already-in-use'?'This mobile number is already registered. Please login.':e.message)}};
 onAuthStateChanged(auth,async u=>{
   if(!u){show(adminRoute?'adminLogin':'customerLogin');return;}
+  // Customer accounts should not need read access to the admins collection.
+  // Previously every customer login attempted that read first; if Firestore
+  // rules denied it, a valid login was sent back to the login screen.
+  if(!adminRoute){
+    try{
+      await loadCustomer();
+      await loadCustomerProducts();
+    }catch(e){
+      show('customerLogin');
+      msg('phoneMsg','Login succeeded, but the customer account could not be loaded: '+(e.message||'Please try again.'));
+    }
+    return;
+  }
   try{
     const a=await getDoc(doc(db,'admins',u.uid));
     if(a.exists()&&a.data().role==='admin'&&a.data().active===true){
-      if(!adminRoute){await signOut(auth);show('customerLogin');return;}
       show('adminApp');$('adminEmail').textContent=u.email||'';
       await loadCustomers();await loadAdminProducts();await loadAdminPaymentSettings();await loadAdminOfferOrders();await loadRewardEligible();
-    }else if(adminRoute){
+    }else{
       await signOut(auth);show('adminLogin');
       msg('adminMsg','Email and password were accepted, but this Firebase account is NOT enabled as an active shop admin. The Firestore admins/'+u.uid+' document must exist with role: "admin" and active: true.');
-    }else{await loadCustomer();await loadCustomerProducts();}
+    }
   }catch(e){
-    show(adminRoute?'adminLogin':'customerLogin');
-    msg(adminRoute?'adminMsg':'phoneMsg',adminRoute?('Admin verification failed: '+(e.message||'Could not read the admin permission record. Check Firestore access and network.')):e.message);
+    show('adminLogin');
+    msg('adminMsg','Admin verification failed: '+(e.message||'Could not read the admin permission record. Check Firestore access and network.'));
   }
 });
 async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>';await loadCustomerOrders()}
