@@ -114,7 +114,50 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 .pending-qty-controls button{padding:4px 8px!important;min-width:28px!important;font-size:12px!important}
 .order-flow-stage{padding:8px!important;margin:7px 0!important}
 .online-payment-fields img.customer-payment-qr{display:block!important;width:240px!important;height:240px!important;max-width:78vw!important;max-height:78vw!important;aspect-ratio:1/1!important;object-fit:contain!important;padding:8px!important;margin:7px auto!important}
-#customerReservations .order-flow-stage{padding:7px!important;margin:6px 0!important}#customerReservations .payment-choice{padding:8px!important;margin:7px 0!important}#customerReservations .payment-choice label{font-size:12px;margin:5px 0}#customerReservations .online-payment-fields{padding:8px!important;margin-top:7px!important}#customerReservations .online-payment-fields label{font-size:11px;margin:5px 0 3px}#customerReservations .online-payment-fields input{padding:8px;font-size:13px}#customerReservations .order-flow-actions{margin-top:7px}#customerReservations .order-flow-actions button{padding:9px;font-size:12px}</style></head><body>
+#customerReservations .order-flow-stage{padding:7px!important;margin:6px 0!important}#customerReservations .payment-choice{padding:8px!important;margin:7px 0!important}#customerReservations .payment-choice label{font-size:12px;margin:5px 0}#customerReservations .online-payment-fields{padding:8px!important;margin-top:7px!important}#customerReservations .online-payment-fields label{font-size:11px;margin:5px 0 3px}#customerReservations .online-payment-fields input{padding:8px;font-size:13px}#customerReservations .order-flow-actions{margin-top:7px}#customerReservations .order-flow-actions button{padding:9px;font-size:12px}</style>
+<style id="tanmayi-app-redesign">
+:root{--app-bg:#f5f3ed;--app-card:#fff;--app-ink:#201b14;--app-gold:#d9ad55;--app-red:#8d1d24}
+body{background:var(--app-bg);padding-bottom:82px}
+body>header{display:none}
+#customerView,#adminApp{max-width:100%;margin:0 auto;padding:0 14px 28px}
+.app-topbar{position:sticky;top:0;z-index:50;margin:0 -14px 16px;padding:13px 15px;background:linear-gradient(115deg,#171717,#49331a);color:#f4d58a;border-bottom:3px solid var(--app-gold);display:flex;align-items:center;gap:13px;box-shadow:0 5px 18px #0002}
+.app-brand{font-weight:850;line-height:1.15;flex:1}.app-brand small{display:block;color:#e8d7b5;font-size:11px;font-weight:500;margin-top:3px}
+.app-menu-btn{width:42px;height:42px;border:1px solid #ffffff40;background:#ffffff12;color:#fff;border-radius:13px;font-size:22px;margin:0;padding:0}
+.app-icon-btn{background:#ffffff12;color:#fff;border:1px solid #ffffff40;margin:0;padding:9px 11px}
+.app-drawer-shade{position:fixed;inset:0;background:#0008;z-index:100;display:none}
+.app-drawer{position:fixed;z-index:101;top:0;bottom:0;left:0;width:min(82vw,320px);background:#fffaf1;box-shadow:12px 0 35px #0003;transform:translateX(-105%);transition:transform .22s ease;padding:0 15px 24px;overflow:auto}
+.app-drawer.open{transform:translateX(0)}.app-drawer-shade.open{display:block}
+.drawer-head{margin:0 -15px 12px;padding:25px 18px 18px;background:linear-gradient(120deg,#171717,#49331a);color:#f4d58a;border-bottom:3px solid var(--app-gold)}
+.drawer-head b{font-size:17px}.drawer-head small{display:block;color:#e9d9b8;margin-top:5px}
+.drawer-link{display:flex;width:100%;align-items:center;gap:12px;text-align:left;margin:5px 0;padding:13px 12px;background:transparent;color:#302719;border-radius:12px;border:1px solid transparent;font-weight:700}
+.drawer-link.active,.drawer-link:active{background:#f3e7ce;border-color:#e2c98f;color:#7b4c13}
+.app-page{display:none;animation:appFade .18s ease}.app-page.active{display:block}
+@keyframes appFade{from{opacity:.65;transform:translateY(4px)}to{opacity:1;transform:none}}
+.app-bottomnav{position:fixed;z-index:60;bottom:0;left:0;right:0;display:flex;justify-content:space-around;gap:3px;padding:8px 5px calc(8px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e7dfd1;box-shadow:0 -5px 18px #0000000c}
+.app-bottomnav button{flex:1;min-width:0;margin:0;padding:6px 2px;background:transparent;color:#655b4c;border-radius:11px;font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:3px}
+.app-bottomnav button span{font-size:19px;line-height:1.1}.app-bottomnav button.active{background:#f4e8cf;color:#7a4b12}
+.app-page-title{font-size:19px;font-weight:850;margin:8px 0 14px;color:#3b2b18}
+#customerView .card,#adminApp .card{box-shadow:0 5px 18px #2d21100a}
+#customerView .customer-dashboard{display:none}
+#customerView .customer-panel{margin-top:10px}
+#customerView .customer-panel.hidden{display:none}
+#customerView .customer-panel:not(.hidden){display:block}
+#customerView .app-page .customer-panel{margin-top:0}
+#customerView .app-page .customer-panel.hidden{display:none}
+#customerView .app-page .customer-panel:not(.hidden){display:block}
+#adminApp .admin-page .card{margin:0 0 14px}
+#adminApp .admin-page .stats{margin-bottom:14px}
+#adminApp .admin-page .app-page-title{margin-top:2px}
+#customerLogin,#adminLogin{max-width:520px;margin:26px auto;border-radius:20px;overflow:hidden;box-shadow:0 12px 34px #251a1020}
+#adminLogin{padding:0;border:1px solid #e6dfd2}
+#adminLogin h2{background:linear-gradient(120deg,#171717,#49331a);color:#f4d58a;padding:25px 20px;margin:0 0 18px}
+#adminLogin label,#adminLogin input,#adminLogin button,#adminLogin .msg{margin-left:18px;margin-right:18px;width:calc(100% - 36px)}
+#adminLogin button{width:calc(100% - 36px);margin-bottom:18px}
+#customerLogin{background:#fff}
+@media(min-width:760px){#customerView,#adminApp{max-width:1050px}.app-bottomnav{left:50%;right:auto;transform:translateX(-50%);width:min(100%,700px);border:1px solid #e7dfd1;border-bottom:0;border-radius:16px 16px 0 0}}
+</style>
+
+</head><body>
 <header><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System</p></header>
 <main class="wrap">
 <section id="adminLogin" class="card hidden"><h2>Admin Login</h2><label>Email</label><input id="email" type="email" placeholder="Admin email">
@@ -202,10 +245,11 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import{getFirestore,doc,getDoc}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 const cfg={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-store-and-gifts.firebaseapp.com',projectId:'tanmayi-store-and-gifts',storageBucket:'tanmayi-store-and-gifts.firebasestorage.app',messagingSenderId:'1061146758363',appId:'1:1061146758363:web:3260ea51094ba5fbab10fe',measurementId:'G-3RWVE6G0W9'};
 const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https://tanmayi-pin-reset-api.onrender.com';
+window.tanmayiAuth=auth;window.tanmayiFirebaseAuth={EmailAuthProvider,reauthenticateWithCredential,updatePassword};
 const $=id=>document.getElementById(id),money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),date=v=>v?new Date(v).toLocaleString('en-IN'):'—',customerEmail=m=>`${m}@tanmayi-loyalty.app`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null,customerProfile=null,customerOrdersCache=[],customerProductsCache=[],customerPaymentQr="",paymentStepOpen=false,orderConfirmedData=null,selectedOrderPaymentMethod="CASH_ON_DELIVERY",activeOfferAnchorId="";
@@ -502,6 +546,7 @@ $('saveProduct').onclick=async()=>{clear('productAdminMsg');const name=$('produc
 const adminRoute=new URLSearchParams(location.search).get('admin')==='1';if(adminRoute)$('adminLogin').classList.remove('hidden');
 $('toggleCustomerHistory').onclick=()=>{const panel=$('customerHistoryPanel'),opening=panel.classList.contains('hidden');panel.classList.toggle('hidden',!opening);$('toggleCustomerHistory').setAttribute('aria-expanded',String(opening));$('toggleCustomerHistory').textContent=opening?'📋 My Bill History　▲':'📋 My Bill History　▼'};
 function openCustomerPanel(name){document.querySelectorAll('[id^="customerPanel-"]').forEach(p=>p.classList.add('hidden'));const panel=$('customerPanel-'+name);if(panel)panel.classList.remove('hidden');if(name==='orders')loadCustomerOrders();if(name==='buyAgain')renderBuyAgain();if(name==='myList')loadCustomerProducts();if(name==='stamps'){} }
+window.openCustomerPanel=openCustomerPanel;
 document.querySelectorAll('[data-customer-panel]').forEach(b=>b.onclick=()=>openCustomerPanel(b.dataset.customerPanel));
 $('openCustomerProfile').onclick=()=>{openCustomerPanel('profile');$('profileSummary').textContent=customerProfile?`${customerProfile.name} · ${customerProfile.mobile} · ${customerProfile.address||customerProfile.village||''}`:'';renderProfileOrders();};
 $('saveCustomerAddress').onclick=async()=>{clear('profileMsg');const name=$('profileName').value.trim(),address=$('profileAddress').value.trim();if(!name||!address)return msg('profileMsg','Enter your name and address before saving.');$('saveCustomerAddress').disabled=true;try{const r=await api('/api/customer/profile','PATCH',{name,address});customerProfile={...customerProfile,...r.profile};$('welcome').textContent=`${customerProfile.name} · ${customerProfile.mobile} · ${customerProfile.address}`;$('profileSummary').textContent=`${customerProfile.name} · ${customerProfile.mobile} · ${customerProfile.address}`;msg('profileMsg','Your profile and address have been saved.')}catch(e){msg('profileMsg',e.message)}finally{$('saveCustomerAddress').disabled=false}};
@@ -745,6 +790,99 @@ window.addEventListener("unhandledrejection", function (event) {
       }
     }, 1800);
   });
+})();
+</script>
+
+
+<script id="tanmayi-app-navigation">
+(function(){
+  const $=id=>document.getElementById(id);
+  function node(tag,cls,html){const n=document.createElement(tag);if(cls)n.className=cls;if(html!==undefined)n.innerHTML=html;return n}
+  function drawerConfig(root,kind,items,bottom){
+    const shell=node('div','app-shell');
+    const bar=node('div','app-topbar',`<button class="app-menu-btn" type="button" aria-label="Open menu">☰</button><div class="app-brand">TANMAYI STORE AND GIFTS<small>${kind==='customer'?'Customer Store':'Admin Control Panel'}</small></div>${kind==='customer'?'<button class="app-icon-btn" type="button" id="appRefreshBtn">↻</button>':'<button class="app-icon-btn" type="button" id="appLogoutBtn">↗</button>'}`);
+    const shade=node('div','app-drawer-shade'),drawer=node('aside','app-drawer');
+    drawer.innerHTML=`<div class="drawer-head"><b>🎁 TANMAYI STORE AND GIFTS</b><small>${kind==='customer'?'Shop • Offers • Loyalty':'Management Menu'}</small></div>`;
+    const pages=node('div','app-pages');
+    items.forEach((it,i)=>{
+      const link=node('button','drawer-link',`<span>${it.icon}</span><span>${it.label}</span>`);link.type='button';link.dataset.page=it.id;drawer.append(link);
+      const page=node('section','app-page'+(i===0?' active':''));page.id=kind+'Page-'+it.id;
+      page.innerHTML=`<div class="app-page-title">${it.icon} ${it.label}</div>`;
+      const content=it.content;
+      if(Array.isArray(content))content.forEach(el=>el&&page.append(el));else if(content)page.append(content);
+      pages.append(page);
+    });
+    const nav=node('nav','app-bottomnav');nav.dataset.kind=kind;drawer.dataset.kind=kind;shade.dataset.kind=kind;nav.style.display=root.classList.contains('hidden')?'none':'flex';
+    const visibilityObserver=new MutationObserver(()=>{const visible=!root.classList.contains('hidden');nav.style.display=visible?'flex':'none';if(!visible){close();}});visibilityObserver.observe(root,{attributes:true,attributeFilter:['class']});
+    bottom.forEach(it=>{const b=node('button',it.id===items[0].id?'active':'',`<span>${it.icon}</span>${it.label}`);b.type='button';b.dataset.page=it.id;nav.append(b)});
+    shell.append(bar,pages);root.prepend(shell);[...root.children].forEach(ch=>{if(ch!==shell)ch.classList.add('hidden')});document.body.append(shade,drawer,nav);
+    const menu=bar.querySelector('.app-menu-btn');
+    function close(){drawer.classList.remove('open');shade.classList.remove('open')}
+    function go(id){items.forEach(it=>{const p=$(`${kind}Page-${it.id}`);if(p)p.classList.toggle('active',it.id===id)});drawer.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));nav.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));close();root.dataset.activePage=id;window.scrollTo({top:0,behavior:'smooth'});if(kind==='customer'){const target=items.find(x=>x.id===id);if(target&&target.onOpen)target.onOpen()}}
+    menu.onclick=()=>{drawer.classList.add('open');shade.classList.add('open')};shade.onclick=close;
+    drawer.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
+    nav.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
+    if(kind==='customer'&&$('appRefreshBtn'))$('appRefreshBtn').onclick=()=>$('refreshCustomerAccount')?.click();
+    if(kind==='admin'&&$('appLogoutBtn'))$('appLogoutBtn').onclick=()=>$('logout')?.click();
+    return {go};
+  }
+  function setupCustomer(){
+    const root=$('customerView');if(!root||root.dataset.redesigned)return;root.dataset.redesigned='1';
+    const children=[...root.children];
+    const welcome=children.find(x=>x.querySelector('#welcome'));
+    const panels=['orders','buyAgain','account','myList','stamps','profile'].map(id=>$('customerPanel-'+id)).filter(Boolean);
+    const home=node('div','customer-home');
+    if(welcome)home.append(welcome);
+    const tiles=node('div','customer-dashboard');tiles.innerHTML='<button class="customer-tile" data-go="myList"><span>🛍️</span><small>Shop Products</small></button><button class="customer-tile" data-go="stamps"><span>🎟️</span><small>My Stamps</small></button><button class="customer-tile" data-go="orders"><span>📦</span><small>My Orders</small></button><button class="customer-tile" data-go="account"><span>👤</span><small>My Account</small></button>';home.append(tiles);
+    const profileTop=children.find(x=>x.classList.contains('customer-profile-top'));if(profileTop)home.append(profileTop);
+    const items=[
+      {id:'home',label:'Home',icon:'⌂',content:[home]},
+      {id:'myList',label:'Products',icon:'🛍️',content:[$('customerPanel-myList')],onOpen:()=>window.openCustomerPanel?.('myList')},
+      {id:'stamps',label:'My Stamps',icon:'🎟️',content:[$('customerPanel-stamps')],onOpen:()=>window.openCustomerPanel?.('stamps')},
+      {id:'orders',label:'Orders',icon:'📦',content:[$('customerPanel-orders')],onOpen:()=>window.openCustomerPanel?.('orders')},
+      {id:'buyAgain',label:'Buy Again',icon:'🔁',content:[$('customerPanel-buyAgain')],onOpen:()=>window.openCustomerPanel?.('buyAgain')},
+      {id:'account',label:'Account',icon:'👤',content:[$('customerPanel-account')],onOpen:()=>window.openCustomerPanel?.('account')}
+    ];
+    const nav=drawerConfig(root,'customer',items,[items[0],items[1],items[2],items[3],items[5]]);
+    const customerExit=node('button','drawer-link','↗ Logout');customerExit.type='button';customerExit.onclick=()=>{document.querySelector('.app-drawer')?.classList.remove('open');document.querySelector('.app-drawer-shade')?.classList.remove('open');$('customerLogout')?.click()};document.querySelector('.app-drawer[data-kind="customer"]')?.append(customerExit);
+    tiles.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>nav.go(b.dataset.go));
+    root.querySelectorAll('.customer-panel').forEach(p=>p.classList.add('hidden'));
+    nav.go('home');
+    const account=$('customerPanel-account');
+    if(account&&!$('customerChangePin')){const box=node('div','card');box.id='customerChangePin';box.innerHTML='<h3>🔐 Change Login PIN</h3><p class="muted">Your current 6-digit PIN is required to update it.</p><label>Current PIN</label><input id="customerCurrentPin" type="password" inputmode="numeric" maxlength="6"><label>New PIN</label><input id="customerNewPin" type="password" inputmode="numeric" maxlength="6"><button type="button" id="customerChangePinBtn">Update PIN</button><div id="customerPinMsg" class="msg hidden"></div>';account.append(box);$('customerChangePinBtn').onclick=async()=>{const m=$('customerPinMsg');m.classList.remove('hidden');try{const user=window.tanmayiAuth?.currentUser;if(!user)throw Error('Please login again.');const oldPin=$('customerCurrentPin').value,newPin=$('customerNewPin').value;if(!/^\\d{6}$/.test(oldPin)||!/^\\d{6}$/.test(newPin))throw Error('Enter valid current and new 6-digit PIN.');const {EmailAuthProvider,reauthenticateWithCredential,updatePassword}=window.tanmayiFirebaseAuth;const mobile=customerProfile?.mobile||$('phone')?.value;const cred=EmailAuthProvider.credential(`${mobile}@tanmayi-loyalty.app`,oldPin);await reauthenticateWithCredential(user,cred);await updatePassword(user,newPin);m.textContent='PIN updated successfully.';$('customerCurrentPin').value='';$('customerNewPin').value=''}catch(e){m.textContent=e.message||'PIN update failed.'}}}
+  }
+  function setupAdmin(){
+    const root=$('adminApp');if(!root||root.dataset.redesigned)return;root.dataset.redesigned='1';
+    const children=[...root.children];
+    const head=children.find(x=>x.querySelector('#adminEmail'));
+    const stats=children.find(x=>x.classList.contains('stats'));
+    const dashboard=children.find(x=>x.id==='orderDashboard');
+    const sections=children.filter(x=>x.tagName==='SECTION'&&x!==dashboard);
+    const findSection=(text)=>sections.find(x=>(x.querySelector('h2')?.textContent||'').toLowerCase().includes(text));
+    const products=findSection('manage shop photos');
+    const payments=findSection('online payment qr');
+    const orders=findSection('customer orders');
+    const qr=findSection('customer login qr');
+    const rewards=findSection('reward eligible');
+    const customers=findSection('registered customers');
+    const detail=$('detail');
+    const items=[
+      {id:'dashboard',label:'Dashboard',icon:'📊',content:[head,stats,dashboard]},
+      {id:'orders',label:'Orders',icon:'📦',content:[orders]},
+      {id:'products',label:'Products & Offers',icon:'🛍️',content:[products]},
+      {id:'customers',label:'Customers',icon:'👥',content:[customers,detail]},
+      {id:'rewards',label:'Rewards',icon:'🎁',content:[rewards]},
+      {id:'payments',label:'Payment QR',icon:'💳',content:[payments]},
+      {id:'qr',label:'Customer QR',icon:'▦',content:[qr]}
+    ];
+    drawerConfig(root,'admin',items,items.slice(0,5));
+    const headRow=root.querySelector('.app-topbar');
+    const change=node('button','drawer-link','🔐 Change Password');change.type='button';change.onclick=()=>{closeAdminDrawer();showAdminPassword()};
+    document.querySelector('.app-drawer')?.append(change);
+    function closeAdminDrawer(){document.querySelector('.app-drawer')?.classList.remove('open');document.querySelector('.app-drawer-shade')?.classList.remove('open')}
+    function showAdminPassword(){let box=$('adminChangePassword');if(!box){box=node('section','card hidden');box.id='adminChangePassword';box.innerHTML='<h3>🔐 Change Admin Password</h3><label>Current password</label><input id="adminCurrentPassword" type="password" autocomplete="current-password"><label>New password</label><input id="adminNewPassword" type="password" autocomplete="new-password"><button type="button" id="adminChangePasswordBtn">Update Password</button><div id="adminPasswordMsg" class="msg hidden"></div>';root.querySelector('.app-pages').append(box);box.querySelector('#adminChangePasswordBtn').onclick=async()=>{const msg=box.querySelector('#adminPasswordMsg');msg.classList.remove('hidden');try{const user=window.tanmayiAuth?.currentUser;if(!user)throw Error('Please login again.');const {EmailAuthProvider,reauthenticateWithCredential,updatePassword}=window.tanmayiFirebaseAuth;const cred=EmailAuthProvider.credential(user.email,box.querySelector('#adminCurrentPassword').value);await reauthenticateWithCredential(user,cred);await updatePassword(user,box.querySelector('#adminNewPassword').value);msg.textContent='Password updated successfully.'}catch(e){msg.textContent=e.message||'Password update failed.'}}}box.classList.toggle('hidden');}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{setupCustomer();setupAdmin()});
 })();
 </script>
 
