@@ -31,6 +31,57 @@ const makeCode = () => crypto.randomInt(0, 1000000).toString().padStart(6, "0");
 function emailEscape(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 }
+async function sendRefundRequestNotification(refund, order, paymentScreenshotData) {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
+  const missing = [];
+  if (!SMTP_HOST) missing.push('SMTP_HOST');
+  if (!SMTP_PORT) missing.push('SMTP_PORT');
+  if (!SMTP_USER) missing.push('SMTP_USER');
+  if (!SMTP_PASS) missing.push('SMTP_PASS');
+  if (missing.length) throw new Error(`Missing SMTP environment variables: ${missing.join(', ')}`);
+  const port = Number(SMTP_PORT);
+  if (!Number.isInteger(port) || port <= 0) throw new Error('SMTP_PORT must be a valid port number.');
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST, port,
+    secure: String(SMTP_SECURE || (port === 465 ? 'true' : 'false')).toLowerCase() === 'true',
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000
+  });
+  const itemLines = (order.items || []).map(item => `${item.productName} | Qty ${item.quantity} | ₹${item.lineTotal}`).join('\n');
+  const text = [
+    'NEW CUSTOMER REFUND REQUEST – TANMAYI STORE AND GIFTS',
+    `Order: #${order.orderNumber}`, `Customer: ${refund.customerName || order.customerName || 'Customer'}`,
+    `Mobile: ${refund.mobile || order.mobile || ''}`, `Village: ${order.village || ''}`,
+    `Order amount: ₹${Number(order.total || 0).toLocaleString('en-IN')}`,
+    `Original payment method: ONLINE PAYMENT`, `Original payment UTR: ${order.paymentUtr || ''}`,
+    `Bank account holder name: ${refund.holderName || ''}`, `Customer refund UPI ID / number: ${refund.upiId || ''}`,
+    `Refund request time: ${new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata'})}`,
+    '', 'ORDER PRODUCTS:', itemLines || 'Product details unavailable.',
+    '', 'Please review the customer details and process the refund manually.'
+  ].join('\n');
+  const attachments = [];
+  if (typeof paymentScreenshotData === 'string') {
+    const m = paymentScreenshotData.match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i);
+    if (m) attachments.push({ filename:`order-${order.orderNumber}-payment-proof.${m[1].toLowerCase()==='jpeg'?'jpg':m[1].toLowerCase()}`, content:Buffer.from(m[2],'base64'), contentType:`image/${m[1].toLowerCase()==='jpg'?'jpeg':m[1].toLowerCase()}` });
+  }
+  try {
+    await transporter.verify();
+    const info = await transporter.sendMail({
+      from: MAIL_FROM || `TANMAYI STORE AND GIFTS <${SMTP_USER}>`,
+      to: ORDER_NOTIFICATION_EMAIL || SMTP_USER,
+      subject: `REFUND REQUEST – Order #${order.orderNumber} – TANMAYI STORE AND GIFTS`,
+      text,
+      html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><h2 style="background:#171717;color:#d9b45b;padding:20px">TANMAYI STORE AND GIFTS</h2><h3>NEW CUSTOMER REFUND REQUEST</h3><p><b>Order:</b> #${emailEscape(order.orderNumber)}<br><b>Customer:</b> ${emailEscape(refund.customerName || order.customerName || 'Customer')}<br><b>Mobile:</b> ${emailEscape(refund.mobile || order.mobile || '')}<br><b>Village:</b> ${emailEscape(order.village || '')}<br><b>Order amount:</b> ₹${Number(order.total || 0).toLocaleString('en-IN')}<br><b>Original payment UTR:</b> ${emailEscape(order.paymentUtr || '')}<br><b>Bank holder name:</b> ${emailEscape(refund.holderName || '')}<br><b>Customer UPI ID / number:</b> ${emailEscape(refund.upiId || '')}</p><h4>Products</h4><pre>${emailEscape(itemLines || 'Product details unavailable.')}</pre><p>Please review the details and process the refund manually.</p>${attachments.length?'<p>Original payment screenshot is attached.</p>':''}</div>`,
+      attachments
+    });
+    console.info('REFUND_REQUEST_EMAIL_SENT',{orderNumber:order.orderNumber,messageId:info.messageId});
+    return {sent:true,messageId:info.messageId};
+  } catch(error) {
+    console.error('REFUND_REQUEST_EMAIL_FAILED',{orderNumber:order.orderNumber,code:error.code||'UNKNOWN',message:String(error.message||'Email send failed').slice(0,300)});
+    throw error;
+  } finally { transporter.close(); }
+}
+
 async function sendOrderNotification(order) {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
   const missing = [];
@@ -693,6 +744,7 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
     if (!orderId) return res.status(400).json({ error:"Order not found." });
     const orderRef=db.collection(ORDERS_COLLECTION).doc(orderId);
     let refundRequested=false;
+    let refundEmailPayload=null;
     await db.runTransaction(async tx => {
       const orderSnap=await tx.get(orderRef);
       if (!orderSnap.exists || orderSnap.data().customerUid !== req.user.uid) throw new Error("You cannot cancel this order.");
@@ -714,13 +766,27 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
       const reservations=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",orderId));
       if(online){
         const holderName=String(req.body?.holderName||"").trim().slice(0,100),upiId=String(req.body?.upiId||"").trim().slice(0,100);
-        tx.set(refundRef,{orderId,orderNumber:order.orderNumber,customerUid:req.user.uid,customerName:order.customerName||"Customer",mobile:order.mobile||"",holderName,upiId,status:"requested",customerMessage:"Refund requested by customer",requestedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+        const paymentSnap=await tx.get(db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(orderId));
+        tx.set(refundRef,{orderId,orderNumber:order.orderNumber,customerUid:req.user.uid,customerName:order.customerName||"Customer",mobile:order.mobile||"",holderName,upiId,status:"requested",customerMessage:"Refund requested by customer",requestedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),emailStatus:"pending"},{merge:true});
+        refundEmailPayload={refund:{orderNumber:order.orderNumber,customerName:order.customerName||"Customer",mobile:order.mobile||"",holderName,upiId},order:{...order},paymentScreenshotData:paymentSnap.exists?(paymentSnap.data().screenshotData||""):""};
         refundRequested=true;
       }
       reservations.docs.filter(d=>d.data().status === "active").forEach(d=>tx.update(d.ref,{status:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp()}));
       tx.update(orderRef,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),customerCancelled:true,...(online?{refundStatus:"requested"}:{})});
     });
-    res.json({ok:true,refundRequested,message:refundRequested?"Order cancelled. Your refund request has been sent to the shop.":"Order cancelled successfully."});
+    let refundEmailSent=false;
+    if(refundRequested && refundEmailPayload){
+      const refundRef=db.collection(ORDER_REFUNDS_COLLECTION).doc(orderId);
+      try{
+        const mail=await sendRefundRequestNotification(refundEmailPayload.refund,refundEmailPayload.order,refundEmailPayload.paymentScreenshotData);
+        refundEmailSent=mail.sent;
+        await refundRef.update({emailStatus:"sent",emailMessageId:mail.messageId||"",emailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
+      }catch(mailError){
+        console.error("refund request email failed:",mailError);
+        await refundRef.update({emailStatus:"failed",emailError:String(mailError.message||"Email failed").slice(0,250),emailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+      }
+    }
+    res.json({ok:true,refundRequested,message:refundRequested?"Order cancelled. Your refund request has been submitted to the shop.":"Order cancelled successfully."});
   } catch(e) { res.status(400).json({error:e.message || "Could not cancel this order."}); }
 });
 
