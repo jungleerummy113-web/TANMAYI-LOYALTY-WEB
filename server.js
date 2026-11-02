@@ -547,7 +547,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     const paymentScreenshot = req.body?.paymentScreenshot;
     if (!["CASH_ON_DELIVERY", "ONLINE_PAYMENT"].includes(paymentMethod)) return res.status(400).json({ error:"Choose a valid payment method." });
     if (paymentMethod === "ONLINE_PAYMENT") {
-      if (!/^\\d{12}$/.test(paymentUtr)) return res.status(400).json({ error:"Enter the exact 12-digit UTR number." });
+      if (!/^\d{12}$/.test(paymentUtr)) return res.status(400).json({ error:"Enter the exact 12-digit UTR number." });
       decodePaymentImage(paymentScreenshot, "Payment screenshot");
     }
     if (!productIds.length) return res.status(400).json({ error:"Add at least one product before confirming." });

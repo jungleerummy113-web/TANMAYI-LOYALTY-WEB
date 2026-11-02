@@ -397,7 +397,7 @@ function renderReservations(items){
           if(!customerPaymentQr)throw Error('Shop online payment QR is not available yet. Please choose Cash on Delivery or contact the shop.');
           const utr=$('onlinePaymentUtr')?.value.trim()||'';
           const screenshotFile=$('onlinePaymentScreenshot')?.files?.[0];
-          if(!/^\\d{12}$/.test(utr))throw Error('Please enter the exact 12-digit UTR number.');
+          if(!/^\d{12}$/.test(utr))throw Error('Please enter the exact 12-digit UTR number.');
           if(!screenshotFile)throw Error('Please upload your payment screenshot.');
           payload.paymentUtr=utr;
           payload.paymentScreenshot=await imageData(screenshotFile);
