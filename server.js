@@ -468,6 +468,13 @@ app.get("/api/customer/store-settings", requireUser, async (_req, res) => {
   } catch (e) { res.status(500).json({ error: "Could not load store settings." }); }
 });
 app.put("/api/admin/store-settings", requireAdmin, async (req, res) => {
+  const startedAt = Date.now();
+  console.log("[STORE_SETTINGS] PUT received", {
+    adminUid: req.adminUid || "unknown",
+    hasWhatsAppNumber: Object.prototype.hasOwnProperty.call(req.body || {}, "whatsappNumber"),
+    photoCount: Array.isArray(req.body?.promotionPhotos) ? req.body.promotionPhotos.length : 0,
+    photoLengths: Array.isArray(req.body?.promotionPhotos) ? req.body.promotionPhotos.map(p => typeof p === "string" ? p.length : -1) : []
+  });
   try {
     const update = { updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: req.adminUid };
     if (Object.prototype.hasOwnProperty.call(req.body || {}, "whatsappNumber")) {
@@ -487,8 +494,12 @@ app.put("/api/admin/store-settings", requireAdmin, async (req, res) => {
     }
     if (!("whatsappNumber" in update) && !("promotionPhotos" in update)) return res.status(400).json({ error: "No store settings supplied." });
     await db.collection(STORE_SETTINGS_COLLECTION).doc("public").set(update, { merge: true });
+    console.log("[STORE_SETTINGS] Saved successfully", { photoCount: update.promotionPhotos?.length || 0, whatsappUpdated: Object.prototype.hasOwnProperty.call(update, "whatsappNumber"), elapsedMs: Date.now() - startedAt });
     res.json({ ok: true, message: "Store settings saved." });
-  } catch (e) { res.status(400).json({ error: e.message || "Could not save store settings." }); }
+  } catch (e) {
+    console.error("[STORE_SETTINGS] Save failed", { message: e.message, code: e.code, stack: e.stack, elapsedMs: Date.now() - startedAt });
+    res.status(400).json({ error: e.message || "Could not save store settings." });
+  }
 });
 
 app.get("/api/customer/payment-settings", requireUser, async (_req, res) => {
