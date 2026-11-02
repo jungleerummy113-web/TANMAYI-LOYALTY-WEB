@@ -450,6 +450,40 @@ app.put("/api/admin/payment-settings", requireAdmin, async (req, res) => {
     res.json({ ok:true, message:"Online payment QR code updated successfully." });
   } catch (e) { res.status(400).json({ error:e.message || "Could not update payment QR." }); }
 });
+
+// Customer-facing WhatsApp contact and dashboard promotion images.
+const STORE_SETTINGS_COLLECTION = "storeSettings";
+app.get("/api/customer/store-settings", requireUser, async (_req, res) => {
+  try {
+    const snap = await db.collection(STORE_SETTINGS_COLLECTION).doc("public").get();
+    const d = snap.exists ? snap.data() : {};
+    res.json({ whatsappNumber: String(d.whatsappNumber || "7899066113"), promotionPhotos: Array.isArray(d.promotionPhotos) ? d.promotionPhotos.slice(0, 5) : [] });
+  } catch (e) { res.status(500).json({ error: "Could not load store settings." }); }
+});
+app.put("/api/admin/store-settings", requireAdmin, async (req, res) => {
+  try {
+    const update = { updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: req.adminUid };
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "whatsappNumber")) {
+      const number = String(req.body.whatsappNumber || "").trim();
+      if (!/^\d{10}$/.test(number)) return res.status(400).json({ error: "Enter a valid 10-digit WhatsApp number." });
+      update.whatsappNumber = number;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "promotionPhotos")) {
+      const photos = req.body.promotionPhotos;
+      if (!Array.isArray(photos) || photos.length > 5) return res.status(400).json({ error: "Upload up to 5 promotion photos." });
+      for (const photo of photos) {
+        if (typeof photo !== "string" || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/i.test(photo) || photo.length > 150000) {
+          return res.status(400).json({ error: "Each promotion photo must be a compressed JPG under 110 KB. Please choose smaller images." });
+        }
+      }
+      update.promotionPhotos = photos;
+    }
+    if (!("whatsappNumber" in update) && !("promotionPhotos" in update)) return res.status(400).json({ error: "No store settings supplied." });
+    await db.collection(STORE_SETTINGS_COLLECTION).doc("public").set(update, { merge: true });
+    res.json({ ok: true, message: "Store settings saved." });
+  } catch (e) { res.status(400).json({ error: e.message || "Could not save store settings." }); }
+});
+
 app.get("/api/customer/payment-settings", requireUser, async (_req, res) => {
   try {
     const snap = await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
