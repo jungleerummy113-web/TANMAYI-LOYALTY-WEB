@@ -543,11 +543,11 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     const productIds = Array.isArray(req.body?.productIds) ? req.body.productIds.map(x => String(x || "")).filter(Boolean) : [];
     const clientRequestId = String(req.body?.clientRequestId || "");
     const paymentMethod = String(req.body?.paymentMethod || "CASH_ON_DELIVERY");
-    const paymentUtr = String(req.body?.paymentUtr || "").trim();
+    const paymentUtr = String(req.body?.paymentUtr || "").replace(/[^0-9]/g, "");
     const paymentScreenshot = req.body?.paymentScreenshot;
     if (!["CASH_ON_DELIVERY", "ONLINE_PAYMENT"].includes(paymentMethod)) return res.status(400).json({ error:"Choose a valid payment method." });
     if (paymentMethod === "ONLINE_PAYMENT") {
-      if (!/^\d{12}$/.test(paymentUtr)) return res.status(400).json({ error:"Enter the exact 12-digit UTR number." });
+      if (paymentUtr.length !== 12) return res.status(400).json({ error:`UTR must contain exactly 12 digits. Server received ${paymentUtr.length} digit(s).` });
       decodePaymentImage(paymentScreenshot, "Payment screenshot");
     }
     if (!productIds.length) return res.status(400).json({ error:"Add at least one product before confirming." });
