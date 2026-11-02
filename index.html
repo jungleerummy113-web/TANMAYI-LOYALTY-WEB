@@ -49,6 +49,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 
 .order-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.order-stat{background:#fffaf0;border:1px solid #eadfc9;border-radius:10px;padding:10px;min-width:0}.order-stat small{display:block;color:#6b6254;font-size:12px}.order-stat b{display:block;font-size:23px;margin-top:3px}.order-stat.today{border-color:#c49a45;background:#fff3d2}.today-customer-list{display:grid;gap:6px}.today-customer-row{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;background:#faf8f2;border-radius:8px;font-size:13px}.compact-orders{display:grid;gap:8px}.compact-order{border:1px solid #e5ddcf;border-radius:11px;background:#fffdf8;padding:10px}.compact-order-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px}.compact-order-head strong{font-size:14px}.compact-order-meta{font-size:11px;color:#706657}.compact-order-customer{font-size:14px;font-weight:750;margin:4px 0}.compact-order-phone{font-size:13px;color:#554d42}.compact-order-product{display:flex;align-items:center;gap:9px;margin:8px 0;padding:7px;background:#faf7ef;border-radius:8px}.compact-order-product img{width:54px;height:54px;object-fit:cover;border-radius:7px;border:1px solid #e2d7c5;background:#fff}.compact-order-product .no-photo{width:54px;height:54px;display:grid;place-items:center;background:#eee8dc;border-radius:7px;font-size:10px;color:#777}.compact-order-product b{display:block;font-size:13px}.compact-order-product small{font-size:12px;color:#6b6254}.compact-order-status{font-size:11px;font-weight:800;border-radius:14px;padding:4px 8px;background:#f5e8c8;color:#694a13}.compact-order-actions{display:flex;gap:6px;flex-wrap:wrap}.compact-order-actions button{font-size:12px;padding:8px 10px;margin:4px 4px 0 0}.compact-order-details{font-size:12px;color:#665e53;margin:4px 0}.order-empty{padding:12px;color:#6b6254;text-align:center}@media(max-width:520px){.order-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.order-stat b{font-size:21px}.compact-order{padding:9px}}
 
+.payment-choice{margin:12px 0;padding:12px;border:1px solid #d8c9ad;border-radius:11px;background:#fffaf0}.payment-choice label{display:flex;align-items:center;gap:8px;font-weight:700;color:#33291b}.payment-choice input[type=radio]{width:auto}.online-payment-fields{margin-top:12px;padding:12px;border:1px dashed #c9b98f;border-radius:10px;background:#fffdf7}.online-payment-fields img{display:block;max-width:220px;max-height:220px;object-fit:contain;margin:8px auto;background:#fff;padding:8px;border:1px solid #eee;border-radius:8px}.payment-proof-thumb{display:block;max-width:180px;max-height:180px;object-fit:contain;border:1px solid #ddd;border-radius:8px;margin:8px 0;background:#fff}.payment-confirm-backdrop.hidden{display:none!important}.payment-confirm-backdrop{position:fixed;inset:0;background:#0009;z-index:10001;display:flex;align-items:center;justify-content:center;padding:18px}.payment-confirm-card{width:min(420px,100%);background:#fffdf7;border:2px solid #d6ad55;border-radius:18px;padding:22px;text-align:center;box-shadow:0 18px 50px #0005;position:relative}.payment-confirm-close{position:absolute;right:10px;top:8px;background:#eee;color:#333;border-radius:50%;padding:4px 12px;font-size:24px}.payment-confirm-card h2{color:#8d1d24}.payment-confirm-card p{line-height:1.5;color:#5e5549}.payment-admin-proof{margin:8px 0;padding:8px;background:#faf7ef;border-radius:8px}.payment-admin-proof b{display:block;margin-bottom:4px}
 .install-choice-backdrop{position:fixed;inset:0;background:#0009;z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px}
 .install-choice-card{width:min(420px,100%);background:#fffdf7;border:2px solid #d6ad55;border-radius:18px;padding:22px;text-align:center;box-shadow:0 18px 50px #0005}
 .install-choice-card h2{color:#5a3510;margin:0 0 10px}.install-choice-card p{color:#6b6254;line-height:1.5}
@@ -113,6 +114,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <div class="stats"><div class="stat"><small>Total Customers</small><b id="customerCount">0</b></div><div class="stat"><small>Stamp balance</small><b id="stampCount">0</b></div><div class="stat"><small>Gifts redeemed</small><b id="giftCount">0</b></div></div>
 <section class="card" id="orderDashboard"><div class="row"><h2>📦 Orders Dashboard</h2><button type="button" class="secondary" id="refreshOrderDashboard">Refresh</button></div><div class="order-stats"><div class="order-stat"><small>New Orders</small><b id="newOrderCount">0</b></div><div class="order-stat"><small>Old Orders</small><b id="oldOrderCount">0</b></div><div class="order-stat"><small>Completed Orders</small><b id="completedOrderCount">0</b></div><div class="order-stat today"><small>Today's Orders</small><b id="todayOrderCount">0</b></div><div class="order-stat"><small>Pending Today</small><b id="pendingTodayCount">0</b></div><div class="order-stat"><small>Completed Today</small><b id="completedTodayCount">0</b></div></div><h3>Today's Customer Orders</h3><div id="todayCustomerOrders" class="today-customer-list">No orders today.</div></section>
 <section class="card"><h2>Manage Shop Photos &amp; Offers</h2><p class="muted">Upload up to 8 active products. Add two photos of each product and set its original and offer prices.</p><label>Product name</label><input id="productName" maxlength="80" placeholder="Product name"><label>Product size (example: 10 × 24 inch)</label><input id="productSize" maxlength="80" placeholder="10 × 24 inch"><label>Product description / details</label><textarea id="productDescription" rows="4" maxlength="1200" placeholder="Enter product material, colour, design and other details"></textarea><label>Original price (₹)</label><input id="productOriginal" type="number" min="1" step="1" placeholder="Original price"><label>Offer price (₹)</label><input id="productOffer" type="number" min="1" step="1" placeholder="Offer price"><label>Available stock (number of same items)</label><input id="productStock" type="number" min="0" step="1" placeholder="How many pieces are available"><label>Photo 1</label><input id="productPhoto1" type="file" accept="image/*"><label>Photo 2 (different angle)</label><input id="productPhoto2" type="file" accept="image/*"><button id="saveProduct" class="gold">Upload Product &amp; Offer</button><div id="productAdminMsg" class="msg hidden"></div><h3>Uploaded Products</h3><div id="adminProducts" class="product-grid"></div></section>
+<section class="card" id="adminPaymentSettings"><h2>💳 Online Payment QR Settings</h2><p class="muted">Upload or replace the shop UPI QR code. Customers will see the latest saved QR code when they choose Online Payment.</p><div id="adminPaymentQrPreview" class="qr-area hidden"></div><label>Upload / Replace Payment QR Code</label><input id="adminPaymentQrFile" type="file" accept="image/*"><button type="button" class="gold" id="saveAdminPaymentQr">Save Payment QR Code</button><div id="adminPaymentQrMsg" class="msg hidden"></div></section>
 <section class="card" id="offerOrdersSection"><div class="row"><h2>Customer Orders</h2><button type="button" class="secondary" id="refreshOfferOrders">Refresh</button></div><p class="muted">Order details, selected product photo, collection and cash status. Final approval చేసినప్పుడే bill & stamps update అవుతాయి.</p><div id="adminOfferOrders" class="compact-orders">Loading customer orders…</div><div id="offerOrderMsg" class="msg hidden"></div></section>
 <section class="card"><div class="row"><div><h2>Customer Login QR Code</h2><small class="muted">Customers scan this QR to open the login / registration page.</small></div></div>
 <button id="makeQR" class="gold">Generate Customer QR Code</button>
@@ -136,6 +138,15 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 <h2 style="margin-top:18px">Prepare Reward Redemption</h2><p class="muted">Customer collection confirmation resets stamps and current cycle. Admin approval alone does not reset anything.</p><label>Approved points (₹1 = 1 point; enter 0 for gift only)</label><input id="approvedPoints" type="number" min="0" step="1" value="0"><button class="gold" id="redeem">Approve Reward Options</button><div id="redeemMsg" class="msg hidden"></div>
 <div class="scroll"><table><thead><tr><th>Date</th><th>Gift</th><th>Stamps used</th></tr></thead><tbody id="redRows"></tbody></table></div></section>
 </section></main>
+<div id="paymentConfirmPopup" class="payment-confirm-backdrop hidden" aria-hidden="true">
+ <div class="payment-confirm-card">
+  <button type="button" class="payment-confirm-close" id="paymentPopupClose" aria-label="Close">×</button>
+  <div style="font-size:38px">✓</div>
+  <h2>Payment Details Submitted</h2>
+  <p>Please wait for shop verification. Once verified, please collect your product at TANMAYI STORE AND GIFTS.</p>
+  <div class="portal-actions"><button type="button" class="gold" id="paymentPopupOkay">OKAY</button><button type="button" class="secondary" id="paymentPopupNo">NO</button></div>
+ </div>
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -145,7 +156,7 @@ const cfg={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-
 const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https://tanmayi-pin-reset-api.onrender.com';
 const $=id=>document.getElementById(id),money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),date=v=>v?new Date(v).toLocaleString('en-IN'):'—',customerEmail=m=>`${m}@tanmayi-loyalty.app`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null,customerProfile=null,customerOrdersCache=[],customerProductsCache=[];
+let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null,customerProfile=null,customerOrdersCache=[],customerProductsCache=[],customerPaymentQr="",paymentStepOpen=false,selectedOrderPaymentMethod="CASH_ON_DELIVERY";
 function msg(id,t){$(id).textContent=t;$(id).classList.remove('hidden')}function clear(id){$(id).classList.add('hidden');$(id).textContent=''}
 function show(id){['adminLogin','customerLogin','customerView','adminApp'].forEach(x=>$(x).classList.toggle('hidden',x!==id))}
 async function api(path,method='GET',body=null){const token=auth.currentUser?await auth.currentUser.getIdToken():'';const r=await fetch(API+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}
@@ -209,6 +220,29 @@ async function loadAdminProducts(){
     });
   }catch(e){msg('productAdminMsg',e.message)}
 }
+async function loadAdminPaymentSettings(){
+  try{
+    const r=await api('/api/admin/payment-settings');
+    const el=$('adminPaymentQrPreview');
+    if(r.qrData){el.innerHTML=`<strong>Current Customer Payment QR Code</strong><img src="${esc(r.qrData)}" alt="Shop UPI QR code" style="max-width:220px;max-height:220px;object-fit:contain;background:#fff;padding:8px;border-radius:8px">`;el.classList.remove('hidden')}
+    else{el.innerHTML='<span class="muted">No payment QR uploaded yet.</span>';el.classList.remove('hidden')}
+  }catch(e){msg('adminPaymentQrMsg',e.message||'Could not load payment QR settings.')}
+}
+$('saveAdminPaymentQr').onclick=async()=>{
+  clear('adminPaymentQrMsg');
+  const file=$('adminPaymentQrFile').files[0];
+  if(!file)return msg('adminPaymentQrMsg','Choose a payment QR image first.');
+  $('saveAdminPaymentQr').disabled=true;
+  try{
+    const qrData=await imageData(file);
+    const r=await api('/api/admin/payment-settings','PUT',{qrData});
+    $('adminPaymentQrFile').value='';
+    msg('adminPaymentQrMsg',r.message||'Payment QR saved.');
+    await loadAdminPaymentSettings();
+  }catch(e){msg('adminPaymentQrMsg',e.message||'Could not save payment QR.')}
+  finally{$('saveAdminPaymentQr').disabled=false}
+};
+
 async function loadAdminOfferOrders(){
   try{
     const r=await api('/api/admin/offer-orders');
@@ -231,15 +265,22 @@ async function loadAdminOfferOrders(){
         const photo=(i.photoUrls||[])[0];
         return `<div class="compact-order-product">${photo?`<img src="${photo}" alt="Selected product">`:'<div class="no-photo">NO PHOTO</div>'}<div><b>${esc(i.productName)} × ${Number(i.quantity)}</b><small>${moneyPrice(i.offerPrice||i.lineTotal)}${Number(i.quantity)>1?' each':''} · Line ${moneyPrice(i.lineTotal)}</small></div></div>`;
       }).join('');
-      const collected=x.collectionStatus==='collected',paid=x.paymentStatus==='received',completed=x.orderStatus==='completed';
-      const status=completed?'COMPLETED':x.orderStatus==='cancelled'?'CANCELLED':x.orderStatus==='expired'?'EXPIRED':paid?'CASH RECEIVED':collected?'COLLECTED':'NEW ORDER';
+      const collected=x.collectionStatus==='collected',paid=x.paymentStatus==='received',online=x.paymentMethod==='ONLINE_PAYMENT',onlineSubmitted=online&&x.paymentStatus==='submitted',completed=x.orderStatus==='completed';
+      const status=completed?'COMPLETED':x.orderStatus==='cancelled'?'CANCELLED':x.orderStatus==='expired'?'EXPIRED':onlineSubmitted?'ONLINE PAYMENT SUBMITTED':paid?(online?'ONLINE PAYMENT VERIFIED':'CASH RECEIVED'):collected?'COLLECTED':'NEW ORDER';
       return `<article class="compact-order"><div class="compact-order-head"><strong>ORDER #${esc(x.orderNumber)}</strong><span class="compact-order-status">${status}</span></div>
         <div class="compact-order-meta">${date(x.confirmedAt)}</div>
         <div class="compact-order-customer">${esc(x.customerName)}</div><div class="compact-order-phone">📞 ${esc(x.mobile)}</div>
-        ${items}<div class="compact-order-details"><b>Total: ${moneyPrice(x.total)}</b> · CASH ON DELIVERY · Payment: ${paid?'RECEIVED':'PENDING'}</div>
+        ${items}<div class="compact-order-details"><b>Total: ${moneyPrice(x.total)}</b> · ${online?'ONLINE PAYMENT':'CASH ON DELIVERY'} · Payment: ${paid?'VERIFIED / RECEIVED':onlineSubmitted?'WAITING FOR VERIFICATION':'PENDING'}</div>
+        ${online?`<div class="payment-admin-proof"><b>UTR: ${esc(x.paymentUtr||'Not supplied')}</b>${x.paymentScreenshotData?`<a href="${esc(x.paymentScreenshotData)}" target="_blank" rel="noopener"><img class="payment-proof-thumb" src="${esc(x.paymentScreenshotData)}" alt="Customer payment screenshot"></a>`:'<small>Payment screenshot not available</small>'}</div>`:''}
         <div class="compact-order-details">Collection: ${collected?'COLLECTED':'PENDING'} · Stamps: ${x.stampsStatus==='added'?'UPDATED':'PENDING'}</div>
-        <div class="compact-order-actions">${!completed&&x.orderStatus==='ready'&&!collected?`<button class="gold" data-order-collect="${esc(x.id)}">COLLECTED</button>`:''}${!completed&&collected&&!paid?`<button class="gold" data-order-payment="${esc(x.id)}">CASH RECEIVED</button>`:''}${!completed&&collected&&paid?`<button class="gold" data-order-complete="${esc(x.id)}">FINAL APPROVAL · ADD STAMPS</button>`:''}</div></article>`;
+        <div class="compact-order-actions">${!completed&&onlineSubmitted?`<button class="gold" data-order-verify="${esc(x.id)}">VERIFY ONLINE PAYMENT</button>`:''}${!completed&&x.orderStatus==='ready'&&!collected&&(!online||paid)?`<button class="gold" data-order-collect="${esc(x.id)}">COLLECTED</button>`:''}${!completed&&collected&&!paid&&!online?`<button class="gold" data-order-payment="${esc(x.id)}">CASH RECEIVED</button>`:''}${!completed&&collected&&paid?`<button class="gold" data-order-complete="${esc(x.id)}">FINAL APPROVAL · ADD STAMPS</button>`:''}</div></article>`;
     }).join('')||'<div class="order-empty">No customer orders found.</div>';
+    document.querySelectorAll('[data-order-verify]').forEach(b=>b.onclick=async()=>{
+      if(!confirm('Verify that the UTR and payment screenshot show the correct received payment?'))return;
+      b.disabled=true;
+      try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderVerify)+'/verify-payment','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}
+      catch(e){msg('offerOrderMsg',e.message);b.disabled=false}
+    });
     document.querySelectorAll('[data-order-collect]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderCollect)+'/collect','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
     document.querySelectorAll('[data-order-payment]').forEach(b=>b.onclick=async()=>{if(!confirm('Confirm that you received the full cash payment for this order?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderPayment)+'/payment','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
     document.querySelectorAll('[data-order-complete]').forEach(b=>b.onclick=async()=>{if(!confirm('Final approval: cash is received and customer has collected all products. Add bill and stamps now?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderComplete)+'/complete','POST',{});msg('offerOrderMsg',z.message);await Promise.all([loadAdminOfferOrders(),loadAdminProducts(),loadCustomers(),loadRewardEligible()])}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
@@ -264,7 +305,7 @@ async function loadCustomerOrders(){
       return `<div class="product-card" style="border:1px solid #d8c28c;background:#fffdf7">
         <strong>ORDER #${esc(x.orderNumber)}</strong>
         <p><b>Confirmed</b> · ${date(x.confirmedAt)}</p>
-        ${completed?`<p class="price-offer">✓ ORDER COMPLETED</p><h3>Your Billing Stamps Updated 🙏</h3><p>Thank you for shopping. Please visit once again 🙏</p><p>Stamps added: ${Number(x.stampsAdded)}</p>`:cancelled?`<p class="muted">ORDER CANCELLED</p>`:expired?`<p class="muted">OFFER TIME EXPIRED · Please contact the shop if you still want this order.</p>`:`<p class="muted"><b>CONFIRMED</b><br>We're preparing these products for gifting packing.</p><div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><h3 style="margin:0;color:#8a641d">🎁 ORDER READY FOR COLLECTION</h3><p>Please visit TANMAYI STORE AND GIFTS and collect your order. We will prepare your gifting pack when you arrive.</p></div><p><b>Payment:</b> CASH ON DELIVERY · <b>Status:</b> Pending at shop</p><p><b>Products:</b></p><ul>${items}</ul><p><b>Total:</b> ${moneyPrice(x.total)}</p><p class="countdown">Collect before: ${date(x.expiresAt)}</p><button class="cancel-reservation" data-cancel-order="${esc(x.id)}">Cancel Order</button>`}
+        ${completed?`<p class="price-offer">✓ ORDER COMPLETED</p><h3>Your Billing Stamps Updated 🙏</h3><p>Thank you for shopping. Please visit once again 🙏</p><p>Stamps added: ${Number(x.stampsAdded)}</p>`:cancelled?`<p class="muted">ORDER CANCELLED</p>`:expired?`<p class="muted">OFFER TIME EXPIRED · Please contact the shop if you still want this order.</p>`:`<p class="muted"><b>CONFIRMED</b><br>We're preparing these products for gifting packing.</p><div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><h3 style="margin:0;color:#8a641d">🎁 ORDER READY FOR COLLECTION</h3><p>Please visit TANMAYI STORE AND GIFTS and collect your order. We will prepare your gifting pack when you arrive.</p></div><p><b>Payment:</b> ${x.paymentMethod==='ONLINE_PAYMENT'?'ONLINE PAYMENT':'CASH ON DELIVERY'} · <b>Status:</b> ${x.paymentMethod==='ONLINE_PAYMENT'?(x.paymentStatus==='received'?'Verified by shop':'Submitted – waiting for shop verification'):'Pending at shop'}</p>${x.paymentMethod==='ONLINE_PAYMENT'?`<p><b>UTR:</b> ${esc(x.paymentUtr||'Submitted')}</p>`:''}<p><b>Products:</b></p><ul>${items}</ul><p><b>Total:</b> ${moneyPrice(x.total)}</p><p class="countdown">Collect before: ${date(x.expiresAt)}</p><button class="cancel-reservation" data-cancel-order="${esc(x.id)}">Cancel Order</button>`}
       </div>`;
     }).join('')||'<p class="muted">No orders yet. Your confirmed orders will appear here.</p>';
     renderProfileOrders();renderBuyAgain();
@@ -277,7 +318,8 @@ $('refreshMyOrders').onclick=loadCustomerOrders;
 
 async function loadCustomerProducts(){
   try{
-    const [r,m]=await Promise.all([api('/api/customer/offers'),api('/api/customer/my-offers')]);
+    const [r,m,pay]=await Promise.all([api('/api/customer/offers'),api('/api/customer/my-offers'),api('/api/customer/payment-settings').catch(()=>({qrData:""}))]);
+    customerPaymentQr=pay.qrData||"";
     customerProductsCache=r.products||[];
     $('customerProducts').innerHTML=r.products.map(x=>{
       const pendingCount=pendingOfferCart.filter(p=>p.productId===x.id).length;
@@ -293,6 +335,7 @@ async function loadCustomerProducts(){
     }).join('')||'<p class="muted">No active offers right now.</p>';
 
     document.querySelectorAll('[data-stage-offer]').forEach(b=>b.onclick=()=>{
+      if(!pendingOfferCart.length){paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";}
       pendingOfferCart.push({key:Date.now()+'-'+Math.random().toString(36).slice(2),productId:b.dataset.stageOffer,productName:b.dataset.name,offerPrice:Number(b.dataset.price)});
       renderReservations(m.reservations);
       loadCustomerProducts();
@@ -303,7 +346,7 @@ async function loadCustomerProducts(){
 function renderReservations(items){
   const staged=pendingOfferCart.map(x=>`<div class="product-card pending-cart-card">
     <strong>${esc(x.productName)}</strong> · ${moneyPrice(x.offerPrice)}
-    <p class="muted">Added to cart · Timer starts only after you press Confirm to buy.</p>
+    <p class="muted">Selected product · Choose how you want to pay below.</p>
     <button class="cancel-reservation" data-remove-staged="${esc(x.key)}">Remove from cart</button>
   </div>`).join('');
   const confirmed=items.map(x=>`<div class="product-card" data-expiry="${Number(x.expiresAt)}">
@@ -314,25 +357,63 @@ function renderReservations(items){
   </div>`).join('');
   const total=pendingOfferCart.length+items.length;
   $('selectedOfferCount').textContent=`Selected items: ${total}`;
-  $('customerReservations').innerHTML=(staged+confirmed)||'<p class="muted">You have not selected any offers.</p>';
+  const paymentChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="payment-choice">
+    <strong>Choose Payment Method for Selected Product(s)</strong>
+    <label><input type="radio" name="orderPaymentMethod" value="CASH_ON_DELIVERY" ${selectedOrderPaymentMethod==='CASH_ON_DELIVERY'?'checked':''}> 1. Cash on Delivery – Visit Shop</label>
+    <label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" ${selectedOrderPaymentMethod==='ONLINE_PAYMENT'?'checked':''}> 2. Online Payment</label>
+    <div id="onlinePaymentFields" class="online-payment-fields hidden">
+      ${customerPaymentQr?`<p><b>Scan Shop Payment QR Code</b></p><img src="${esc(customerPaymentQr)}" alt="Shop UPI QR code">`:'<p class="muted">Shop payment QR code is not uploaded yet. Please contact the shop or choose Cash on Delivery.</p>'}
+      <label>Upload Payment Screenshot</label><input type="file" id="onlinePaymentScreenshot" accept="image/*">
+      <label>Enter 12-digit UTR Number</label><input type="text" id="onlinePaymentUtr" inputmode="numeric" maxlength="12" placeholder="12-digit UTR number">
+      <small class="muted">Payment details will be sent to the shop for verification.</small>
+    </div>
+  </div>`:'';
+  $('customerReservations').innerHTML=(staged+paymentChoice+confirmed)||'<p class="muted">You have not selected any offers.</p>';
+  document.querySelectorAll('input[name="orderPaymentMethod"]').forEach(r=>r.onchange=()=>{
+    selectedOrderPaymentMethod=r.value;
+    const online=selectedOrderPaymentMethod==='ONLINE_PAYMENT';
+    $('onlinePaymentFields')?.classList.toggle('hidden',!online);
+    const finalButton=$('confirmOffersButton');
+    if(finalButton)finalButton.textContent=online?'Confirm Payment & Order':'Confirm Order';
+  });
   const confirmButton=document.getElementById('confirmOffersButton');
   if(confirmButton)confirmButton.remove();
   if(pendingOfferCart.length){
     const btn=document.createElement('button');
-    btn.id='confirmOffersButton';btn.className='gold';btn.textContent=`Confirm to buy (${pendingOfferCart.length})`;
+    btn.id='confirmOffersButton';btn.className='gold';btn.textContent=paymentStepOpen?'Confirm Order':'Confirm to buy ('+pendingOfferCart.length+')';
     btn.onclick=async()=>{
+      if(!paymentStepOpen){
+        paymentStepOpen=true;
+        try{const latestPaymentSettings=await api('/api/customer/payment-settings');customerPaymentQr=latestPaymentSettings.qrData||"";}catch(_){}
+        renderReservations(items);
+        return;
+      }
       btn.disabled=true;
       try{
         if(!pendingOrderRequestId)pendingOrderRequestId=(crypto.randomUUID?crypto.randomUUID():('req_'+Date.now()+'_'+Math.random().toString(36).slice(2)));
-        const orderResult=await api('/api/customer/confirm-offers','POST',{productIds:pendingOfferCart.map(x=>x.productId),clientRequestId:pendingOrderRequestId});
-        pendingOrderRequestId=null;pendingOfferCart=[];
+        const paymentMethod=document.querySelector('input[name="orderPaymentMethod"]:checked')?.value||selectedOrderPaymentMethod||'CASH_ON_DELIVERY';
+        const payload={productIds:pendingOfferCart.map(x=>x.productId),clientRequestId:pendingOrderRequestId,paymentMethod};
+        if(paymentMethod==='ONLINE_PAYMENT'){
+          if(!customerPaymentQr)throw Error('Shop online payment QR is not available yet. Please choose Cash on Delivery or contact the shop.');
+          const utr=$('onlinePaymentUtr')?.value.trim()||'';
+          const screenshotFile=$('onlinePaymentScreenshot')?.files?.[0];
+          if(!/^\\d{12}$/.test(utr))throw Error('Please enter the exact 12-digit UTR number.');
+          if(!screenshotFile)throw Error('Please upload your payment screenshot.');
+          payload.paymentUtr=utr;
+          payload.paymentScreenshot=await imageData(screenshotFile);
+        }
+        const orderResult=await api('/api/customer/confirm-offers','POST',payload);
+        pendingOrderRequestId=null;pendingOfferCart=[];paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";
+        if(paymentMethod==='ONLINE_PAYMENT')showPaymentConfirmationPopup();
         await loadCustomerOrders();await loadCustomerProducts();
-      }catch(e){alert(e.message);btn.disabled=false;await loadCustomerProducts()}
+      }catch(e){alert(e.message);btn.disabled=false}
     };
     $('customerReservations').appendChild(btn);
+    if(paymentStepOpen&&selectedOrderPaymentMethod==='ONLINE_PAYMENT')btn.textContent='Confirm Payment & Order';
   }
   document.querySelectorAll('[data-remove-staged]').forEach(b=>b.onclick=()=>{
     pendingOfferCart=pendingOfferCart.filter(x=>x.key!==b.dataset.removeStaged);
+    if(!pendingOfferCart.length){paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";}
     renderReservations(items);loadCustomerProducts();
   });
   document.querySelectorAll('[data-cancel-reservation]').forEach(b=>b.onclick=async()=>{
@@ -343,6 +424,15 @@ function renderReservations(items){
   });
   updateCountdowns();
 }
+function showPaymentConfirmationPopup(){
+  const popup=$('paymentConfirmPopup');
+  popup.classList.remove('hidden');popup.setAttribute('aria-hidden','false');
+}
+function hidePaymentConfirmationPopup(){
+  const popup=$('paymentConfirmPopup');
+  popup.classList.add('hidden');popup.setAttribute('aria-hidden','true');
+}
+$('paymentPopupOkay').onclick=$('paymentPopupNo').onclick=$('paymentPopupClose').onclick=hidePaymentConfirmationPopup;
 function updateCountdowns(){document.querySelectorAll('[data-countdown]').forEach(el=>{const left=Number(el.dataset.countdown)-Date.now();if(left<=0){el.textContent='Offer expired';el.closest('[data-expiry]')?.classList.add('muted')}else{const h=Math.floor(left/3600000),m=Math.floor(left%3600000/60000),s=Math.floor(left%60000/1000);el.textContent=` · Expires in ${h}h ${m}m ${s}s`}})}
 setInterval(updateCountdowns,1000);
 $('saveProduct').onclick=async()=>{clear('productAdminMsg');const name=$('productName').value.trim(),size=$('productSize').value.trim(),description=$('productDescription').value.trim(),originalPrice=Number($('productOriginal').value),offerPrice=Number($('productOffer').value),stock=Number($('productStock').value),f1=$('productPhoto1').files[0],f2=$('productPhoto2').files[0];if(!name||!Number.isFinite(originalPrice)||originalPrice<=0||!Number.isFinite(offerPrice)||offerPrice<=0||offerPrice>=originalPrice||!Number.isInteger(stock)||stock<0||!f1||!f2)return msg('productAdminMsg','Enter product name, valid prices, stock (whole number) and both photos.');$('saveProduct').disabled=true;try{const photo1=await imageData(f1),photo2=await imageData(f2);await api('/api/admin/products','POST',{name,size,description,originalPrice,offerPrice,stock,photo1,photo2});$('productName').value=$('productSize').value=$('productDescription').value=$('productOriginal').value=$('productOffer').value=$('productStock').value='';$('productPhoto1').value=$('productPhoto2').value='';msg('productAdminMsg','Product and offer uploaded successfully.');await loadAdminProducts()}catch(e){msg('productAdminMsg',e.message)}finally{$('saveProduct').disabled=false}};
@@ -386,7 +476,7 @@ onAuthStateChanged(auth,async u=>{
     if(a.exists()&&a.data().role==='admin'&&a.data().active===true){
       if(!adminRoute){await signOut(auth);show('customerLogin');return;}
       show('adminApp');$('adminEmail').textContent=u.email||'';
-      await loadCustomers();await loadAdminProducts();await loadAdminOfferOrders();await loadRewardEligible();
+      await loadCustomers();await loadAdminProducts();await loadAdminPaymentSettings();await loadAdminOfferOrders();await loadRewardEligible();
     }else if(adminRoute){
       await signOut(auth);show('adminLogin');
       msg('adminMsg','Email and password were accepted, but this Firebase account is NOT enabled as an active shop admin. The Firestore admins/'+u.uid+' document must exist with role: "admin" and active: true.');

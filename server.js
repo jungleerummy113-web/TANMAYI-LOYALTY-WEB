@@ -60,8 +60,8 @@ async function sendOrderNotification(order) {
     from: MAIL_FROM || `TANMAYI STORE AND GIFTS <${SMTP_USER}>`,
     to: ORDER_NOTIFICATION_EMAIL || SMTP_USER,
     subject: `New customer order #${order.orderNumber} – TANMAYI STORE AND GIFTS`,
-    text: `New order received\nOrder: #${order.orderNumber}\nCustomer: ${order.customerName}\nMobile: ${order.mobile}\nVillage: ${order.village}\nPayment: CASH ON DELIVERY\nOrder status: CONFIRMED / READY\n\n${textItems}\n\nTotal: ₹${order.total}\nOrder time: ${order.confirmedAtText || 'Just now'}`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><div style="background:#171717;color:#d9b45b;padding:22px;border-radius:12px 12px 0 0;text-align:center"><h2 style="margin:0">TANMAYI STORE AND GIFTS</h2><p style="margin:8px 0 0;color:#fff">NEW CUSTOMER ORDER RECEIVED</p></div><div style="border:1px solid #e8dfc9;padding:20px;border-radius:0 0 12px 12px"><h2>Order #${emailEscape(order.orderNumber)}</h2><p><b>Customer:</b> ${emailEscape(order.customerName)}<br><b>Mobile:</b> ${emailEscape(order.mobile)}<br><b>Village:</b> ${emailEscape(order.village)}<br><b>Payment:</b> CASH ON DELIVERY<br><b>Status:</b> CONFIRMED / READY</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px">Product</th><th>Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemRows}</tbody></table><h2 style="text-align:right">Total: ₹${Number(order.total || 0).toLocaleString('en-IN')}</h2><p style="color:#666">Order time: ${emailEscape(order.confirmedAtText || 'Just now')}</p></div></div>`
+    text: `New order received\\nOrder: #${order.orderNumber}\\nCustomer: ${order.customerName}\\nMobile: ${order.mobile}\\nVillage: ${order.village}\\nPayment: ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'ONLINE PAYMENT – UTR ' + (order.paymentUtr || 'submitted') : 'CASH ON DELIVERY'}\\nPayment status: ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'SUBMITTED – ADMIN VERIFICATION REQUIRED' : 'PENDING AT SHOP'}\\nOrder status: CONFIRMED / READY\\n\\n${textItems}\\n\\nTotal: ₹${order.total}\\nOrder time: ${order.confirmedAtText || 'Just now'}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><div style="background:#171717;color:#d9b45b;padding:22px;border-radius:12px 12px 0 0;text-align:center"><h2 style="margin:0">TANMAYI STORE AND GIFTS</h2><p style="margin:8px 0 0;color:#fff">NEW CUSTOMER ORDER RECEIVED</p></div><div style="border:1px solid #e8dfc9;padding:20px;border-radius:0 0 12px 12px"><h2>Order #${emailEscape(order.orderNumber)}</h2><p><b>Customer:</b> ${emailEscape(order.customerName)}<br><b>Mobile:</b> ${emailEscape(order.mobile)}<br><b>Village:</b> ${emailEscape(order.village)}<br><b>Payment:</b> ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'ONLINE PAYMENT' : 'CASH ON DELIVERY'}<br><b>Payment status:</b> ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'SUBMITTED – ADMIN VERIFICATION REQUIRED' : 'PENDING AT SHOP'}<br>${order.paymentMethod === 'ONLINE_PAYMENT' ? '<b>UTR:</b> ' + emailEscape(order.paymentUtr || '') + '<br>' : ''}<b>Status:</b> CONFIRMED / READY</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px">Product</th><th>Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemRows}</tbody></table><h2 style="text-align:right">Total: ₹${Number(order.total || 0).toLocaleString('en-IN')}</h2><p style="color:#666">Order time: ${emailEscape(order.confirmedAtText || 'Just now')}</p></div></div>`
   };
 
   try {
@@ -364,6 +364,16 @@ const PRODUCTS_COLLECTION = "shopProducts";
 const RESERVATIONS_COLLECTION = "offerReservations";
 const OFFER_HOLD_MS = 60 * 60 * 1000;
 const MAX_ACTIVE_PRODUCTS = 8;
+const PAYMENT_SETTINGS_COLLECTION = "shopPaymentSettings";
+const PAYMENT_SUBMISSIONS_COLLECTION = "orderPaymentSubmissions";
+const PAYMENT_UTR_KEYS_COLLECTION = "paymentUtrKeys";
+function decodePaymentImage(dataUrl, label) {
+  if (typeof dataUrl !== "string") throw new Error(`${label} image is required.`);
+  const match = dataUrl.match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/i);
+  if (!match) throw new Error(`${label} must be uploaded as an image.`);
+  if (dataUrl.length > 360000) throw new Error(`${label} is too large. Please choose a smaller image.`);
+  return dataUrl;
+}
 function decodeImage(dataUrl) {
   if (typeof dataUrl !== "string") throw new Error("Both product photos are required.");
   const match = dataUrl.match(/^data:image\/(jpeg|jpg);base64,([A-Za-z0-9+/=]+)$/i);
@@ -372,6 +382,29 @@ function decodeImage(dataUrl) {
   if (dataUrl.length > 360000) throw new Error("Photo is too large after compression. Please choose a smaller image.");
   return dataUrl;
 }
+// Shop-owned UPI QR settings. Only active admins can replace the QR image.
+app.get("/api/admin/payment-settings", requireAdmin, async (_req, res) => {
+  try {
+    const snap = await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
+    res.json({ qrData: snap.exists ? String(snap.data().qrData || "") : "", updatedAt: snap.exists ? safeDate(snap.data().updatedAt) : null });
+  } catch (e) { res.status(500).json({ error:"Could not load payment QR settings." }); }
+});
+app.put("/api/admin/payment-settings", requireAdmin, async (req, res) => {
+  try {
+    const qrData = decodePaymentImage(req.body?.qrData, "Payment QR");
+    await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").set({
+      qrData, updatedAt:admin.firestore.FieldValue.serverTimestamp(), updatedBy:req.adminUid
+    }, { merge:true });
+    res.json({ ok:true, message:"Online payment QR code updated successfully." });
+  } catch (e) { res.status(400).json({ error:e.message || "Could not update payment QR." }); }
+});
+app.get("/api/customer/payment-settings", requireUser, async (_req, res) => {
+  try {
+    const snap = await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
+    res.json({ qrData: snap.exists ? String(snap.data().qrData || "") : "" });
+  } catch (e) { res.status(500).json({ error:"Could not load shop payment QR." }); }
+});
+
 app.get("/api/admin/products", requireAdmin, async (_req, res) => {
   try {
     const [snap, reservationSnap] = await Promise.all([
@@ -509,6 +542,14 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
   try {
     const productIds = Array.isArray(req.body?.productIds) ? req.body.productIds.map(x => String(x || "")).filter(Boolean) : [];
     const clientRequestId = String(req.body?.clientRequestId || "");
+    const paymentMethod = String(req.body?.paymentMethod || "CASH_ON_DELIVERY");
+    const paymentUtr = String(req.body?.paymentUtr || "").trim();
+    const paymentScreenshot = req.body?.paymentScreenshot;
+    if (!["CASH_ON_DELIVERY", "ONLINE_PAYMENT"].includes(paymentMethod)) return res.status(400).json({ error:"Choose a valid payment method." });
+    if (paymentMethod === "ONLINE_PAYMENT") {
+      if (!/^\\d{12}$/.test(paymentUtr)) return res.status(400).json({ error:"Enter the exact 12-digit UTR number." });
+      decodePaymentImage(paymentScreenshot, "Payment screenshot");
+    }
     if (!productIds.length) return res.status(400).json({ error:"Add at least one product before confirming." });
     if (productIds.length > 30) return res.status(400).json({ error:"You can confirm up to 30 items at a time." });
     if (!/^[A-Za-z0-9_-]{10,120}$/.test(clientRequestId)) return res.status(400).json({ error:"Please retry confirming your order." });
@@ -521,6 +562,8 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     const requestKey = sha256(`${req.user.uid}:${clientRequestId}`);
     const requestRef = db.collection(ORDER_REQUEST_KEYS).doc(requestKey);
     const counterRef = db.collection("systemCounters").doc("customerOrderNumber");
+    const paymentSubmissionRef = db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(orderRef.id);
+    const utrKeyRef = paymentMethod === "ONLINE_PAYMENT" ? db.collection(PAYMENT_UTR_KEYS_COLLECTION).doc(paymentUtr) : null;
 
     await db.runTransaction(async tx => {
       const priorRequest = await tx.get(requestRef);
@@ -534,6 +577,10 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 
       const counterSnap = await tx.get(counterRef);
       const customerSnap = await tx.get(customerRef(req.user.uid));
+      if (utrKeyRef) {
+        const utrSnap = await tx.get(utrKeyRef);
+        if (utrSnap.exists) throw new Error("This UTR number has already been submitted. Please check the number or contact the shop.");
+      }
       if (!customerSnap.exists) throw new Error("Customer profile not found. Please login again.");
       const productSnaps = new Map();
       for (const [id, ref] of productRefs) productSnaps.set(id, await tx.get(ref));
@@ -566,13 +613,24 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
       const orderData = {
         orderNumber, customerUid:req.user.uid,
         customerName:String(customer.name || "Customer"), mobile:String(customer.mobile || ""), village:String(customer.village || ""),
-        items, total, paymentMethod:"CASH ON DELIVERY",
-        orderStatus:"ready", collectionStatus:"pending", paymentStatus:"pending", stampsStatus:"pending",
+        items, total, paymentMethod,
+        paymentUtr: paymentMethod === "ONLINE_PAYMENT" ? paymentUtr : "",
+        orderStatus:"ready", collectionStatus:"pending",
+        paymentStatus: paymentMethod === "ONLINE_PAYMENT" ? "submitted" : "pending",
+        stampsStatus:"pending",
         createdAt:confirmedAt, confirmedAt, readyAt:confirmedAt,
         expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt),
         emailStatus:"pending", createdByCustomer:true
       };
       tx.create(orderRef, orderData);
+      if (paymentMethod === "ONLINE_PAYMENT") {
+        tx.create(paymentSubmissionRef, {
+          orderId:orderRef.id, orderNumber, customerUid:req.user.uid,
+          utr:paymentUtr, screenshotData:paymentScreenshot,
+          status:"submitted", submittedAt:confirmedAt
+        });
+        tx.create(utrKeyRef, { orderId:orderRef.id, customerUid:req.user.uid, createdAt:confirmedAt });
+      }
       tx.set(counterRef, { lastOrderNumber:orderNumber, updatedAt:admin.firestore.FieldValue.serverTimestamp() }, { merge:true });
       tx.create(requestRef, { orderId:orderRef.id, customerUid:req.user.uid, createdAt:admin.firestore.FieldValue.serverTimestamp() });
       productIds.forEach((id, index) => {
@@ -610,7 +668,7 @@ app.get("/api/customer/my-orders", requireUser, async (req, res) => {
     const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get();
     const orders = snap.docs.map(d => {
       const x=d.data();
-      return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH ON DELIVERY",
+      return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH_ON_DELIVERY", paymentStatus:x.paymentStatus || "pending", paymentUtr:x.paymentUtr || "",
         orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending", paymentStatus:x.paymentStatus || "pending",
         stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
         cancelledAt:safeDate(x.cancelledAt), readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
@@ -643,7 +701,11 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
 // Admin dashboard order API. Response fields match the Admin HTML dashboard.
 app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   try {
-    const snap = await db.collection(ORDERS_COLLECTION).get();
+    const [snap, paymentSnap] = await Promise.all([
+      db.collection(ORDERS_COLLECTION).get(),
+      db.collection(PAYMENT_SUBMISSIONS_COLLECTION).get()
+    ]);
+    const paymentByOrder = new Map(paymentSnap.docs.map(d => [d.id, d.data()]));
     const now = Date.now();
     const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
     const rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
@@ -669,8 +731,12 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
           ? item.photoUrls
           : (productPhotos.get(String(item.productId || "")) || [])
       }));
+      const payment = paymentByOrder.get(id) || {};
       return { id, ...x, confirmedAt, expiresAt, orderStatus:effectiveStatus,
         total:moneyNumber(x.total), items,
+        paymentUtr:x.paymentUtr || payment.utr || "",
+        paymentScreenshotData:payment.status === "submitted" ? (payment.screenshotData || "") : "",
+        paymentSubmissionStatus:payment.status || "",
         customerName:x.customerName || "Customer", mobile:x.mobile || "" };
     }).sort((a,b) => new Date(b.confirmedAt || 0) - new Date(a.confirmedAt || 0));
     const keyOf = x => x.confirmedAt ? new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date(x.confirmedAt)) : "";
@@ -697,18 +763,41 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   } catch(e) { console.error("admin offer orders",e); res.status(500).json({error:"Could not load customer orders."}); }
 });
 
-app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
+app.post("/api/admin/orders/:id/verify-payment", requireAdmin, async (req,res)=>{
   try {
     const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id);
     await db.runTransaction(async tx=>{
       const snap=await tx.get(ref);
       if(!snap.exists) throw new Error("Order not found.");
       const x=snap.data();
+      if(x.paymentMethod !== "ONLINE_PAYMENT") throw new Error("This order is not an online payment order.");
+      if(x.paymentStatus === "received") return;
+      if(x.paymentStatus !== "submitted") throw new Error("No online payment submission is waiting for verification.");
+      const paymentRef=db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(req.params.id);
+      const paymentSnap=await tx.get(paymentRef);
+      if(!paymentSnap.exists || paymentSnap.data().status !== "submitted") throw new Error("Payment screenshot or submission record is missing.");
+      tx.update(ref,{paymentStatus:"received",paymentVerifiedAt:admin.firestore.FieldValue.serverTimestamp(),paymentVerifiedBy:req.adminUid});
+      tx.update(paymentRef,{status:"verified",verifiedAt:admin.firestore.FieldValue.serverTimestamp(),verifiedBy:req.adminUid});
+    });
+    res.json({ok:true,message:"Online payment verified. Customer can collect the product at the shop."});
+  } catch(e) { res.status(400).json({error:e.message || "Could not verify online payment."}); }
+});
+
+app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
+  try {
+    const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id);
+    let onlinePayment = false;
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref);
+      if(!snap.exists) throw new Error("Order not found.");
+      const x=snap.data();
+      onlinePayment = x.paymentMethod === "ONLINE_PAYMENT";
       if(x.orderStatus !== "ready" || asMillis(x.expiresAt) <= Date.now()) throw new Error("This order is expired or no longer awaiting collection.");
+      if(onlinePayment && x.paymentStatus !== "received") throw new Error("Verify the online payment before marking the product collected.");
       if(x.collectionStatus === "collected") return;
       tx.update(ref,{collectionStatus:"collected",orderStatus:"collected",collectedAt:admin.firestore.FieldValue.serverTimestamp(),collectedBy:req.adminUid});
     });
-    res.json({ok:true,message:"Order collection marked. Next, confirm cash payment."});
+    res.json({ok:true,message:onlinePayment ? "Product collection marked. Online payment is verified; final approval can now add billing stamps." : "Order collection marked. Next, confirm cash payment."});
   } catch(e) { res.status(400).json({error:e.message || "Could not update collection status."}); }
 });
 
