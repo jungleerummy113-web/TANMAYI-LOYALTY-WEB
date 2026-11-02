@@ -157,6 +157,19 @@ body>header{display:none}
 @media(min-width:760px){#customerView,#adminApp{max-width:1050px}.app-bottomnav{left:50%;right:auto;transform:translateX(-50%);width:min(100%,700px);border:1px solid #e7dfd1;border-bottom:0;border-radius:16px 16px 0 0}}
 .customer-promo-banner{display:flex;gap:10px;overflow-x:auto;margin:0 0 14px;border-radius:16px}.customer-promo-banner img{width:100%;min-width:100%;max-height:210px;object-fit:cover;border-radius:16px;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}.promotion-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.promotion-preview-grid img{width:100%;height:130px;object-fit:cover;border-radius:12px}.app-topbar-spacer{width:42px;height:42px;display:block}#adminApp #logout{display:none!important}.customer-promo-banner{display:flex;gap:10px;overflow-x:auto;margin:0 0 14px;border-radius:16px}.customer-promo-banner img{width:100%;min-width:100%;max-height:210px;object-fit:cover;border-radius:16px;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}.promotion-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.promotion-preview-grid img{width:100%;height:130px;object-fit:cover;border-radius:12px}.app-topbar-spacer{width:42px;height:42px;display:block}.order-stat:has(#completedOrderCount),.order-stat:has(#completedTodayCount){display:none!important}.customer-promo-banner{display:flex;gap:10px;overflow-x:auto;margin:0 0 14px;border-radius:16px}.customer-promo-banner img{width:100%;min-width:100%;max-height:210px;object-fit:cover;border-radius:16px;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}.promotion-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.promotion-preview-grid img{width:100%;height:130px;object-fit:cover;border-radius:12px}.app-topbar-spacer{width:42px;height:42px;display:block}</style>
 
+
+<style id="tanmayi-customer-dashboard-fixes">
+#customerLogout{display:none!important}
+.customer-home-title{margin:14px 0 8px;color:#26232b}
+.customer-home-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0 18px}
+.customer-home-actions #refreshCustomerAccount{display:inline-flex!important}
+.customer-whatsapp-dashboard{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 16px;border-radius:14px;text-decoration:none;font-weight:800;color:#fff;background:linear-gradient(110deg,#ee8fb4,#f29a36);box-shadow:0 5px 14px #d98d7433}
+#customerPromoBanner:empty{display:none!important}
+#customerPromoBanner{width:100%;margin:12px 0 16px;overflow-x:auto;scroll-snap-type:x mandatory}
+#customerPromoBanner img{display:block;min-width:100%;max-width:100%;height:auto;max-height:260px;object-fit:cover;border-radius:16px;scroll-snap-align:start;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}
+#promotionSettingsMsg{display:block;margin-top:12px;padding:10px 12px;border-radius:10px;background:#fff3d9;color:#654515;font-weight:700}
+#savePromotionPhotos:disabled{opacity:.65}
+</style>
 </head><body>
 <header><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System</p></header>
 <main class="wrap">
@@ -590,6 +603,7 @@ onAuthStateChanged(auth,async u=>{
     try{
       await loadCustomer();
       show('customerView');
+      if(window.refreshTanmayiStoreSettings) await window.refreshTanmayiStoreSettings();
       // Product/offer loading is secondary; a product API error must not undo login.
       loadCustomerProducts();
     }catch(e){
@@ -613,7 +627,7 @@ onAuthStateChanged(auth,async u=>{
   }
 });
 async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders()}
-$('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
+$('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
 document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventListener('change',()=>{$('approvedPointsInfo').classList.toggle('hidden',el.value!=='points'||!el.checked)}));
 $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemMsg');$('customerTaken').disabled=true;try{const choice=document.querySelector('input[name="rewardChoice"]:checked')?.value||'gift';await api('/api/customer/redeem-taken','POST',{redemptionId:pendingId,choice});msg('customerRedeemMsg','Redemption completed. Stamps and current cycle reset successfully.');await loadCustomer()}catch(e){msg('customerRedeemMsg',e.message)}finally{$('customerTaken').disabled=false}};
 async function loadRewardEligible(){
@@ -838,9 +852,15 @@ window.addEventListener("unhandledrejection", function (event) {
     const welcome=children.find(x=>x.querySelector('#welcome'));
     const panels=['orders','buyAgain','account','myList','stamps','profile'].map(id=>$('customerPanel-'+id)).filter(Boolean);
     const home=node('div','customer-home');
-    if(welcome)home.append(welcome);
-    const tiles=node('div','customer-dashboard');tiles.innerHTML='<button class="customer-tile" data-go="myList"><span>🛍️</span><small>Shop Products</small></button><button class="customer-tile" data-go="stamps"><span>🎟️</span><small>My Stamps</small></button><button class="customer-tile" data-go="orders"><span>📦</span><small>My Orders</small></button><button class="customer-tile" data-go="account"><span>👤</span><small>My Account</small></button>';home.append(tiles);
     const profileTop=children.find(x=>x.classList.contains('customer-profile-top'));if(profileTop)home.append(profileTop);
+    const promoBanner=$('customerPromoBanner');if(promoBanner)home.append(promoBanner);
+    home.append(node('h2','customer-home-title','Welcome to TANMAYI STORE AND GIFTS'));
+    if(welcome)home.append(welcome);
+    const actionRow=node('div','customer-home-actions');
+    const refreshButton=$('refreshCustomerAccount');if(refreshButton)actionRow.append(refreshButton);
+    const whatsapp=node('a','customer-whatsapp-dashboard','🟢 WhatsApp · 7899066113');whatsapp.id='customerDashboardWhatsApp';whatsapp.href='https://wa.me/917899066113';whatsapp.target='_blank';whatsapp.rel='noopener';actionRow.append(whatsapp);home.append(actionRow);
+    const logoutButton=$('customerLogout');if(logoutButton)logoutButton.style.display='none';
+    const tiles=node('div','customer-dashboard');tiles.innerHTML='<button class="customer-tile" data-go="myList"><span>🛍️</span><small>Shop Products</small></button><button class="customer-tile" data-go="stamps"><span>🎟️</span><small>My Stamps</small></button><button class="customer-tile" data-go="orders"><span>📦</span><small>My Orders</small></button><button class="customer-tile" data-go="account"><span>👤</span><small>My Account</small></button>';home.append(tiles);
     const items=[
       {id:'home',label:'Home',icon:'⌂',content:[home]},
       {id:'myList',label:'Products',icon:'🛍️',content:[$('customerPanel-myList')],onOpen:()=>window.openCustomerPanel?.('myList')},
@@ -913,9 +933,10 @@ window.addEventListener("unhandledrejection", function (event) {
      async function promotionImageData(file){const img=new Image(),url=URL.createObjectURL(file);try{await new Promise((ok,bad)=>{img.onload=ok;img.onerror=bad;img.src=url});let scale=Math.min(1,620/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));const ctx=c.getContext('2d');ctx.drawImage(img,0,0,c.width,c.height);for(const q of [.55,.45,.35,.28,.22]){const d=c.toDataURL('image/jpeg',q);if(d.length<=145000)return d}throw Error('Photo too large. Please select a smaller image.')}finally{URL.revokeObjectURL(url)}}
      async function loadStoreSettings(){try{const d=await api('/api/customer/store-settings');$('adminWhatsappNumber').value=d.whatsappNumber||'7899066113';const el=$('adminPromotionPreview');if(el)el.innerHTML=(d.promotionPhotos||[]).map(x=>'<img src="'+x+'" alt="Promotion">').join('')}catch(e){console.warn(e)}}
      $('saveWhatsappNumber').onclick=async()=>{const n=$('adminWhatsappNumber').value.trim();if(!/^\\d{10}$/.test(n))return msg('whatsappSettingsMsg','Enter a valid 10-digit number.');try{await api('/api/admin/store-settings','PUT',{whatsappNumber:n});msg('whatsappSettingsMsg','WhatsApp number saved.')}catch(e){msg('whatsappSettingsMsg',e.message)}};
-     $('savePromotionPhotos').onclick=async()=>{const fs=[...$('promotionPhotos').files].slice(0,5);if(!fs.length)return msg('promotionSettingsMsg','Select photos first.');try{const photos=[];for(const f of fs)photos.push(await promotionImageData(f));await api('/api/admin/store-settings','PUT',{promotionPhotos:photos});msg('promotionSettingsMsg','Promotion photos saved.');await loadStoreSettings()}catch(e){msg('promotionSettingsMsg',e.message)}};
-     async function loadCustomerPromo(){try{const d=await api('/api/customer/store-settings');const el=$('customerPromoBanner');if(el)el.innerHTML=(d.promotionPhotos||[]).map(x=>'<img src="'+x+'" alt="TANMAYI STORE AND GIFTS promotion">').join('')}catch(e){}}
-     loadCustomerPromo();
+     $('promotionPhotos').addEventListener('change',()=>{const fs=[...$('promotionPhotos').files].slice(0,5);const el=$('adminPromotionPreview');if(el)el.innerHTML='';if(fs.length){msg('promotionSettingsMsg',fs.length+' photo(s) selected. Press Save Promotion Photos to publish.');fs.forEach(f=>{const u=URL.createObjectURL(f),im=node('img');im.src=u;im.onload=()=>URL.revokeObjectURL(u);el?.append(im)})}else clear('promotionSettingsMsg')});
+     $('savePromotionPhotos').onclick=async()=>{const btn=$('savePromotionPhotos'),fs=[...$('promotionPhotos').files].slice(0,5);if(!fs.length)return msg('promotionSettingsMsg','Please choose at least one photo first.');btn.disabled=true;btn.textContent='Uploading...';msg('promotionSettingsMsg','Uploading promotional photos. Please wait...');try{const photos=[];for(const f of fs)photos.push(await promotionImageData(f));await api('/api/admin/store-settings','PUT',{promotionPhotos:photos});msg('promotionSettingsMsg','✓ Upload successful! '+photos.length+' promotional photo(s) saved and published to the customer dashboard.');$('promotionPhotos').value='';await loadStoreSettings()}catch(e){msg('promotionSettingsMsg','Upload failed: '+(e.message||'Please try again.'))}finally{btn.disabled=false;btn.textContent='Save Promotion Photos'}};
+     async function loadCustomerPromo(){try{const d=await api('/api/customer/store-settings');const el=$('customerPromoBanner');if(el){el.innerHTML=(d.promotionPhotos||[]).map(x=>'<img src="'+x+'" alt="TANMAYI STORE AND GIFTS promotion">').join('');el.style.display=d.promotionPhotos?.length?'flex':'none'}const n=String(d.whatsappNumber||'7899066113').replace(/\\D/g,'');const a=$('customerDashboardWhatsApp');if(a){a.href='https://wa.me/91'+n;a.textContent='🟢 WhatsApp · '+n}}catch(e){console.warn('Store promotion/contact settings unavailable:',e.message)}}
+     window.refreshTanmayiStoreSettings=loadCustomerPromo;
      adminDrawer?.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>{if(['whatsapp','promotions'].includes(b.dataset.page))loadStoreSettings()}));
     const headRow=root.querySelector('.app-topbar');
     const change=node('button','drawer-link','🔐 Change Password');change.type='button';change.onclick=()=>{closeAdminDrawer();showAdminPassword()};
