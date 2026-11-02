@@ -94,11 +94,16 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 .order-flow-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.order-flow-actions button{flex:1;min-width:125px;margin:0}.order-flow-actions .continue-btn{background:#8d1d24}.order-flow-actions .back-btn{background:#4e5965}.order-flow-success{text-align:center;padding:14px 8px}.order-flow-success .success-mark{width:66px;height:66px;margin:0 auto 10px;border-radius:50%;display:grid;place-items:center;background:#d9f4df;color:#16713a;font-size:38px;font-weight:900}.order-flow-success h2{color:#16713a;font-size:22px;margin:8px 0}.order-flow-success .order-number{font-size:24px;font-weight:900;color:#7e2028;margin:8px 0}.order-flow-note{font-size:13px;color:#5c554a;line-height:1.45}.order-flow-card input[type=file]{font-size:13px}
 @media(max-width:520px){.order-flow-backdrop{padding:7px}.order-flow-card{max-height:96dvh;border-radius:16px}.order-flow-body{padding:12px}.order-flow-head{padding:12px}}
 
-/* Final compact customer product layout: one product per row, 4:3 photos. */
-#customerProducts.customer-product-grid{grid-template-columns:1fr!important;gap:9px!important}
-#customerProducts .product-card{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:9px!important}
-#customerProducts .product-photos{display:block;overflow:visible}
-#customerProducts .product-photos img{display:block;width:100%;min-width:0;height:auto;aspect-ratio:4/3;max-height:220px;object-fit:contain;margin:0 auto}
+/* Customer product list: one card per row; two uploaded photos stacked in square 3:3 frames. */
+#customerProducts.customer-product-grid{display:grid;grid-template-columns:1fr!important;gap:9px!important}
+#customerProducts .product-card{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;padding:9px!important}
+#customerProducts .product-photos{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;overflow:visible}
+#customerProducts .product-photos img{display:block;width:100%;min-width:0;height:auto;aspect-ratio:1/1;max-height:none;object-fit:contain;margin:0 auto;background:#f7f3eb;border-radius:8px;cursor:zoom-in}
+#customerProducts .product-card p{margin:3px 0;font-size:12px;line-height:1.3}
+#customerProducts .customer-product-prices{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+#customerProducts .price-offer{font-size:18px}
+#customerProducts .product-card .stock-line{font-size:12px}
+#customerProducts .product-card button{margin:3px 0 0;padding:9px 12px;font-size:13px}
 /* Selected product row must size to its contents, not stretch into a tall empty panel. */
 .pending-cart-card{aspect-ratio:auto!important;min-height:0!important;grid-template-columns:112px minmax(0,1fr)!important;align-items:center!important;padding:8px!important}
 .pending-cart-card .selected-product-photo{display:block;width:112px!important;height:84px!important;max-height:84px!important;aspect-ratio:4/3!important;object-fit:contain!important}
@@ -108,8 +113,8 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 .pending-qty-controls{gap:4px!important}
 .pending-qty-controls button{padding:4px 8px!important;min-width:28px!important;font-size:12px!important}
 .order-flow-stage{padding:8px!important;margin:7px 0!important}
-.online-payment-fields img.customer-payment-qr{display:block!important;width:min(300px,78vw)!important;height:auto!important;aspect-ratio:1/1!important;max-height:none!important;object-fit:contain!important;padding:8px!important;margin:8px auto!important}
-</style></head><body>
+.online-payment-fields img.customer-payment-qr{display:block!important;width:240px!important;height:240px!important;max-width:78vw!important;max-height:78vw!important;aspect-ratio:1/1!important;object-fit:contain!important;padding:8px!important;margin:7px auto!important}
+#customerReservations .order-flow-stage{padding:7px!important;margin:6px 0!important}#customerReservations .payment-choice{padding:8px!important;margin:7px 0!important}#customerReservations .payment-choice label{font-size:12px;margin:5px 0}#customerReservations .online-payment-fields{padding:8px!important;margin-top:7px!important}#customerReservations .online-payment-fields label{font-size:11px;margin:5px 0 3px}#customerReservations .online-payment-fields input{padding:8px;font-size:13px}#customerReservations .order-flow-actions{margin-top:7px}#customerReservations .order-flow-actions button{padding:9px;font-size:12px}</style></head><body>
 <header><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System</p></header>
 <main class="wrap">
 <section id="adminLogin" class="card hidden"><h2>Admin Login</h2><label>Email</label><input id="email" type="email" placeholder="Admin email">
@@ -408,9 +413,10 @@ async function loadCustomerProducts(){
     $('customerProducts').innerHTML=r.products.map(x=>{
       const pendingCount=pendingOfferCart.filter(p=>p.productId===x.id).reduce((n,p)=>n+Math.max(1,Number(p.quantity)||1),0);
       const available=Math.max(0,Number(x.availableStock??x.stock??0)-pendingCount);
+      const photos=Array.isArray(x.photoUrls)?x.photoUrls.slice(0,2):[];
       return `<div class="product-card" data-product-card-id="${esc(x.id)}"><strong>${esc(x.name)}</strong>
-        <div class="product-photos">${x.photoUrls.map(u=>`<img src="${esc(u)}" alt="${esc(x.name)}">`).join('')}</div>
-        <p><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>
+        <div class="product-photos">${photos.map((u,i)=>`<img src="${esc(u)}" alt="${esc(x.name)} photo ${i+1}" data-zoom-product-image="${esc(u)}" loading="lazy">`).join('')}</div>
+        <p class="customer-product-prices"><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>
         ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
         ${x.description?`<p style="white-space:pre-wrap"><b>Description:</b> ${esc(x.description)}</p>`:''}
         <p class="stock-line">Available: ${available} pieces${pendingCount?` · Added to cart: ${pendingCount}`:''}</p>
@@ -442,7 +448,7 @@ function renderReservations(items){
     return;
   }
   const staged=pendingOfferCart.map(x=>{const qty=Math.max(1,Number(x.quantity)||1);return `<div class="product-card pending-cart-card">${x.photoUrls?.[0]?`<img class="selected-product-photo" src="${esc(x.photoUrls[0])}" alt="${esc(x.productName)}" data-zoom-product-image="${esc(x.photoUrls[0])}">`:'<div class="selected-product-photo" style="display:grid;place-items:center;color:#777;font-size:11px">No image</div>'}<div class="selected-product-info"><strong>${esc(x.productName)}</strong><span class="pending-price">${moneyPrice(x.offerPrice)} each</span><div class="pending-qty-controls"><button type="button" data-qty-minus="${esc(x.productId)}">−</button><span class="pending-qty">${qty}</span><button type="button" data-qty-plus="${esc(x.productId)}">+</button><button type="button" class="pending-remove-btn" data-remove-staged="${esc(x.productId)}">Cancel</button></div><b>${moneyPrice(Number(x.offerPrice)*qty)}</b></div></div>`}).join('');
-  const confirmed=(items||[]).map(x=>`<div class="product-card" data-expiry="${Number(x.expiresAt)}"><strong>${esc(x.productName)}</strong> · ${moneyPrice(x.offerPrice)}<span class="countdown" data-countdown="${Number(x.expiresAt)}"></span><div class="collection-notice">PLEASE VISIT TANMAYI STORE AND GIFTS AND COLLECT YOUR PRODUCT BEFORE EXPIRY OF THIS OFFER TIME.</div><button class="cancel-reservation" data-cancel-reservation="${esc(x.id)}">Cancel selection</button></div>`).join('');
+  const confirmed=(items||[]).map(x=>`<div class="product-card" data-expiry="${Number(x.expiresAt)}"><strong>${esc(x.productName)}</strong> · ${moneyPrice(x.offerPrice)}<span class="countdown" data-countdown="${Number(x.expiresAt)}"></span><div class="collection-notice">Collect at TANMAYI STORE AND GIFTS before this offer expires.</div><button class="cancel-reservation" data-cancel-reservation="${esc(x.id)}">Cancel selection</button></div>`).join('');
   const total=pendingOfferCart.reduce((n,x)=>n+Math.max(1,Number(x.quantity)||1),0)+(items||[]).length;
   $('selectedOfferCount').textContent=`Selected items: ${total}`;
   const paymentChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="order-flow-stage payment-stage"><p class="order-flow-step-title">STEP 2 · CHOOSE PAYMENT</p><strong>Payment method</strong><div class="payment-choice"><label><input type="radio" name="orderPaymentMethod" value="CASH_ON_DELIVERY" ${selectedOrderPaymentMethod==='CASH_ON_DELIVERY'?'checked':''}> Cash on Delivery – Visit Shop</label><label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" ${selectedOrderPaymentMethod==='ONLINE_PAYMENT'?'checked':''}> Online Payment</label><div id="onlinePaymentFields" class="online-payment-fields hidden">${customerPaymentQr?`<p style="font-size:12px;margin:4px 0"><b>Shop UPI QR</b></p><img class="customer-payment-qr" src="${esc(customerPaymentQr)}" alt="Shop UPI QR code">`:'<p class="muted">Shop payment QR code is not uploaded yet. Please choose Cash on Delivery or contact the shop.</p>'}<label>Upload Payment Screenshot</label><input type="file" id="onlinePaymentScreenshot" accept="image/*"><label>Enter 12-digit UTR Number</label><input type="text" id="onlinePaymentUtr" inputmode="numeric" maxlength="12" placeholder="12-digit UTR number"></div></div></div>`:'';
@@ -527,27 +533,35 @@ $('customerSignIn').onclick=async()=>{clear('phoneMsg');const m=$('phone').value
 $('register').onclick=async()=>{clear('phoneMsg');const mobile=$('phone').value.trim(),password=$('customerPassword').value,name=$('name').value.trim(),village=$('village').value.trim();if(!/^\d{10}$/.test(mobile)||!/^\d{6}$/.test(password)||!name||!village)return msg('phoneMsg','Enter name, village, valid mobile and 6-digit PIN.');try{await createUserWithEmailAndPassword(auth,customerEmail(mobile),password);await api('/api/customer/register','POST',{name,mobile,village});await loadCustomer()}catch(e){msg('phoneMsg',e.code==='auth/email-already-in-use'?'This mobile number is already registered. Please login.':e.message)}};
 onAuthStateChanged(auth,async u=>{
   if(!u){show(adminRoute?'adminLogin':'customerLogin');return;}
+  if(!adminRoute){
+    // Customer login must not depend on read access to the admins collection.
+    // Authenticate the customer directly through their own customer API.
+    try{
+      await loadCustomer();
+      show('customerView');
+      // Product/offer loading is secondary; a product API error must not undo login.
+      loadCustomerProducts();
+    }catch(e){
+      show('customerLogin');
+      msg('phoneMsg',e.message||'Customer account could not be loaded. Please try again.');
+    }
+    return;
+  }
   try{
-    // Restore the previously working role-routing flow: check whether this
-    // Firebase account is an admin first; otherwise load it as a customer.
     const a=await getDoc(doc(db,'admins',u.uid));
     if(a.exists()&&a.data().role==='admin'&&a.data().active===true){
-      if(!adminRoute){await signOut(auth);show('customerLogin');return;}
       show('adminApp');$('adminEmail').textContent=u.email||'';
       await loadCustomers();await loadAdminProducts();await loadAdminPaymentSettings();await loadAdminOfferOrders();await loadRewardEligible();
-    }else if(adminRoute){
+    }else{
       await signOut(auth);show('adminLogin');
       msg('adminMsg','Email and password were accepted, but this Firebase account is NOT enabled as an active shop admin. The Firestore admins/'+u.uid+' document must exist with role: "admin" and active: true.');
-    }else{
-      await loadCustomer();
-      await loadCustomerProducts();
     }
   }catch(e){
-    show(adminRoute?'adminLogin':'customerLogin');
-    msg(adminRoute?'adminMsg':'phoneMsg',adminRoute?('Admin verification failed: '+(e.message||'Could not read the admin permission record. Check Firestore access and network.')):(e.message||'Customer login failed. Please try again.'));
+    show('adminLogin');
+    msg('adminMsg','Admin verification failed: '+(e.message||'Could not read the admin permission record. Check Firestore access and network.'));
   }
 });
-async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>';await loadCustomerOrders()}
+async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders()}
 $('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
 document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventListener('change',()=>{$('approvedPointsInfo').classList.toggle('hidden',el.value!=='points'||!el.checked)}));
 $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemMsg');$('customerTaken').disabled=true;try{const choice=document.querySelector('input[name="rewardChoice"]:checked')?.value||'gift';await api('/api/customer/redeem-taken','POST',{redemptionId:pendingId,choice});msg('customerRedeemMsg','Redemption completed. Stamps and current cycle reset successfully.');await loadCustomer()}catch(e){msg('customerRedeemMsg',e.message)}finally{$('customerTaken').disabled=false}};
