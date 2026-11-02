@@ -453,6 +453,13 @@ app.put("/api/admin/payment-settings", requireAdmin, async (req, res) => {
 
 // Customer-facing WhatsApp contact and dashboard promotion images.
 const STORE_SETTINGS_COLLECTION = "storeSettings";
+app.get("/api/admin/store-settings", requireAdmin, async (_req, res) => {
+  try {
+    const snap = await db.collection(STORE_SETTINGS_COLLECTION).doc("public").get();
+    const d = snap.exists ? snap.data() : {};
+    res.json({ whatsappNumber: String(d.whatsappNumber || "7899066113"), promotionPhotos: Array.isArray(d.promotionPhotos) ? d.promotionPhotos.slice(0, 5) : [] });
+  } catch (e) { res.status(500).json({ error: "Could not load store settings." }); }
+});
 app.get("/api/customer/store-settings", requireUser, async (_req, res) => {
   try {
     const snap = await db.collection(STORE_SETTINGS_COLLECTION).doc("public").get();
