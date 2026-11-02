@@ -451,6 +451,24 @@ app.put("/api/admin/payment-settings", requireAdmin, async (req, res) => {
   } catch (e) { res.status(400).json({ error:e.message || "Could not update payment QR." }); }
 });
 
+// Signed Cloudinary uploads keep large image binaries out of Firestore.
+app.post("/api/admin/promotion-upload-signature", requireAdmin, (req, res) => {
+  try {
+    const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+      return res.status(503).json({ error: "Promotion image storage is not configured yet. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to the Render backend environment." });
+    }
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = "tanmayi-promotions";
+    const signatureBase = `folder=${folder}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`;
+    const signature = crypto.createHash("sha1").update(signatureBase).digest("hex");
+    res.json({ cloudName: CLOUDINARY_CLOUD_NAME, apiKey: CLOUDINARY_API_KEY, timestamp, folder, signature });
+  } catch (e) {
+    console.error("[PROMOTION_UPLOAD] Signature generation failed:", e.message);
+    res.status(500).json({ error: "Could not prepare secure photo upload." });
+  }
+});
+
 // Customer-facing WhatsApp contact and dashboard promotion images.
 const STORE_SETTINGS_COLLECTION = "storeSettings";
 app.get("/api/admin/store-settings", requireAdmin, async (_req, res) => {
@@ -486,8 +504,13 @@ app.put("/api/admin/store-settings", requireAdmin, async (req, res) => {
       const photos = req.body.promotionPhotos;
       if (!Array.isArray(photos) || photos.length > 5) return res.status(400).json({ error: "Upload up to 5 promotion photos." });
       for (const photo of photos) {
-        if (typeof photo !== "string" || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/i.test(photo) || photo.length > 150000) {
-          return res.status(400).json({ error: "Each promotion photo must be a compressed JPG under 110 KB. Please choose smaller images." });
+        let valid = false;
+        try {
+          const url = new URL(photo);
+          valid = url.protocol === "https:" && url.hostname === "res.cloudinary.com" && url.pathname.includes("/image/upload/");
+        } catch {}
+        if (typeof photo !== "string" || !valid || photo.length > 2000) {
+          return res.status(400).json({ error: "Promotion photos must be secure Cloudinary image URLs. Upload the photos again." });
         }
       }
       update.promotionPhotos = photos;
