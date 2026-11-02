@@ -878,9 +878,8 @@ window.addEventListener("unhandledrejection", function (event) {
     const items=[
       {id:'dashboard',label:'Dashboard',icon:'📊',content:[head,stats,dashboard]},
       {id:'orders',label:'Pending / Running Orders',icon:'📦',content:[orders]},
-      {id:'history',label:'Completed Orders History',icon:'✅',content:[$('adminCompletedHistorySection')]},
-      {id:'whatsapp',label:'WhatsApp',icon:'🟢',content:[]},
-      {id:'promotions',label:'Promotions',icon:'🖼️',content:[]},
+      {id:'online',label:'Online Payment Orders',icon:'💳',content:[]},
+      {id:'cod',label:'Cash on Delivery Orders',icon:'💵',content:[]},
       {id:'history',label:'Completed Orders History',icon:'✅',content:[$('adminCompletedHistorySection')]},
       {id:'whatsapp',label:'WhatsApp',icon:'🟢',content:[]},
       {id:'promotions',label:'Promotions',icon:'🖼️',content:[]},
@@ -890,9 +889,24 @@ window.addEventListener("unhandledrejection", function (event) {
       {id:'payments',label:'Payment QR',icon:'💳',content:[payments]},
       {id:'qr',label:'Customer QR',icon:'▦',content:[qr]}
     ];
+    const onlineBox=$('adminOnlineOrders'),codBox=$('adminCodOrders');
+    const onlineHeading=onlineBox?.previousElementSibling,codHeading=codBox?.previousElementSibling;
+    const makePaymentPage=(heading,box,title,buttonId)=>{
+      const page=node('section','card');
+      page.innerHTML=`<div class="row"><h2>${title}</h2><button type="button" class="secondary" id="${buttonId}">Refresh</button></div>`;
+      if(box)page.append(box);
+      if(heading)heading.remove();
+      return page;
+    };
+    items.find(x=>x.id==='online').content=[makePaymentPage(onlineHeading,onlineBox,'💳 Online Payment Orders','refreshOnlineOrders')];
+    items.find(x=>x.id==='cod').content=[makePaymentPage(codHeading,codBox,'💵 Cash on Delivery Orders','refreshCodOrders')];
+    const orderHint=orders?.querySelector('p.muted');
+    if(orderHint)orderHint.textContent='Use Online Payment Orders and Cash on Delivery Orders in the menu to view and manage each type separately.';
     const adminNav=drawerConfig(root,'admin',items,items.slice(0,5));
      const adminDrawer=document.querySelector('.app-drawer[data-kind="admin"]');
      const closeAdminDrawer=()=>{adminDrawer?.classList.remove('open');document.querySelector('.app-drawer-shade[data-kind="admin"]')?.classList.remove('open')};
+     $('refreshOnlineOrders')?.addEventListener('click',()=>loadAdminOfferOrders());
+     $('refreshCodOrders')?.addEventListener('click',()=>loadAdminOfferOrders());
      const logoutLink=node('button','drawer-link','↗ Logout');logoutLink.type='button';logoutLink.onclick=()=>{closeAdminDrawer();$('logout')?.click()};adminDrawer?.append(logoutLink);
      const waPage=$('adminPage-whatsapp');if(waPage)waPage.innerHTML='<div class="app-page-title">🟢 WhatsApp</div><div class="card"><label>WhatsApp number (10 digits)</label><input id="adminWhatsappNumber" inputmode="numeric" maxlength="10" value="7899066113"><button type="button" id="saveWhatsappNumber" class="gold">Save WhatsApp Number</button><div id="whatsappSettingsMsg" class="msg hidden"></div></div>';
      const promoPage=$('adminPage-promotions');if(promoPage)promoPage.innerHTML='<div class="app-page-title">🖼️ Promotions</div><div class="card"><p class="muted">Upload up to 5 promotional photos. These appear on the customer dashboard. Uploading again replaces the previous photos.</p><label>Promotion photos</label><input id="promotionPhotos" type="file" accept="image/*" multiple><button type="button" id="savePromotionPhotos" class="gold">Save Promotion Photos</button><div id="promotionSettingsMsg" class="msg hidden"></div><div id="adminPromotionPreview" class="promotion-preview-grid"></div></div>';
