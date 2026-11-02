@@ -626,7 +626,7 @@ onAuthStateChanged(auth,async u=>{
     msg('adminMsg','Admin verification failed: '+(e.message||'Could not read the admin permission record. Check Firestore access and network.'));
   }
 });
-async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders()}
+async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings()}
 $('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
 document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventListener('change',()=>{$('approvedPointsInfo').classList.toggle('hidden',el.value!=='points'||!el.checked)}));
 $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemMsg');$('customerTaken').disabled=true;try{const choice=document.querySelector('input[name="rewardChoice"]:checked')?.value||'gift';await api('/api/customer/redeem-taken','POST',{redemptionId:pendingId,choice});msg('customerRedeemMsg','Redemption completed. Stamps and current cycle reset successfully.');await loadCustomer()}catch(e){msg('customerRedeemMsg',e.message)}finally{$('customerTaken').disabled=false}};
@@ -928,40 +928,14 @@ window.addEventListener("unhandledrejection", function (event) {
      $('refreshCodOrders')?.addEventListener('click',()=>loadAdminOfferOrders());
      const logoutLink=node('button','drawer-link','↗ Logout');logoutLink.type='button';logoutLink.onclick=()=>{closeAdminDrawer();$('logout')?.click()};adminDrawer?.append(logoutLink);
      const waPage=$('adminPage-whatsapp');if(waPage)waPage.innerHTML='<div class="app-page-title">🟢 WhatsApp</div><div class="card"><label>WhatsApp number (10 digits)</label><input id="adminWhatsappNumber" inputmode="numeric" maxlength="10" value="7899066113"><button type="button" id="saveWhatsappNumber" class="gold">Save WhatsApp Number</button><div id="whatsappSettingsMsg" class="msg hidden"></div></div>';
-     const promoPage=$('adminPage-promotions');if(promoPage)promoPage.innerHTML='<div class="app-page-title">🖼️ Promotions</div><div class="card"><p class="muted">Upload up to 5 promotional photos (maximum 2 MB each). These appear on the customer dashboard. Uploading again replaces the previous photos.</p><label>Promotion photos</label><input id="promotionPhotos" type="file" accept="image/*" multiple><button type="button" id="savePromotionPhotos" class="gold">Save Promotion Photos</button><div id="promotionSettingsMsg" class="msg hidden"></div><div id="adminPromotionPreview" class="promotion-preview-grid"></div></div>';
+     const promoPage=$('adminPage-promotions');if(promoPage)promoPage.innerHTML='<div class="app-page-title">🖼️ Promotions</div><div class="card"><p class="muted">Upload up to 5 promotional photos (maximum 10 MB each). JPG, PNG and WEBP are supported. These appear on the customer dashboard. Uploading again replaces the previous photos.</p><label>Promotion photos</label><input id="promotionPhotos" type="file" accept="image/*" multiple><button type="button" id="savePromotionPhotos" class="gold">Save Promotion Photos</button><div id="promotionSettingsMsg" class="msg hidden"></div><div id="adminPromotionPreview" class="promotion-preview-grid"></div></div>';
       async function promotionImageData(file){
         if(!file)throw Error('Please select a photo.');
-        if(file.size>20*1024*1024)throw Error('Choose a photo smaller than 20 MB.');
-        if(!file.type.startsWith('image/'))throw Error('Please choose a JPG, PNG or WEBP image.');
-        if(file.size<=2*1024*1024)return file;
-        let bitmap=null,source=null,url=null;
-        const timed=(promise,ms,message)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(Error(message)),ms))]);
-        try{
-          if('createImageBitmap' in window){
-            try{bitmap=await timed(createImageBitmap(file),12000,'Photo decoding timed out. Please choose a JPG or PNG.');source=bitmap}
-            catch(e){console.warn('ImageBitmap decode failed; using image fallback:',e.message)}
-          }
-          if(!source){
-            url=URL.createObjectURL(file);const img=new Image();
-            await timed(new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('This photo format is not supported. Please choose JPG or PNG.'));img.src=url}),12000,'Photo could not be opened within 12 seconds. Please choose JPG or PNG.');
-            source=img;
-          }
-          const w=source.width||source.naturalWidth,h=source.height||source.naturalHeight;
-          if(!w||!h)throw Error('Could not read photo dimensions. Choose another photo.');
-          let maxSide=1800;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
-          if(!ctx)throw Error('Photo editor is unavailable in this browser.');
-          const render=()=>{const scale=Math.min(1,maxSide/Math.max(w,h));canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));ctx.drawImage(source,0,0,canvas.width,canvas.height)};
-          const makeBlob=quality=>timed(new Promise((resolve,reject)=>{try{canvas.toBlob(b=>b?resolve(b):reject(Error('Browser could not compress this photo.')),'image/jpeg',quality)}catch(e){reject(e)}}),12000,'Photo compression timed out. Please try another JPG or PNG.');
-          for(let pass=0;pass<2;pass++){
-            render();
-            for(const quality of [0.86,0.78,0.70,0.62,0.54]){
-              const blob=await makeBlob(quality);
-              if(blob.size<=2*1024*1024)return blob;
-            }
-            maxSide=1200;
-          }
-          throw Error('Photo is still above 2 MB after compression. Please choose a smaller photo.');
-        }finally{if(bitmap)bitmap.close();if(url)URL.revokeObjectURL(url)}
+        if(!file.type||!file.type.startsWith('image/'))throw Error('Please choose a JPG, PNG or WEBP image.');
+        if(file.size>10*1024*1024)throw Error('Choose a photo smaller than 10 MB.');
+        // Send the original file directly to Cloudinary. This avoids slow or stuck
+        // canvas/image decoding on mobile browsers; Cloudinary stores the original.
+        return file;
       }
       async function uploadPromotionPhoto(blob,onStage){
         onStage('Requesting secure upload permission...');
