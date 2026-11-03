@@ -659,7 +659,7 @@ $('downloadQR').onclick=()=>{const img=$('qrCode').querySelector('img'),canvas=$
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch((err) => {
+    navigator.serviceWorker.register("./service-worker.js?v=6", { updateViaCache: "none" }).then(reg => reg.update()).catch((err) => {
       console.warn("App offline support registration failed:", err);
     });
   });
