@@ -1088,9 +1088,10 @@ window.addEventListener("unhandledrejection", function (event) {
   const $=id=>document.getElementById(id);
   async function request(path,method='GET',body){
     const user=window.tanmayiAuth?.currentUser;
-    if(!user)throw Error('Login session missing. Please sign in again.');
-    const token=await user.getIdToken();
-    const response=await fetch(API+path,{method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    if(!user)throw Error('Customer login session is not ready. Please refresh after login.');
+    const token=await user.getIdToken(true);
+    const url=API+path+(path.includes('?')?'&':'?')+'_fresh='+Date.now();
+    const response=await fetch(url,{method,cache:'no-store',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
     const data=await response.json().catch(()=>({error:'Server returned an unreadable response.'}));
     if(!response.ok)throw Error(data.error||('Request failed ('+response.status+').'));
     return data;
@@ -1102,8 +1103,9 @@ window.addEventListener("unhandledrejection", function (event) {
       const number=$('adminWhatsappNumber');if(number)number.value=d.whatsappNumber||'7899066113';
       const preview=$('adminPromotionPreview');
       if(preview)preview.innerHTML=(d.promotionPhotos||[]).map(url=>'<img src="'+String(url).replaceAll('"','&quot;')+'" alt="Promotion">').join('');
-      status('whatsappSettingsMsg','Settings loaded successfully.');
-    }catch(e){status('whatsappSettingsMsg','Could not load settings: '+e.message)}
+      status('whatsappSettingsMsg','Saved settings loaded.');
+      status('promotionSettingsMsg',(d.promotionPhotos||[]).length+' saved promotional photo(s) found.');
+    }catch(e){status('whatsappSettingsMsg','Could not load settings: '+e.message);status('promotionSettingsMsg','Could not load saved promotions: '+e.message)}
   }
   async function saveWhatsapp(){
     const input=$('adminWhatsappNumber'),button=$('saveWhatsappNumber');
@@ -1127,20 +1129,37 @@ window.addEventListener("unhandledrejection", function (event) {
     const photos=Array.isArray(data.promotionPhotos)?data.promotionPhotos:[];
     if(banner){
       banner.replaceChildren();
-      photos.forEach(url=>{const img=document.createElement('img');img.src=url;img.alt='TANMAYI STORE AND GIFTS promotion';img.loading='lazy';banner.append(img)});
+      photos.forEach(url=>{
+        const img=document.createElement('img');
+        img.src=url+(url.includes('?')?'&':'?')+'v='+Date.now();
+        img.alt='TANMAYI STORE AND GIFTS promotion';
+        img.loading='eager';
+        img.onerror=()=>{img.alt='Promotion photo could not load';};
+        banner.append(img);
+      });
       banner.style.display=photos.length?'flex':'none';
     }
     const number=String(data.whatsappNumber||'7899066113').replaceAll(/[^0-9]/g,'').slice(-10);
     const href='https://wa.me/91'+number;
-    const dashboard=$('customerDashboardWhatsApp');
-    if(dashboard){dashboard.href=href;dashboard.textContent='🟢 WhatsApp · '+number}
+    document.querySelectorAll('#customerDashboardWhatsApp,.customer-whatsapp-dashboard').forEach(link=>{
+      link.href=href;link.textContent='🟢 WhatsApp · '+number;
+    });
     const contact=$('customerWhatsAppLink');
     if(contact){contact.href=href;contact.textContent='Chat on WhatsApp · '+number}
     return data;
   }
   window.refreshTanmayiStoreSettings=async function(){
-    try{return await refreshCustomerSettings()}
-    catch(e){console.warn('Customer store settings failed:',e);return null}
+    try{
+      const data=await refreshCustomerSettings();
+      const banner=$('customerPromoBanner');
+      const number=String(data.whatsappNumber||'7899066113').replaceAll(/[^0-9]/g,'').slice(-10);
+      console.info('[TANMAYI] Customer settings refreshed; WhatsApp:',number,'promotion photos:',(data.promotionPhotos||[]).length);
+      return data;
+    }catch(e){
+      console.error('[TANMAYI] Customer settings refresh failed:',e);
+      status('customerRedeemMsg','Store details could not refresh: '+e.message);
+      return null;
+    }
   };
   document.addEventListener('click',function(event){
     const save=event.target.closest('#saveWhatsappNumber');
@@ -1149,7 +1168,13 @@ window.addEventListener("unhandledrejection", function (event) {
     if(page)setTimeout(loadAdminSettings,0);
   },true);
   document.addEventListener('DOMContentLoaded',function(){
-    if(window.tanmayiAuth?.currentUser&&!location.search.includes('admin=1'))window.refreshTanmayiStoreSettings();
+    if(!location.search.includes('admin=1')){
+      const refresh=()=>window.refreshTanmayiStoreSettings?.();
+      setTimeout(refresh,1000);
+      setTimeout(refresh,3000);
+      $('refreshCustomerAccount')?.addEventListener('click',()=>setTimeout(refresh,300));
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+    }
   });
 })();
 </script>
