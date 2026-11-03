@@ -482,19 +482,36 @@ app.post("/api/admin/promotion-upload-signature", requireAdmin, (req, res) => {
 
 // Customer-facing WhatsApp contact and dashboard promotion images.
 const STORE_SETTINGS_COLLECTION = "storeSettings";
+function sendStoreSettings(res, d, source) {
+  const payload = {
+    whatsappNumber: String(d.whatsappNumber || "7899066113"),
+    promotionPhotos: Array.isArray(d.promotionPhotos) ? d.promotionPhotos.slice(0, 5) : [],
+    updatedAt: d.updatedAt?.toDate ? d.updatedAt.toDate().toISOString() : null
+  };
+  res.set({
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "Surrogate-Control": "no-store"
+  });
+  console.log("[STORE_SETTINGS] GET " + source, {
+    whatsappLast4: payload.whatsappNumber.slice(-4),
+    photoCount: payload.promotionPhotos.length,
+    updatedAt: payload.updatedAt
+  });
+  return res.json(payload);
+}
 app.get("/api/admin/store-settings", requireAdmin, async (_req, res) => {
   try {
     const snap = await db.collection(STORE_SETTINGS_COLLECTION).doc("public").get();
-    const d = snap.exists ? snap.data() : {};
-    res.json({ whatsappNumber: String(d.whatsappNumber || "7899066113"), promotionPhotos: Array.isArray(d.promotionPhotos) ? d.promotionPhotos.slice(0, 5) : [] });
-  } catch (e) { res.status(500).json({ error: "Could not load store settings." }); }
+    return sendStoreSettings(res, snap.exists ? snap.data() : {}, "admin");
+  } catch (e) { console.error("[STORE_SETTINGS] Admin GET failed:", e.message); res.status(500).json({ error: "Could not load store settings." }); }
 });
 app.get("/api/customer/store-settings", async (_req, res) => {
   try {
     const snap = await db.collection(STORE_SETTINGS_COLLECTION).doc("public").get();
-    const d = snap.exists ? snap.data() : {};
-    res.json({ whatsappNumber: String(d.whatsappNumber || "7899066113"), promotionPhotos: Array.isArray(d.promotionPhotos) ? d.promotionPhotos.slice(0, 5) : [] });
-  } catch (e) { res.status(500).json({ error: "Could not load store settings." }); }
+    return sendStoreSettings(res, snap.exists ? snap.data() : {}, "customer");
+  } catch (e) { console.error("[STORE_SETTINGS] Customer GET failed:", e.message); res.status(500).json({ error: "Could not load store settings." }); }
 });
 app.put("/api/admin/store-settings", requireAdmin, async (req, res) => {
   const startedAt = Date.now();
@@ -527,9 +544,25 @@ app.put("/api/admin/store-settings", requireAdmin, async (req, res) => {
       update.promotionPhotos = photos;
     }
     if (!("whatsappNumber" in update) && !("promotionPhotos" in update)) return res.status(400).json({ error: "No store settings supplied." });
-    await db.collection(STORE_SETTINGS_COLLECTION).doc("public").set(update, { merge: true });
-    console.log("[STORE_SETTINGS] Saved successfully", { photoCount: update.promotionPhotos?.length || 0, whatsappUpdated: Object.prototype.hasOwnProperty.call(update, "whatsappNumber"), elapsedMs: Date.now() - startedAt });
-    res.json({ ok: true, message: "Store settings saved." });
+    const settingsRef = db.collection(STORE_SETTINGS_COLLECTION).doc("public");
+    await settingsRef.set(update, { merge: true });
+    const verifySnap = await settingsRef.get();
+    const saved = verifySnap.exists ? verifySnap.data() : {};
+    const savedPhotos = Array.isArray(saved.promotionPhotos) ? saved.promotionPhotos.slice(0, 5) : [];
+    const savedNumber = String(saved.whatsappNumber || "7899066113");
+    const numberMatches = !Object.prototype.hasOwnProperty.call(update, "whatsappNumber") || savedNumber === update.whatsappNumber;
+    const photosMatch = !Object.prototype.hasOwnProperty.call(update, "promotionPhotos") || JSON.stringify(savedPhotos) === JSON.stringify(update.promotionPhotos);
+    console.log("[STORE_SETTINGS] Save verified", {
+      photoCount: savedPhotos.length,
+      whatsappLast4: savedNumber.slice(-4),
+      whatsappUpdated: Object.prototype.hasOwnProperty.call(update, "whatsappNumber"),
+      numberMatches,
+      photosMatch,
+      elapsedMs: Date.now() - startedAt
+    });
+    if (!numberMatches || !photosMatch) return res.status(500).json({ error: "Settings write could not be verified. Please retry." });
+    res.set({ "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate", "Pragma": "no-cache", "Expires": "0" });
+    res.json({ ok: true, message: "Store settings saved and verified.", whatsappNumber: savedNumber, promotionPhotos: savedPhotos });
   } catch (e) {
     console.error("[STORE_SETTINGS] Save failed", { message: e.message, code: e.code, stack: e.stack, elapsedMs: Date.now() - startedAt });
     res.status(400).json({ error: e.message || "Could not save store settings." });
