@@ -853,7 +853,7 @@ window.addEventListener("unhandledrejection", function (event) {
     const panels=['orders','buyAgain','account','myList','stamps','profile'].map(id=>$('customerPanel-'+id)).filter(Boolean);
     const home=node('div','customer-home');
     const profileTop=children.find(x=>x.classList.contains('customer-profile-top'));if(profileTop)home.append(profileTop);
-    const promoBanner=$('customerPromoBanner');if(promoBanner)home.append(promoBanner);
+    let promoBanner=$('customerPromoBanner');if(!promoBanner){promoBanner=node('div','customer-promo-banner');promoBanner.id='customerPromoBanner';}home.append(promoBanner);
     home.append(node('h2','customer-home-title','Welcome to TANMAYI STORE AND GIFTS'));
     if(welcome)home.append(welcome);
     const actionRow=node('div','customer-home-actions');
