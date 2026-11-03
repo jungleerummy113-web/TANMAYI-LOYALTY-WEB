@@ -485,7 +485,6 @@ async function loadCustomerProducts(){
         <div class="product-photos">${photos.map((u,i)=>`<img src="${esc(u)}" alt="${esc(x.name)} photo ${i+1}" data-zoom-product-image="${esc(u)}" loading="lazy">`).join('')}</div>
         <p class="customer-product-prices"><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>
         ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
-        ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
         ${x.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(x.description)}</p></details>`:''}
         <button data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${available<=0?'disabled':''}>${available<=0?'No more stock available':'Select &amp; Add'}</button>
       </div>`;
