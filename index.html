@@ -1051,8 +1051,16 @@ window.addEventListener("unhandledrejection", function (event) {
       }
       button.textContent='Saving photos...';
       showStatus('Photos uploaded. Saving promotion links to the store...');
-      await apiRequest('/api/admin/store-settings','PUT',{promotionPhotos:urls});
-      showStatus('✓ Upload successful! '+urls.length+' promotional photo(s) saved.');
+      const saved=await apiRequest('/api/admin/store-settings','PUT',{promotionPhotos:urls});
+      if(!Array.isArray(saved.promotionPhotos)||saved.promotionPhotos.length!==urls.length||urls.some((url,index)=>saved.promotionPhotos[index]!==url)){
+        throw Error('Cloudinary upload completed, but saved promotion photos did not verify in Firestore.');
+      }
+      const publicResponse=await fetch('https://tanmayi-pin-reset-api.onrender.com/api/customer/store-settings?verify='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+      const publicSettings=await publicResponse.json().catch(()=>({}));
+      if(!publicResponse.ok||!Array.isArray(publicSettings.promotionPhotos)||urls.some(url=>!publicSettings.promotionPhotos.includes(url))){
+        throw Error('Photos are saved in Admin settings, but Customer API is not returning them yet.');
+      }
+      showStatus('✓ Upload verified! '+urls.length+' photo(s) saved and visible to Customer API.');
       input.value='';
       setPreview([]);
     }catch(error){
@@ -1120,7 +1128,10 @@ window.addEventListener("unhandledrejection", function (event) {
       const saved=await request('/api/admin/store-settings');
       input.value=saved.whatsappNumber||number;
       status('whatsappSettingsMsg','✓ WhatsApp number saved successfully.');
-      await refreshCustomerSettings();
+      const customerData=await refreshCustomerSettings();
+      if(String(customerData.whatsappNumber||'').replaceAll(/[^0-9]/g,'').slice(-10)!==number){
+        throw Error('Admin saved the number, but Customer API returned a different number. Check Render logs: [STORE_SETTINGS] GET customer.');
+      }
     }catch(e){status('whatsappSettingsMsg','Save failed: '+e.message)}
     finally{button.disabled=false;button.textContent='Save WhatsApp Number'}
   }
