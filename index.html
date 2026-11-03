@@ -858,7 +858,7 @@ window.addEventListener("unhandledrejection", function (event) {
     if(welcome)home.append(welcome);
     const actionRow=node('div','customer-home-actions');
     const refreshButton=$('refreshCustomerAccount');if(refreshButton)actionRow.append(refreshButton);
-     const whatsapp=$('customerDashboardWhatsApp')||node('a','customer-whatsapp-dashboard','🟢 WhatsApp · 7899066113');whatsapp.classList.add('customer-whatsapp-dashboard');whatsapp.id='customerDashboardWhatsApp';whatsapp.href='https://wa.me/917899066113';whatsapp.target='_blank';whatsapp.rel='noopener';actionRow.append(whatsapp);home.append(actionRow);const originalHomeRow=children.find(x=>x.querySelector('#refreshCustomerAccount'));if(originalHomeRow)originalHomeRow.remove();
+     const whatsapp=$('customerDashboardWhatsApp')||node('a','customer-whatsapp-dashboard','🟢 WhatsApp · 7899066113');whatsapp.classList.add('customer-whatsapp-dashboard');whatsapp.id='customerDashboardWhatsApp';whatsapp.target='_blank';whatsapp.rel='noopener';actionRow.append(whatsapp);home.append(actionRow);const originalHomeRow=children.find(x=>x.querySelector('#refreshCustomerAccount'));if(originalHomeRow)originalHomeRow.remove();
     const logoutButton=$('customerLogout');if(logoutButton)logoutButton.style.display='none';
     const tiles=node('div','customer-dashboard');tiles.innerHTML='<button class="customer-tile" data-go="myList"><span>🛍️</span><small>Shop Products</small></button><button class="customer-tile" data-go="stamps"><span>🎟️</span><small>My Stamps</small></button><button class="customer-tile" data-go="orders"><span>📦</span><small>My Orders</small></button><button class="customer-tile" data-go="account"><span>👤</span><small>My Account</small></button>';home.append(tiles);
     const items=[
@@ -876,6 +876,7 @@ window.addEventListener("unhandledrejection", function (event) {
     tiles.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>nav.go(b.dataset.go));
     root.querySelectorAll('.customer-panel').forEach(p=>p.classList.add('hidden'));
     nav.go('home');
+    if(window.tanmayiAuth?.currentUser)window.setTimeout(()=>window.refreshTanmayiStoreSettings?.(),0);
     const account=$('customerPanel-account');
     if(account&&!$('customerChangePin')){const box=node('div','card');box.id='customerChangePin';box.innerHTML='<h3>🔐 Change Login PIN</h3><p class="muted">Your current 6-digit PIN is required to update it.</p><label>Current PIN</label><input id="customerCurrentPin" type="password" inputmode="numeric" maxlength="6"><label>New PIN</label><input id="customerNewPin" type="password" inputmode="numeric" maxlength="6"><button type="button" id="customerChangePinBtn">Update PIN</button><div id="customerPinMsg" class="msg hidden"></div>';account.append(box);$('customerChangePinBtn').onclick=async()=>{const m=$('customerPinMsg');m.classList.remove('hidden');try{const user=window.tanmayiAuth?.currentUser;if(!user)throw Error('Please login again.');const oldPin=$('customerCurrentPin').value,newPin=$('customerNewPin').value;if(!/^\\d{6}$/.test(oldPin)||!/^\\d{6}$/.test(newPin))throw Error('Enter valid current and new 6-digit PIN.');const {EmailAuthProvider,reauthenticateWithCredential,updatePassword}=window.tanmayiFirebaseAuth;const mobile=customerProfile?.mobile||$('phone')?.value;const cred=EmailAuthProvider.credential(`${mobile}@tanmayi-loyalty.app`,oldPin);await reauthenticateWithCredential(user,cred);await updatePassword(user,newPin);m.textContent='PIN updated successfully.';$('customerCurrentPin').value='';$('customerNewPin').value=''}catch(e){m.textContent=e.message||'PIN update failed.'}}}
   }
@@ -1124,7 +1125,9 @@ window.addEventListener("unhandledrejection", function (event) {
     finally{button.disabled=false;button.textContent='Save WhatsApp Number'}
   }
   async function refreshCustomerSettings(){
-    const data=await request('/api/customer/store-settings');
+    const response=await fetch(API+'/api/customer/store-settings?_fresh='+Date.now(),{method:'GET',cache:'no-store',headers:{'Accept':'application/json'}});
+    const data=await response.json().catch(()=>({error:'Invalid store settings response.'}));
+    if(!response.ok)throw Error(data.error||('Store settings request failed ('+response.status+').'));
     const banner=$('customerPromoBanner');
     const photos=Array.isArray(data.promotionPhotos)?data.promotionPhotos:[];
     if(banner){
