@@ -870,7 +870,7 @@ window.addEventListener("unhandledrejection", function (event) {
       {id:'account',label:'Account',icon:'👤',content:[$('customerPanel-account')],onOpen:()=>window.openCustomerPanel?.('account')}
     ];
     const nav=drawerConfig(root,'customer',items,[items[0],items[1],items[2],items[3],items[5]]);
-      const customerWhatsApp=$('customerPage-whatsapp');if(customerWhatsApp){customerWhatsApp.innerHTML='<div class="app-page-title">🟢 WhatsApp Contact</div><div class="card"><p>Contact TANMAYI STORE AND GIFTS directly on WhatsApp.</p><a id="customerWhatsAppLink" class="gold" href="https://wa.me/917899066113" target="_blank" rel="noopener">Chat on WhatsApp · 7899066113</a></div>';}
+      const customerWhatsApp=$('customerPage-whatsapp');if(customerWhatsApp){customerWhatsApp.innerHTML='<div class="app-page-title">🟢 WhatsApp Contact</div><div class="card"><p>Contact TANMAYI STORE AND GIFTS directly on WhatsApp.</p><a id="customerWhatsAppLink" class="gold" href="#" target="_blank" rel="noopener">Loading WhatsApp contact…</a></div>';}
     const customerExit=node('button','drawer-link','↗ Logout');customerExit.type='button';customerExit.onclick=()=>{document.querySelector('.app-drawer')?.classList.remove('open');document.querySelector('.app-drawer-shade')?.classList.remove('open');$('customerLogout')?.click()};document.querySelector('.app-drawer[data-kind="customer"]')?.append(customerExit);
      const shareLink=node('button','drawer-link','↗ Share Website with Friends');shareLink.type='button';shareLink.onclick=async()=>{const url=location.origin+location.pathname;try{if(navigator.share)await navigator.share({title:'TANMAYI STORE AND GIFTS',text:'Visit TANMAYI STORE AND GIFTS',url});else if(navigator.clipboard){await navigator.clipboard.writeText(url);alert('Website link copied. Share it with your friends.')}}catch(e){if(e.name!=='AbortError')alert('Could not share website link.')}};document.querySelector('.app-drawer[data-kind="customer"]')?.append(shareLink);
     tiles.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>nav.go(b.dataset.go));
@@ -979,7 +979,7 @@ window.addEventListener("unhandledrejection", function (event) {
         finally{btn.disabled=false;btn.textContent='Save Promotion Photos'}
       };
       async function loadCustomerPromo(){try{const d=await api('/api/customer/store-settings');const el=$('customerPromoBanner');if(el){el.innerHTML=(d.promotionPhotos||[]).map(x=>'<img src="'+x+'" alt="TANMAYI STORE AND GIFTS promotion">').join('');el.style.display=d.promotionPhotos?.length?'flex':'none'}const n=String(d.whatsappNumber||'7899066113').replace(/\D/g,'');const href='https://wa.me/91'+n;const a=$('customerDashboardWhatsApp');if(a){a.href=href;a.textContent='🟢 WhatsApp · '+n}const contact=$('customerWhatsAppLink');if(contact){contact.href=href;contact.textContent='Chat on WhatsApp · '+n}}catch(e){console.warn('Store promotion/contact settings unavailable:',e.message)}}
-     window.refreshTanmayiStoreSettings=loadCustomerPromo;
+     // Keep the global customer refresh function owned by the customer settings fix script.
      adminDrawer?.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>{if(['whatsapp','promotions'].includes(b.dataset.page))loadStoreSettings()}));
     const headRow=root.querySelector('.app-topbar');
     const change=node('button','drawer-link','🔐 Change Password');change.type='button';change.onclick=()=>{closeAdminDrawer();showAdminPassword()};
