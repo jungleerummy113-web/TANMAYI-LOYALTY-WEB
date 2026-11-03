@@ -1081,4 +1081,77 @@ window.addEventListener("unhandledrejection", function (event) {
 })();
 </script>
 
+
+<script id="tanmayi-store-settings-fix-v1">
+(function(){
+  const API='https://tanmayi-pin-reset-api.onrender.com';
+  const $=id=>document.getElementById(id);
+  async function request(path,method='GET',body){
+    const user=window.tanmayiAuth?.currentUser;
+    if(!user)throw Error('Login session missing. Please sign in again.');
+    const token=await user.getIdToken();
+    const response=await fetch(API+path,{method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    const data=await response.json().catch(()=>({error:'Server returned an unreadable response.'}));
+    if(!response.ok)throw Error(data.error||('Request failed ('+response.status+').'));
+    return data;
+  }
+  function status(id,message){const el=$(id);if(el){el.textContent=message;el.classList.remove('hidden')}}
+  async function loadAdminSettings(){
+    try{
+      const d=await request('/api/admin/store-settings');
+      const number=$('adminWhatsappNumber');if(number)number.value=d.whatsappNumber||'7899066113';
+      const preview=$('adminPromotionPreview');
+      if(preview)preview.innerHTML=(d.promotionPhotos||[]).map(url=>'<img src="'+String(url).replaceAll('"','&quot;')+'" alt="Promotion">').join('');
+      status('whatsappSettingsMsg','Settings loaded successfully.');
+    }catch(e){status('whatsappSettingsMsg','Could not load settings: '+e.message)}
+  }
+  async function saveWhatsapp(){
+    const input=$('adminWhatsappNumber'),button=$('saveWhatsappNumber');
+    if(!input||!button)return;
+    const number=input.value.replaceAll(/[^0-9]/g,'');
+    if(!/^[0-9]{10}$/.test(number)){status('whatsappSettingsMsg','Enter a valid 10-digit WhatsApp number.');return}
+    button.disabled=true;button.textContent='Saving...';
+    status('whatsappSettingsMsg','Saving WhatsApp number...');
+    try{
+      await request('/api/admin/store-settings','PUT',{whatsappNumber:number});
+      const saved=await request('/api/admin/store-settings');
+      input.value=saved.whatsappNumber||number;
+      status('whatsappSettingsMsg','✓ WhatsApp number saved successfully.');
+      await refreshCustomerSettings();
+    }catch(e){status('whatsappSettingsMsg','Save failed: '+e.message)}
+    finally{button.disabled=false;button.textContent='Save WhatsApp Number'}
+  }
+  async function refreshCustomerSettings(){
+    const data=await request('/api/customer/store-settings');
+    const banner=$('customerPromoBanner');
+    const photos=Array.isArray(data.promotionPhotos)?data.promotionPhotos:[];
+    if(banner){
+      banner.replaceChildren();
+      photos.forEach(url=>{const img=document.createElement('img');img.src=url;img.alt='TANMAYI STORE AND GIFTS promotion';img.loading='lazy';banner.append(img)});
+      banner.style.display=photos.length?'flex':'none';
+    }
+    const number=String(data.whatsappNumber||'7899066113').replaceAll(/[^0-9]/g,'').slice(-10);
+    const href='https://wa.me/91'+number;
+    const dashboard=$('customerDashboardWhatsApp');
+    if(dashboard){dashboard.href=href;dashboard.textContent='🟢 WhatsApp · '+number}
+    const contact=$('customerWhatsAppLink');
+    if(contact){contact.href=href;contact.textContent='Chat on WhatsApp · '+number}
+    return data;
+  }
+  window.refreshTanmayiStoreSettings=async function(){
+    try{return await refreshCustomerSettings()}
+    catch(e){console.warn('Customer store settings failed:',e);return null}
+  };
+  document.addEventListener('click',function(event){
+    const save=event.target.closest('#saveWhatsappNumber');
+    if(save){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();saveWhatsapp();return}
+    const page=event.target.closest('[data-page="whatsapp"],[data-page="promotions"]');
+    if(page)setTimeout(loadAdminSettings,0);
+  },true);
+  document.addEventListener('DOMContentLoaded',function(){
+    if(window.tanmayiAuth?.currentUser&&!location.search.includes('admin=1'))window.refreshTanmayiStoreSettings();
+  });
+})();
+</script>
+
 </body></html>
