@@ -984,7 +984,7 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
     }).sort((a,b) => new Date(b.confirmedAt || 0) - new Date(a.confirmedAt || 0));
     const keyOf = x => x.confirmedAt ? new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date(x.confirmedAt)) : "";
     const today = all.filter(x => keyOf(x) === todayKey);
-    const runningOrders = all.filter(x => ["ready", "collected"].includes(x.orderStatus));
+    const runningOrders = all.filter(x => !["completed", "cancelled", "expired"].includes(x.orderStatus));
     const completedOrdersList = all.filter(x => x.orderStatus === "completed");
     const cancelledOrders = all.filter(x => ["cancelled", "expired"].includes(x.orderStatus)).slice(0, 2);
     const todayCustomersMap = new Map();
