@@ -464,12 +464,21 @@ $('refreshMyOrders').onclick=loadCustomerOrders;
 function placeOrderFlowAfterProduct(productId){
   const flow=$('orderFlowBackdrop');
   const mount=$('orderFlowMount');
-  if(!flow||!mount)return;
+  const grid=$('customerProducts');
+  if(!flow||!mount||!grid)return;
   activeOfferAnchorId=productId||activeOfferAnchorId;
   if(flow.parentElement!==mount)mount.appendChild(flow);
+  const selectedCard=activeOfferAnchorId?grid.querySelector('[data-product-card-id="'+CSS.escape(activeOfferAnchorId)+'"]'):null;
+  if(selectedCard){
+    selectedCard.insertAdjacentElement('afterend',mount);
+  }else if(mount.parentElement!==grid.parentElement){
+    grid.insertAdjacentElement('afterend',mount);
+  }
+  mount.style.display='block';
   flow.classList.add('inline-order-flow');
   flow.classList.remove('hidden');
   flow.setAttribute('aria-hidden','false');
+  requestAnimationFrame(()=>mount.scrollIntoView({behavior:'smooth',block:'nearest'}));
 }
 async function loadCustomerProducts(){
   try{
