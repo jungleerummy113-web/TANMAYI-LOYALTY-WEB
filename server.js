@@ -1095,7 +1095,7 @@ app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
       const productSnaps=new Map();
       for(const pid of qtyByProduct.keys()) productSnaps.set(pid,await tx.get(db.collection(PRODUCTS_COLLECTION).doc(pid)));
       for(const [pid,qty] of qtyByProduct){const ps=productSnaps.get(pid);if(!ps?.exists)throw new Error("An order product no longer exists.");const stock=Number(ps.data().stock||0);if(stock<qty)throw new Error("Physical stock is lower than this order quantity. Please correct stock before completing.");}
-      const amount=moneyNumber(order.total);
+      const amount=moneyNumber(order.productTotal ?? order.total);
       if(!(amount>0)) throw new Error("Order total is invalid.");
       const stampsAdded=amount<=800?1:2;
       const c=customerSnap.data(),cycle=moneyNumber(c.cycleBillTotal ?? c.billTotal),life=moneyNumber(c.lifetimeBillTotal ?? cycle);
