@@ -1199,4 +1199,43 @@ window.addEventListener("unhandledrejection", function (event) {
 })();
 </script>
 
+<script id="tanmayi-order-image-zoom-fix">
+(function(){
+  function openZoom(src,alt){
+    if(!src)return;
+    var overlay=document.getElementById('selectedImageZoom');
+    var photo=document.getElementById('selectedImageZoomPhoto');
+    if(!overlay||!photo)return;
+    photo.src=src;
+    photo.alt=alt||'Order image';
+    overlay.hidden=false;
+    overlay.setAttribute('aria-hidden','false');
+  }
+  document.addEventListener('click',function(event){
+    var image=event.target&&event.target.closest&&event.target.closest(
+      '.payment-admin-proof img, .payment-proof-thumb, .compact-order-product img, .customer-order-card img, .product-card img, .pending-cart-card img'
+    );
+    if(!image)return;
+    event.preventDefault();
+    event.stopPropagation();
+    if(event.stopImmediatePropagation)event.stopImmediatePropagation();
+    openZoom(image.currentSrc||image.src,image.alt);
+  },true);
+  document.addEventListener('keydown',function(event){
+    if(event.key==='Escape'){
+      var overlay=document.getElementById('selectedImageZoom');
+      if(overlay&&!overlay.hidden){
+        overlay.hidden=true;
+        overlay.setAttribute('aria-hidden','true');
+        var photo=document.getElementById('selectedImageZoomPhoto');
+        if(photo)photo.removeAttribute('src');
+      }
+    }
+  });
+  var style=document.createElement('style');
+  style.textContent='.payment-admin-proof img,.payment-proof-thumb,.compact-order-product img,.customer-order-card img,.product-card img,.pending-cart-card img{cursor:zoom-in}';
+  document.head.appendChild(style);
+})();
+</script>
+
 </body></html>
