@@ -730,6 +730,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
       if (distanceKm > 12) return res.status(400).json({error:"Home delivery not available at this location or pincode. Delivery is available only within 12 km of the shop."});
     }
     if (!["CASH_ON_DELIVERY", "ONLINE_PAYMENT"].includes(paymentMethod)) return res.status(400).json({ error:"Choose a valid payment method." });
+    if (fulfilmentMode === "HOME_DELIVERY" && paymentMethod !== "ONLINE_PAYMENT") return res.status(400).json({error:"Home delivery is available with Online Payment only. Cash on Delivery is available only for Visit Shop & Collect."});
     if (paymentMethod === "ONLINE_PAYMENT") {
       if (paymentUtr.length !== 12) return res.status(400).json({ error:`UTR must contain exactly 12 digits. Server received ${paymentUtr.length} digit(s).` });
       decodePaymentImage(paymentScreenshot, "Payment screenshot");
