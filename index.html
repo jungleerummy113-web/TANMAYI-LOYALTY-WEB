@@ -210,7 +210,7 @@ body>header{display:none}
 <section class="customer-panel hidden" id="customerPanel-orders"><div class="row"><h3>📦 Orders &amp; Order History</h3><button type="button" class="secondary" id="refreshMyOrders">Refresh Orders</button></div><p class="muted">Running, completed and cancelled orders are shown separately.</p><div id="customerOrders"><p class="muted">Loading orders…</p></div></section>
 <section class="customer-panel hidden" id="customerPanel-buyAgain"><h3>🔁 Buy Again</h3><p class="muted">Products you ordered before. Only currently active products with available stock can be selected.</p><div id="customerBuyAgain" class="customer-product-grid">Loading previous purchases…</div></section>
 <section class="customer-panel hidden" id="customerPanel-account"><h3>👤 Account Details</h3><label>Customer Name</label><input id="profileName" maxlength="80" autocomplete="name"><label>Registered Mobile Number</label><input id="profileMobile" readonly><label>Address / Village</label><textarea id="profileAddress" rows="3" maxlength="250" placeholder="Enter your address"></textarea><div class="profile-actions"><button type="button" id="saveCustomerAddress">Save Address</button></div><div id="profileMsg" class="msg hidden"></div></section>
-<section class="customer-panel hidden" id="customerPanel-myList"><h3>🛍️ My List – Shop Products</h3><p class="muted">Products uploaded by TANMAYI STORE AND GIFTS, with current offer price and stock.</p><div id="customerProducts" class="customer-product-grid">Loading products…</div><div id="selectedOfferCount" class="offer-count" style="margin-top:14px">Selected items: 0</div></section>
+<section class="customer-panel hidden" id="customerPanel-myList"><h3>🛍️ My List – Shop Products</h3><p class="muted">Products uploaded by TANMAYI STORE AND GIFTS, with current offer price and stock.</p><div id="customerProducts" class="customer-product-grid">Loading products…</div><div id="orderFlowMount"></div><div id="selectedOfferCount" class="offer-count" style="margin-top:14px">Selected items: 0</div></section>
 <section class="customer-panel hidden" id="customerPanel-stamps"><h3>🎟️ My Stamps &amp; Rewards</h3><div class="stats"><div class="stat"><small>Current stamps</small><b id="myStamps">0</b></div><div class="stat"><small>Latest bill</small><b id="myBills">₹0</b></div><div class="stat"><small>Gifts redeemed</small><b id="myGifts">0</b></div></div><div id="customerPending" class="card hidden"><h3>🎁 Reward ready to collect</h3><p id="pendingText"></p><label id="rewardChoiceLabel" class="hidden">Choose your reward</label><div id="rewardChoices" class="hidden"><label><input type="radio" name="rewardChoice" value="gift" checked style="width:auto"> Free gift</label><label id="pointsChoiceLabel"><input type="radio" name="rewardChoice" value="points" style="width:auto"> Approved points</label></div><div id="approvedPointsInfo" class="card hidden" style="background:#fffaf0;margin:10px 0;padding:14px"><strong>Approved points available to redeem</strong><div style="font-size:26px;font-weight:800;margin-top:6px"><span id="approvedPointsValue">0</span> Points</div><div id="approvedPointsRupees" class="muted">Redeem value: ₹0</div></div><button id="customerTaken" class="gold">REDEEM TAKEN – Confirm collection</button><div id="customerRedeemMsg" class="msg hidden"></div></div><div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><strong>🎁 Stamp Rules</strong><p>₹1–₹800 purchase = 1 stamp. ₹801 or above = 2 stamps. Collect 10 stamps to redeem a free gift up to ₹800 or approved cash points.</p></div></section>
 <section class="customer-panel hidden" id="customerPanel-profile"><h3>👤 My Profile &amp; History</h3><p id="profileSummary" class="muted"></p><div id="profileOrdersHistory"></div><button type="button" class="history-toggle" id="toggleCustomerHistory" aria-expanded="false">📋 My Bill History　▼</button><section class="card hidden" id="customerHistoryPanel"><p class="muted">Your bill date, time and bill amount. Scroll to see older bills.</p><div class="history-scroll"><table><thead><tr><th>Date &amp; Time</th><th>Bill Amount</th></tr></thead><tbody id="customerHistory"></tbody></table></div></section></section>
 </section>
@@ -463,20 +463,16 @@ $('refreshMyOrders').onclick=loadCustomerOrders;
 
 function placeOrderFlowAfterProduct(productId){
   const flow=$('orderFlowBackdrop');
-  const grid=$('customerProducts');
-  if(!flow||!grid)return;
+  const mount=$('orderFlowMount');
+  if(!flow||!mount)return;
   activeOfferAnchorId=productId||activeOfferAnchorId;
-  const cards=[...grid.querySelectorAll('[data-product-card-id]')];
-  const anchor=cards.find(card=>card.dataset.productCardId===activeOfferAnchorId)||cards.find(card=>card.dataset.productCardId===pendingOfferCart[pendingOfferCart.length-1]?.productId)||cards[0];
-  if(anchor)anchor.insertAdjacentElement('afterend',flow);
+  if(flow.parentElement!==mount)mount.appendChild(flow);
   flow.classList.add('inline-order-flow');
   flow.classList.remove('hidden');
   flow.setAttribute('aria-hidden','false');
 }
 async function loadCustomerProducts(){
   try{
-    const checkoutFlow=$('orderFlowBackdrop');
-    if(checkoutFlow && checkoutFlow.parentElement===$('customerProducts')) document.body.appendChild(checkoutFlow);
     const [r,m,pay]=await Promise.all([api('/api/customer/offers'),api('/api/customer/my-offers'),api('/api/customer/payment-settings').catch(()=>({qrData:""}))]);
     customerPaymentQr=pay.qrData||"";
     customerProductsCache=r.products||[];
@@ -490,12 +486,13 @@ async function loadCustomerProducts(){
         ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
         ${x.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(x.description)}</p></details>`:''}
         <button type="button" class="secondary" disabled>${available<=0?'NO STOCK AVAILABLE':`Available Stock: ${available} pieces`}</button>
-        <button data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${!canAddMore?'disabled':''}>${available<=0?'No stock available':!canAddMore?'Added to cart':'Select &amp; Add'}</button>
+        <button type="button" data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${!canAddMore?'disabled':''}>${available<=0?'No stock available':!canAddMore?'Added to cart':'Select &amp; Add'}</button>
       </div>`;
     }).join('')||'<p class="muted">No active offers right now.</p>';
     if(pendingOfferCart.length&&!orderConfirmedData)placeOrderFlowAfterProduct(activeOfferAnchorId||pendingOfferCart[pendingOfferCart.length-1].productId);
 
-    document.querySelectorAll('[data-stage-offer]').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('[data-stage-offer]').forEach(b=>b.onclick=e=>{
+      e.preventDefault();e.stopPropagation();
       if(!pendingOfferCart.length){paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";}
       const selectedProduct=customerProductsCache.find(p=>p.id===b.dataset.stageOffer)||{};
       const existingSelection=pendingOfferCart.find(p=>p.productId===b.dataset.stageOffer);if(existingSelection){existingSelection.quantity=Math.max(1,Number(existingSelection.quantity)||1)+1;}else{pendingOfferCart.push({key:b.dataset.stageOffer,productId:b.dataset.stageOffer,productName:b.dataset.name,offerPrice:Number(b.dataset.price),quantity:1,photoUrls:Array.isArray(selectedProduct.photoUrls)?selectedProduct.photoUrls.slice(0,2):[]});}
