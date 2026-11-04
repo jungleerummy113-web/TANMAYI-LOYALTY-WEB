@@ -585,7 +585,7 @@ app.get("/api/admin/products", requireAdmin, async (_req, res) => {
     const now = Date.now(), heldByProduct = new Map();
     reservationSnap.docs.forEach(r => {
       const x = r.data();
-      if (asMillis(x.expiresAt) > now) heldByProduct.set(x.productId, (heldByProduct.get(x.productId) || 0) + 1);
+      if (x.orderId || asMillis(x.expiresAt) > now) heldByProduct.set(x.productId, (heldByProduct.get(x.productId) || 0) + 1);
     });
     res.json({ products: snap.docs.map(d => {
       const x=d.data(), stock=Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
@@ -678,7 +678,7 @@ app.get("/api/customer/offers", requireUser, async (_req, res) => {
     const products = [];
     for (const d of snap.docs) {
       const x = d.data(), heldSnap = await db.collection(RESERVATIONS_COLLECTION).where("productId", "==", d.id).get();
-      const held = heldSnap.docs.filter(r => r.data().status === "active" && asMillis(r.data().expiresAt) > now).length;
+      const held = heldSnap.docs.filter(r => r.data().status === "active" && (Boolean(r.data().orderId) || asMillis(r.data().expiresAt) > now)).length;
       const stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       products.push({ id:d.id, name:x.name, size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), stock, availableStock:Math.max(0, stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]) });
     }
@@ -694,7 +694,7 @@ app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
       const product = await tx.get(productRef); if (!product.exists || product.data().active !== true) throw new Error("This offer is no longer available.");
       const existing = await tx.get(db.collection(RESERVATIONS_COLLECTION).where("productId", "==", productId));
       const now = Date.now(), stock = Number.isInteger(Number(product.data().stock)) ? Number(product.data().stock) : 0;
-      const held = existing.docs.filter(d => d.data().status === "active" && asMillis(d.data().expiresAt) > now).length;
+      const held = existing.docs.filter(d => d.data().status === "active" && (Boolean(d.data().orderId) || asMillis(d.data().expiresAt) > now)).length;
       if (held >= stock) throw new Error("Sorry, this product is out of stock or all pieces are currently selected.");
       const expiresAt = now + OFFER_HOLD_MS;
       tx.create(reservationRef, { customerUid:req.user.uid, productId, productName:product.data().name, offerPrice:moneyNumber(product.data().offerPrice), status:"active", createdAt:admin.firestore.FieldValue.serverTimestamp(), expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt) });
@@ -704,8 +704,8 @@ app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
   } catch (e) { res.status(400).json({ error:e.message || "Could not select this offer." }); }
 });
 
-// Customer confirms the staged cart. A single order is created with an automatic
-// CONFIRMED + READY status and a one-hour collection window. Packing is done in-store
+// Customer confirms the staged cart. Confirmed orders remain active until the shop
+// cancels or completes them; the one-hour expiry applies only to unconfirmed selections. Packing is done in-store
 // when the customer arrives; the website does not mark cash paid or award stamps here.
 app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
   let createdOrder = null;
