@@ -867,6 +867,7 @@ app.get("/api/customer/my-orders", requireUser, async (req, res) => {
         refund:refund.status ? {status:refund.status,holderName:refund.holderName||"",upiId:refund.upiId||"",refundUtr:refund.refundUtr||"",customerMessage:refund.customerMessage||"",message:refund.message||"",screenshotData:refund.screenshotData||"",updatedAt:safeDate(refund.updatedAt)} : null,
         orderStatus:(x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending",
         stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
+        fulfilmentMode:x.fulfilmentMode || "SHOP_COLLECTION", deliveryCharge:moneyNumber(x.deliveryCharge), deliveryAddress:x.deliveryAddress || null, paymentVerifiedAt:safeDate(x.paymentVerifiedAt),
         cancelledAt:safeDate(x.cancelledAt), readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
     }).sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
     res.json({ orders });
@@ -1039,7 +1040,7 @@ app.post("/api/admin/orders/:id/verify-payment", requireAdmin, async (req,res)=>
       tx.update(ref,{paymentStatus:"received",paymentVerifiedAt:admin.firestore.FieldValue.serverTimestamp(),paymentVerifiedBy:req.adminUid});
       tx.update(paymentRef,{status:"verified",verifiedAt:admin.firestore.FieldValue.serverTimestamp(),verifiedBy:req.adminUid});
     });
-    res.json({ok:true,message:"Online payment verified. Customer can collect the product at the shop."});
+    res.json({ok:true,message:"Online payment verified. Home delivery orders will be delivered within 1 hour; shop collection orders can be collected at the shop."});
   } catch(e) { res.status(400).json({error:e.message || "Could not verify online payment."}); }
 });
 
