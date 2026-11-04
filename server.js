@@ -1033,7 +1033,7 @@ app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
       if(!snap.exists) throw new Error("Order not found.");
       const x=snap.data();
       onlinePayment = x.paymentMethod === "ONLINE_PAYMENT";
-      if(x.orderStatus !== "ready" || (x.expiresAt && asMillis(x.expiresAt) <= Date.now())) throw new Error("This order is expired or no longer awaiting collection.");
+      if(x.orderStatus !== "ready") throw new Error("This order is no longer awaiting collection.");
       if(onlinePayment && x.paymentStatus !== "received") throw new Error("Verify the online payment before marking the product collected.");
       if(x.collectionStatus === "collected") return;
       tx.update(ref,{collectionStatus:"collected",orderStatus:"collected",collectedAt:admin.firestore.FieldValue.serverTimestamp(),collectedBy:req.adminUid});
