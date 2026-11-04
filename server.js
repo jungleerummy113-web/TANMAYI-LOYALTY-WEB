@@ -716,6 +716,19 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     const paymentMethod = String(req.body?.paymentMethod || "CASH_ON_DELIVERY");
     const paymentUtr = String(req.body?.paymentUtr || "").replace(/[^0-9]/g, "");
     const paymentScreenshot = req.body?.paymentScreenshot;
+    const fulfilmentMode = String(req.body?.fulfilmentMode || "SHOP_COLLECTION");
+    const deliveryAddress = req.body?.deliveryAddress || {};
+    const customerLatitude = Number(req.body?.customerLatitude), customerLongitude = Number(req.body?.customerLongitude);
+    if (!["SHOP_COLLECTION", "HOME_DELIVERY"].includes(fulfilmentMode)) return res.status(400).json({error:"Choose a valid delivery option."});
+    if (fulfilmentMode === "HOME_DELIVERY") {
+      if (!/^\d{10}$/.test(String(deliveryAddress.mobile||"")) || !String(deliveryAddress.name||"").trim() || !String(deliveryAddress.address||"").trim() || !String(deliveryAddress.area||"").trim() || !String(deliveryAddress.landmark||"").trim() || String(deliveryAddress.pincode||"") !== "517408") return res.status(400).json({error:"Home delivery not available at this location or pincode. Check all address fields and PIN 517408."});
+      if (!Number.isFinite(customerLatitude) || !Number.isFinite(customerLongitude) || customerLatitude < -90 || customerLatitude > 90 || customerLongitude < -180 || customerLongitude > 180) return res.status(400).json({error:"Please share your current GPS location to check delivery availability."});
+      const rad = n => n * Math.PI / 180;
+      const dLat = rad(customerLatitude - 13.217485), dLon = rad(customerLongitude - 78.738013);
+      const h = Math.sin(dLat/2)**2 + Math.cos(rad(13.217485))*Math.cos(rad(customerLatitude))*Math.sin(dLon/2)**2;
+      const distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1-h));
+      if (distanceKm > 12) return res.status(400).json({error:"Home delivery not available at this location or pincode. Delivery is available only within 12 km of the shop."});
+    }
     if (!["CASH_ON_DELIVERY", "ONLINE_PAYMENT"].includes(paymentMethod)) return res.status(400).json({ error:"Choose a valid payment method." });
     if (paymentMethod === "ONLINE_PAYMENT") {
       if (paymentUtr.length !== 12) return res.status(400).json({ error:`UTR must contain exactly 12 digits. Server received ${paymentUtr.length} digit(s).` });
@@ -778,13 +791,17 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         return { productId:id, productName:product.name || "Product", size:String(product.size||""), description:String(product.description||""), quantity, offerPrice, lineTotal:offerPrice * quantity,
           photoUrls:Array.isArray(product.photoData) ? product.photoData : (Array.isArray(product.photoUrls) ? product.photoUrls : []) };
       });
-      const total = items.reduce((sum, item) => sum + item.lineTotal, 0);
+      const productTotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+      const deliveryCharge = fulfilmentMode === "HOME_DELIVERY" ? 49 : 0;
+      const total = productTotal + deliveryCharge;
       const orderNumber = Number(counterSnap.exists ? counterSnap.data().lastOrderNumber || 10000 : 10000) + 1;
       const confirmedAt = admin.firestore.FieldValue.serverTimestamp();
       const orderData = {
         orderNumber, customerUid:req.user.uid,
         customerName:String(customer.name || "Customer"), mobile:String(customer.mobile || ""), village:String(customer.village || ""),
-        items, total, paymentMethod,
+        items, productTotal, deliveryCharge, total, paymentMethod,
+        fulfilmentMode,
+        deliveryAddress:fulfilmentMode === "HOME_DELIVERY" ? {name:String(deliveryAddress.name).trim(),mobile:String(deliveryAddress.mobile),address:String(deliveryAddress.address).trim(),area:String(deliveryAddress.area).trim(),landmark:String(deliveryAddress.landmark).trim(),pincode:"517408",latitude:customerLatitude,longitude:customerLongitude} : null,
         paymentUtr: paymentMethod === "ONLINE_PAYMENT" ? paymentUtr : "",
         orderStatus:"ready", collectionStatus:"pending",
         paymentStatus: paymentMethod === "ONLINE_PAYMENT" ? "submitted" : "pending",
@@ -793,6 +810,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         emailStatus:"pending", createdByCustomer:true
       };
       tx.create(orderRef, orderData);
+      if (fulfilmentMode === "HOME_DELIVERY") tx.set(customerRef(req.user.uid), {deliveryAddress:orderData.deliveryAddress}, {merge:true});
       if (paymentMethod === "ONLINE_PAYMENT") {
         tx.create(paymentSubmissionRef, {
           orderId:orderRef.id, orderNumber, customerUid:req.user.uid,
