@@ -414,7 +414,7 @@ app.get("/api/admin/summary", requireAdmin, async (_req,res)=>{
 const PRODUCTS_COLLECTION = "shopProducts";
 const RESERVATIONS_COLLECTION = "offerReservations";
 const OFFER_HOLD_MS = 60 * 60 * 1000;
-const MAX_ACTIVE_PRODUCTS = 8;
+const MAX_ACTIVE_PRODUCTS = 50;
 const PAYMENT_SETTINGS_COLLECTION = "shopPaymentSettings";
 const PAYMENT_SUBMISSIONS_COLLECTION = "orderPaymentSubmissions";
 const PAYMENT_UTR_KEYS_COLLECTION = "paymentUtrKeys";
@@ -602,7 +602,7 @@ app.post("/api/admin/products", requireAdmin, async (req, res) => {
     if (size.length > 80 || description.length > 1200) return res.status(400).json({ error:"Product size must be within 80 characters and description within 1200 characters." });
     if (!name || name.length > 80 || !Number.isFinite(originalPrice) || originalPrice <= 0 || !Number.isFinite(offerPrice) || offerPrice <= 0 || offerPrice >= originalPrice || !Number.isInteger(stock) || stock < 0) return res.status(400).json({ error:"Enter a product name and valid prices. Offer price must be below original price." });
     const active = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get();
-    if (active.size >= MAX_ACTIVE_PRODUCTS) return res.status(400).json({ error:"You can keep a maximum of 8 active products. Pause an existing offer first." });
+    if (active.size >= MAX_ACTIVE_PRODUCTS) return res.status(400).json({ error:"You can keep a maximum of 50 active products. Pause an existing offer first." });
     decodeImage(req.body?.photo1); decodeImage(req.body?.photo2);
     productRef = db.collection(PRODUCTS_COLLECTION).doc();
     const photoData = [decodeImage(req.body.photo1), decodeImage(req.body.photo2)];
