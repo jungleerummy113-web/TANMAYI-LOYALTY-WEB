@@ -288,7 +288,7 @@ async function loadAdminProducts(){
       ${x.description?`<p style="white-space:pre-wrap"><b>Description:</b> ${esc(x.description)}</p>`:''}
       <p class="stock-line">Total physical stock: ${Number(x.stock??0)} pieces</p>
       <p class="stock-line">Confirmed / held by customers: ${Number(x.reservedCount??0)} pieces</p>
-      <p class="stock-line">Available for other customers: ${Number(x.availableStock??x.stock??0)} pieces</p>
+      <button type="button" class="secondary" disabled>Available Stock: ${Math.max(0,Number(x.availableStock??x.stock??0))} pieces</button>
       <details class="product-edit">
         <summary>Edit product, photos, price &amp; stock</summary>
         <label>Product name</label><input id="edit-name-${esc(x.id)}" maxlength="80" value="${esc(x.name)}">
@@ -487,7 +487,8 @@ async function loadCustomerProducts(){
         <p class="customer-product-prices"><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>
         ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
         ${x.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(x.description)}</p></details>`:''}
-        <button data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${available<=0?'disabled':''}>${available<=0?'No more stock available':'Select &amp; Add'}</button>
+        <button type="button" class="secondary" disabled>${available<=0?'NO STOCK AVAILABLE':`Available Stock: ${available} pieces`}</button>
+        <button data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${available<=0?'disabled':''}>${available<=0?'No stock available':'Select &amp; Add'}</button>
       </div>`;
     }).join('')||'<p class="muted">No active offers right now.</p>';
     if(pendingOfferCart.length&&!orderConfirmedData)placeOrderFlowAfterProduct(activeOfferAnchorId||pendingOfferCart[pendingOfferCart.length-1].productId);
