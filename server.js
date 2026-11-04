@@ -654,7 +654,7 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
       const stock = Number(req.body.stock);
       if (!Number.isInteger(stock) || stock < 0 || stock > 100000) return res.status(400).json({ error:"Stock must be a whole number from 0 to 100000." });
       const reservations = await db.collection(RESERVATIONS_COLLECTION).where("productId", "==", req.params.id).get();
-      const held = reservations.docs.filter(d => d.data().status === "active" && asMillis(d.data().expiresAt) > Date.now()).length;
+      const held = reservations.docs.filter(d => d.data().status === "active" && (Boolean(d.data().orderId) || asMillis(d.data().expiresAt) > Date.now())).length;
       if (stock < held) return res.status(400).json({ error:`${held} item(s) are currently confirmed by customers. Stock cannot be lower than this.` });
       updates.stock = stock;
     }
@@ -766,7 +766,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         if (!productSnap?.exists || productSnap.data().active !== true) throw new Error("One of your selected offers is no longer available. Please refresh the offers.");
         const product = productSnap.data();
         const stock = Number.isInteger(Number(product.stock)) ? Number(product.stock) : 0;
-        const held = existingByProduct.get(id).docs.filter(d => d.data().status === "active" && asMillis(d.data().expiresAt) > now).length;
+        const held = existingByProduct.get(id).docs.filter(d => d.data().status === "active" && (Boolean(d.data().orderId) || asMillis(d.data().expiresAt) > now)).length;
         if (held + quantity > stock) throw new Error(`${product.name || "A selected product"} has only ${Math.max(0, stock-held)} piece(s) available now. Please update your selection.`);
       }
 
@@ -790,7 +790,6 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         paymentStatus: paymentMethod === "ONLINE_PAYMENT" ? "submitted" : "pending",
         stampsStatus:"pending",
         createdAt:confirmedAt, confirmedAt, readyAt:confirmedAt,
-        expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt),
         emailStatus:"pending", createdByCustomer:true
       };
       tx.create(orderRef, orderData);
@@ -809,8 +808,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         tx.create(reservationRefs[index], {
           customerUid:req.user.uid, productId:id, productName:product.name || "Product",
           offerPrice:moneyNumber(product.offerPrice), orderId:orderRef.id, orderNumber,
-          status:"active", createdAt:confirmedAt,
-          expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt)
+          status:"active", createdAt:confirmedAt, orderId:orderRef.id, orderNumber
         });
       });
       createdOrder = { id:orderRef.id, ...orderData, confirmedAtText:new Date(now).toLocaleString("en-IN", { timeZone:"Asia/Kolkata" }) };
@@ -836,7 +834,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 // Customer order history, including the completed order and stamp confirmation.
 app.get("/api/customer/my-orders", requireUser, async (req, res) => {
   try {
-    const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).limit(50).get();
+    const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).get();
     const [paymentDocs, refundDocs] = await Promise.all([
       Promise.all(snap.docs.map(d=>db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(d.id).get())),
       Promise.all(snap.docs.map(d=>db.collection(ORDER_REFUNDS_COLLECTION).doc(d.id).get()))
@@ -848,7 +846,7 @@ app.get("/api/customer/my-orders", requireUser, async (req, res) => {
       return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH_ON_DELIVERY", paymentStatus:x.paymentStatus || "pending", paymentUtr:x.paymentUtr || payment.utr || "",
         paymentScreenshotData:x.orderStatus === "cancelled" ? (payment.screenshotData || "") : "",
         refund:refund.status ? {status:refund.status,holderName:refund.holderName||"",upiId:refund.upiId||"",refundUtr:refund.refundUtr||"",customerMessage:refund.customerMessage||"",message:refund.message||"",screenshotData:refund.screenshotData||"",updatedAt:safeDate(refund.updatedAt)} : null,
-        orderStatus:(x.orderStatus === "ready" && asMillis(x.expiresAt) <= Date.now()) ? "expired" : (x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending",
+        orderStatus:(x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending",
         stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
         cancelledAt:safeDate(x.cancelledAt), readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
     }).sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
@@ -966,7 +964,7 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
     const all = rawOrders.map(({id, data:x}) => {
       const confirmedAt = safeDate(x.confirmedAt || x.createdAt);
       const expiresAt = asMillis(x.expiresAt);
-      const effectiveStatus = x.orderStatus === "ready" && expiresAt && expiresAt <= now ? "expired" : (x.orderStatus || "ready");
+      const effectiveStatus = x.orderStatus || "ready";
       const items = (Array.isArray(x.items) ? x.items : []).map(item => ({
         ...item,
         photoUrls:Array.isArray(item.photoUrls) && item.photoUrls.length
@@ -1035,7 +1033,7 @@ app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
       if(!snap.exists) throw new Error("Order not found.");
       const x=snap.data();
       onlinePayment = x.paymentMethod === "ONLINE_PAYMENT";
-      if(x.orderStatus !== "ready" || asMillis(x.expiresAt) <= Date.now()) throw new Error("This order is expired or no longer awaiting collection.");
+      if(x.orderStatus !== "ready" || (x.expiresAt && asMillis(x.expiresAt) <= Date.now())) throw new Error("This order is expired or no longer awaiting collection.");
       if(onlinePayment && x.paymentStatus !== "received") throw new Error("Verify the online payment before marking the product collected.");
       if(x.collectionStatus === "collected") return;
       tx.update(ref,{collectionStatus:"collected",orderStatus:"collected",collectedAt:admin.firestore.FieldValue.serverTimestamp(),collectedBy:req.adminUid});
@@ -1128,7 +1126,7 @@ app.get("/api/admin/offer-reservations", requireAdmin, async (_req, res) => {
   try {
     const snap = await db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get();
     const now = Date.now();
-    const live = snap.docs.filter(d => asMillis(d.data().expiresAt) > now);
+    const live = snap.docs.filter(d => d.data().orderId || asMillis(d.data().expiresAt) > now);
     const groups = new Map();
     for (const d of live) {
       const x = d.data();
