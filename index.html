@@ -468,17 +468,29 @@ function placeOrderFlowAfterProduct(productId){
   if(!flow||!mount||!grid)return;
   activeOfferAnchorId=productId||activeOfferAnchorId;
   if(flow.parentElement!==mount)mount.appendChild(flow);
-  const selectedCard=activeOfferAnchorId?grid.querySelector('[data-product-card-id="'+CSS.escape(activeOfferAnchorId)+'"]'):null;
-  if(selectedCard){
-    selectedCard.insertAdjacentElement('afterend',mount);
-  }else if(mount.parentElement!==grid.parentElement){
-    grid.insertAdjacentElement('afterend',mount);
+  let selectedCard=null;
+  if(activeOfferAnchorId){
+    selectedCard=Array.from(grid.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===String(activeOfferAnchorId));
   }
-  mount.style.display='block';
+  if(selectedCard){
+    selectedCard.appendChild(mount);
+    mount.style.display='block';
+    mount.style.width='100%';
+    mount.style.gridColumn='1 / -1';
+    mount.style.flexBasis='100%';
+  }else{
+    grid.insertAdjacentElement('afterend',mount);
+    mount.style.display='block';
+    mount.style.width='100%';
+  }
   flow.classList.add('inline-order-flow');
   flow.classList.remove('hidden');
+  flow.style.display='block';
   flow.setAttribute('aria-hidden','false');
-  requestAnimationFrame(()=>mount.scrollIntoView({behavior:'smooth',block:'nearest'}));
+  requestAnimationFrame(()=>{
+    mount.scrollIntoView({behavior:'smooth',block:'nearest'});
+    flow.scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
 }
 async function loadCustomerProducts(){
   try{
