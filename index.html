@@ -374,7 +374,7 @@ async function loadAdminOfferOrders(){
       .sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0))[0];
     const runningAdminOrders=adminOrders.filter(x=>!['completed','cancelled','expired'].includes(x.orderStatus));
      const completedAdminOrders=adminOrders.filter(x=>x.orderStatus==='completed').sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0));
-     const onlineAdminOrders=adminOrders.filter(x=>x.paymentMethod==='ONLINE_PAYMENT'&&(runningAdminOrders.some(r=>r.id===x.id)||(x.refund&&['requested','processing'].includes(x.refund.status))));
+     const onlineAdminOrders=adminOrders.filter(x=>x.paymentMethod==='ONLINE_PAYMENT'&&(runningAdminOrders.some(r=>r.id===x.id)||(x.refund&&['requested','processing','success'].includes(x.refund.status))));
      const codAdminOrders=runningAdminOrders.filter(x=>x.paymentMethod!=='ONLINE_PAYMENT');
     const renderAdminOrderCard=x=>{
       const items=(x.items||[]).map(i=>{
