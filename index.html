@@ -374,7 +374,8 @@ async function loadAdminOfferOrders(){
       .sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0))[0];
     const runningAdminOrders=adminOrders.filter(x=>!['completed','cancelled','expired'].includes(x.orderStatus));
      const completedAdminOrders=adminOrders.filter(x=>x.orderStatus==='completed').sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0));
-     const visibleAdminOrders=runningAdminOrders;
+     const onlineAdminOrders=adminOrders.filter(x=>x.paymentMethod==='ONLINE_PAYMENT'&&(runningAdminOrders.some(r=>r.id===x.id)||(x.refund&&['requested','processing'].includes(x.refund.status))));
+     const codAdminOrders=runningAdminOrders.filter(x=>x.paymentMethod!=='ONLINE_PAYMENT');
     const renderAdminOrderCard=x=>{
       const items=(x.items||[]).map(i=>{
         const photo=(i.photoUrls||[])[0];
@@ -397,10 +398,10 @@ async function loadAdminOfferOrders(){
      if(runningEl)runningEl.innerHTML=runningAdminOrders.slice(0,6).map(x=>`<div class="today-customer-row"><span><b>#${esc(x.orderNumber)}</b> · ${esc(x.customerName)} · ${esc(x.orderStatus||'pending')}</span><b>${moneyPrice(x.total)}</b></div>`).join('')||'<p class="muted">No pending or running orders.</p>';
      const historyEl=$('adminCompletedOrders');
      if(historyEl)historyEl.innerHTML=completedAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No completed orders yet.</div>';
-     const onlineOrders=visibleAdminOrders.filter(x=>x.paymentMethod==='ONLINE_PAYMENT');
-    const codOrders=visibleAdminOrders.filter(x=>x.paymentMethod!=='ONLINE_PAYMENT');
-    $('adminOnlineOrders').innerHTML=onlineOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No online payment orders found.</div>';
-    $('adminCodOrders').innerHTML=codOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No cash on delivery orders found.</div>';
+     const runningList=$('adminRunningOrdersList');
+     if(runningList)runningList.innerHTML=runningAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No pending or running orders.</div>';
+     $('adminOnlineOrders').innerHTML=onlineAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No online payment orders found.</div>';
+     $('adminCodOrders').innerHTML=codAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No cash on delivery orders found.</div>';
     document.querySelectorAll('[data-order-verify]').forEach(b=>b.onclick=async()=>{
       if(!confirm('Verify that the UTR and payment screenshot show the correct received payment?'))return;
       b.disabled=true;
@@ -444,10 +445,10 @@ async function loadCustomerOrders(){
       return `<div class="product-card customer-order-card" style="border:1px solid #d8c28c;background:#fffdf7">
         <strong>ORDER #${esc(x.orderNumber)}</strong>
         <p><b>Confirmed</b> · ${date(x.confirmedAt)}</p>
-        ${completed?`<p class="price-offer">✓ ORDER COMPLETED</p><h3>Your Billing Stamps Updated 🙏</h3><p>Thank you for shopping. Please visit once again 🙏</p><p>Stamps added: ${Number(x.stampsAdded)}</p>`:cancelled?`<p class="muted">ORDER CANCELLED</p>`:expired?`<p class="muted">OFFER TIME EXPIRED · Please contact the shop if you still want this order.</p>`:`<p class="muted"><b>CONFIRMED</b><br>Your products are being prepared.</p><div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><h3 style="margin:0;color:#8a641d">🎁 ORDER READY FOR COLLECTION</h3><p>Please collect your order at TANMAYI STORE AND GIFTS.</p></div>`}
+        ${completed?`<p class="price-offer">✓ ORDER COMPLETED</p><h3>Your Billing Stamps Updated 🙏</h3><p>Thank you for shopping. Please visit once again 🙏</p><p>Stamps added: ${Number(x.stampsAdded)}</p>`:cancelled?`<p class="muted">ORDER CANCELLED</p>`:expired?`<p class="muted">OFFER TIME EXPIRED · Please contact the shop if you still want this order.</p>`:x.paymentMethod==='ONLINE_PAYMENT'&&x.paymentStatus!=='received'?`<div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><h3 style="margin:0;color:#8a641d">🧾 BILL PROCESSING</h3><p>Your online payment is waiting for shop verification. The order will be ready after payment is verified.</p></div>`:`<div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><h3 style="margin:0;color:#8a641d">🎁 VISIT OUR SHOP AND COLLECT YOUR PRODUCT</h3><p>Please visit TANMAYI STORE AND GIFTS to collect your product.</p></div>`}
         ${x.paymentMethod==='ONLINE_PAYMENT'?`<div class="payment-admin-proof"><b>ONLINE PAYMENT DETAILS</b><p>Payment UTR: ${esc(x.paymentUtr||'—')}</p>${x.paymentScreenshotData?`<a href="${esc(x.paymentScreenshotData)}" target="_blank" rel="noopener"><img class="payment-proof-thumb" src="${esc(x.paymentScreenshotData)}" alt="Your payment screenshot"></a>`:''}<p>Payment status: ${esc(x.paymentStatus||'submitted')}</p>${x.refund?.status?`<p><b>Refund status:</b> ${esc(String(x.refund.status).toUpperCase())}</p><p><b>Refund account:</b> ${esc(x.refund.holderName||'')} · ${esc(x.refund.upiId||'')}</p>${x.refund.refundUtr?`<p><b>Refund UTR:</b> ${esc(x.refund.refundUtr)}</p>`:''}${x.refund.message?`<p><b>Shop message:</b> ${esc(x.refund.message)}</p>`:''}${x.refund.screenshotData?`<p><b>Refund payment / update screenshot:</b></p><a href="${esc(x.refund.screenshotData)}" target="_blank" rel="noopener"><img class="payment-proof-thumb" src="${esc(x.refund.screenshotData)}" alt="Refund payment or issue screenshot"></a>`:''}`:''}</div>`:''}
         <p><b>Products:</b></p><ul>${items}</ul><p><b>Total:</b> ${moneyPrice(x.total)}</p>
-        ${!completed&&!cancelled&&!expired?`<p class="countdown">Collect before: ${date(x.expiresAt)}</p>${x.paymentMethod==='ONLINE_PAYMENT'?`<div class="refund-request-box" id="refund-box-${esc(x.id)}"><button class="cancel-reservation" data-show-refund="${esc(x.id)}">Cancel Order / Request Refund</button><div class="hidden" id="refund-fields-${esc(x.id)}"><label>Bank Account Holder Name</label><input id="refund-holder-${esc(x.id)}" maxlength="100" placeholder="Enter account holder name"><label>UPI ID / UPI Number</label><input id="refund-upi-${esc(x.id)}" maxlength="100" placeholder="example@upi or mobile UPI"><button class="gold" data-submit-refund="${esc(x.id)}">Cancel &amp; Submit Refund Request</button></div></div>`:`<button class="cancel-reservation" data-cancel-order="${esc(x.id)}">Cancel Order</button>`}`:''}
+        ${!completed&&!cancelled&&!expired&&!(x.paymentMethod==='ONLINE_PAYMENT'&&x.paymentStatus!=='received')?`<p class="countdown">Collect before: ${date(x.expiresAt)}</p>${x.paymentMethod==='ONLINE_PAYMENT'?`<div class="refund-request-box" id="refund-box-${esc(x.id)}"><button class="cancel-reservation" data-show-refund="${esc(x.id)}">Cancel Order</button><div class="hidden" id="refund-fields-${esc(x.id)}"><label>Bank Account Holder Name</label><input id="refund-holder-${esc(x.id)}" maxlength="100" placeholder="Enter account holder name"><label>UPI ID / UPI Number</label><input id="refund-upi-${esc(x.id)}" maxlength="100" placeholder="example@upi or mobile UPI"><button class="gold" data-submit-refund="${esc(x.id)}">Cancel &amp; Submit Refund Request</button></div></div>`:`<button class="cancel-reservation" data-cancel-order="${esc(x.id)}">Cancel Order</button>`}`:''}
       </div>`;
     }).join('')||'<p class="muted">No orders yet. Your confirmed orders will appear here.</p>';
     renderProfileOrders();renderBuyAgain();
@@ -924,7 +925,8 @@ window.addEventListener("unhandledrejection", function (event) {
     items.find(x=>x.id==='online').content=[makePaymentPage(onlineHeading,onlineBox,'💳 Online Payment Orders','refreshOnlineOrders')];
     items.find(x=>x.id==='cod').content=[makePaymentPage(codHeading,codBox,'💵 Cash on Delivery Orders','refreshCodOrders')];
     const orderHint=orders?.querySelector('p.muted');
-    if(orderHint)orderHint.textContent='Use Online Payment Orders and Cash on Delivery Orders in the menu to view and manage each type separately.';
+    if(orderHint)orderHint.textContent='All active customer orders appear here. Use the separate payment menus to manage online and cash orders.';
+    if(orders&&!$('adminRunningOrdersList')){const runningList=node('div','compact-orders');runningList.id='adminRunningOrdersList';if(orderHint)orderHint.insertAdjacentElement('afterend',runningList);else orders.append(runningList);}
     const adminNav=drawerConfig(root,'admin',items,items.slice(0,5));
      const adminDrawer=document.querySelector('.app-drawer[data-kind="admin"]');
      const closeAdminDrawer=()=>{adminDrawer?.classList.remove('open');document.querySelector('.app-drawer-shade[data-kind="admin"]')?.classList.remove('open')};
