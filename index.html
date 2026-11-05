@@ -294,7 +294,32 @@ $('floatingCartButton')?.addEventListener('click',()=>{renderFloatingCart();$('f
 $('floatingCartClose')?.addEventListener('click',()=>{$('floatingCartBackdrop').classList.add('hidden');$('floatingCartBackdrop').setAttribute('aria-hidden','true')});
 $('floatingCartBackdrop')?.addEventListener('click',e=>{if(e.target.id==='floatingCartBackdrop'){$('floatingCartBackdrop').classList.add('hidden');$('floatingCartBackdrop').setAttribute('aria-hidden','true')}});
 $('floatingCartItems')?.addEventListener('click',e=>{const b=e.target.closest('[data-floating-cart-remove]');if(!b)return;pendingOfferCart=pendingOfferCart.filter(x=>x.productId!==b.dataset.floatingCartRemove);if(!pendingOfferCart.length){paymentStepOpen=false;selectedOrderPaymentMethod='CASH_ON_DELIVERY';closeOrderFlow()}savePendingOfferCart();loadCustomerProducts()});
-$('floatingCartCheckout')?.addEventListener('click',()=>{if(!pendingOfferCart.length)return;$('floatingCartBackdrop').classList.add('hidden');$('floatingCartBackdrop').setAttribute('aria-hidden','true');openCustomerPanel('myList');activeOfferAnchorId=pendingOfferCart[pendingOfferCart.length-1].productId;placeOrderFlowAfterProduct(activeOfferAnchorId);$('orderFlowMount')?.scrollIntoView({behavior:'smooth',block:'center'})});
+$('floatingCartCheckout')?.addEventListener('click',async()=>{
+  if(!pendingOfferCart.length)return;
+  const checkoutButton=$('floatingCartCheckout');
+  checkoutButton.disabled=true;
+  $('floatingCartBackdrop').classList.add('hidden');
+  $('floatingCartBackdrop').setAttribute('aria-hidden','true');
+  activeOfferAnchorId=pendingOfferCart[pendingOfferCart.length-1].productId;
+  // Open the checkout/payment step directly instead of returning the customer
+  // to the product-selection step.
+  paymentStepOpen=true;
+  selectedFulfilmentMode='SHOP_COLLECTION';
+  selectedOrderPaymentMethod='CASH_ON_DELIVERY';
+  openCustomerPanel('myList');
+  try{
+    await loadCustomerProducts();
+    try{
+      const latestPaymentSettings=await api('/api/customer/payment-settings');
+      customerPaymentQr=latestPaymentSettings.qrData||'';
+    }catch(error){console.warn('[TANMAYI_CHECKOUT] Payment QR could not be refreshed:',error.message);}
+    renderReservations([]);
+    placeOrderFlowAfterProduct(activeOfferAnchorId);
+    $('orderFlowMount')?.scrollIntoView({behavior:'smooth',block:'center'});
+  }finally{
+    checkoutButton.disabled=!pendingOfferCart.length;
+  }
+});
 function msg(id,t){$(id).textContent=t;$(id).classList.remove('hidden')}function clear(id){$(id).classList.add('hidden');$(id).textContent=''}
 function show(id){['adminLogin','customerLogin','customerView','adminApp'].forEach(x=>$(x).classList.toggle('hidden',x!==id))}
 async function api(path,method='GET',body=null){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);try{const token=auth.currentUser?await Promise.race([auth.currentUser.getIdToken(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Authentication token request timed out. Please sign in again.')),15000))]):'';const r=await fetch(API+path,{method,signal:controller.signal,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}catch(e){if(e.name==='AbortError')throw Error('Server response timeout. Please check Render service status and try again.');throw e}finally{clearTimeout(timer)}}
