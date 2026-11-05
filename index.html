@@ -307,7 +307,10 @@ $('floatingCartCheckout')?.addEventListener('click',()=>{
   // Render the payment stage immediately from the already-loaded cart.
   // Do not reload/rebuild the products list here: that was sending the
   // customer back to the product-selection view on mobile.
-  openCustomerPanel('myList');
+  // Reveal the products panel without calling openCustomerPanel(), which
+  // starts a second asynchronous product reload and races the checkout mount.
+  document.querySelectorAll('[id^="customerPanel-"]').forEach(panel=>panel.classList.add('hidden'));
+  $('customerPanel-myList')?.classList.remove('hidden');
   renderReservations([]);
   placeOrderFlowAfterProduct(activeOfferAnchorId);
   requestAnimationFrame(()=>{
