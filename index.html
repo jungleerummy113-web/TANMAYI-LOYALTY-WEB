@@ -516,29 +516,21 @@ function placeOrderFlowAfterProduct(productId){
   const grid=$('customerProducts');
   if(!flow||!mount||!grid)return;
   activeOfferAnchorId=productId||activeOfferAnchorId;
+  // Keep checkout in its own stable container OUTSIDE customerProducts.
+  // Product refreshes replace customerProducts.innerHTML; nesting checkout
+  // inside a product card caused the checkout DOM to be deleted seconds later.
   if(flow.parentElement!==mount)mount.appendChild(flow);
-  let selectedCard=null;
-  if(activeOfferAnchorId){
-    selectedCard=Array.from(grid.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===String(activeOfferAnchorId));
-  }
-  if(selectedCard){
-    selectedCard.appendChild(mount);
-    mount.style.display='block';
-    mount.style.width='100%';
-    mount.style.gridColumn='1 / -1';
-    mount.style.flexBasis='100%';
-  }else{
-    grid.insertAdjacentElement('afterend',mount);
-    mount.style.display='block';
-    mount.style.width='100%';
-  }
+  if(mount.parentElement!==grid.parentElement)grid.insertAdjacentElement('afterend',mount);
+  mount.style.display='block';
+  mount.style.width='100%';
+  mount.style.gridColumn='1 / -1';
   flow.classList.add('inline-order-flow');
   flow.classList.remove('hidden');
   flow.style.display='block';
   flow.setAttribute('aria-hidden','false');
   requestAnimationFrame(()=>{
-    mount.scrollIntoView({behavior:'smooth',block:'nearest'});
-    flow.scrollIntoView({behavior:'smooth',block:'nearest'});
+    mount.scrollIntoView({behavior:'smooth',block:'center'});
+    flow.scrollIntoView({behavior:'smooth',block:'center'});
   });
 }
 async function loadCustomerProducts(){
@@ -546,15 +538,6 @@ async function loadCustomerProducts(){
     const [r,m,pay]=await Promise.all([api('/api/customer/offers'),api('/api/customer/my-offers'),api('/api/customer/payment-settings').catch(()=>({qrData:""}))]);
     customerPaymentQr=pay.qrData||"";
     customerProductsCache=r.products||[];pendingOfferCart=pendingOfferCart.map(item=>{const latest=customerProductsCache.find(p=>p.id===item.productId);return latest?{...item,productName:latest.name,offerPrice:Number(latest.offerPrice),photoUrls:Array.isArray(latest.photoUrls)?latest.photoUrls.slice(0,2):item.photoUrls}:item});savePendingOfferCart();
-    // An earlier/background offers request can finish after the customer opens
-    // checkout. Replacing customerProducts.innerHTML at that moment destroys
-    // the checkout DOM because the inline order-flow mount lives inside a card.
-    // Keep the live checkout DOM intact; only refresh its backing product cache.
-    const liveOrderFlow=$('orderFlowBackdrop');
-    if(liveOrderFlow&&!liveOrderFlow.classList.contains('hidden')){
-      renderBuyAgain();
-      return;
-    }
     $('customerProducts').innerHTML=r.products.map(x=>{
       const pendingCount=pendingOfferCart.filter(p=>p.productId===x.id).reduce((n,p)=>n+Math.max(1,Number(p.quantity)||1),0);
       const available=Math.max(0,Number(x.availableStock??x.stock??0));const canAddMore=available>pendingCount;
