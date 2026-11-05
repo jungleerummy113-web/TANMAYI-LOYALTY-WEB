@@ -517,8 +517,10 @@ function placeOrderFlowAfterProduct(productId){
   if(!flow||!mount||!grid)return;
   activeOfferAnchorId=productId||activeOfferAnchorId;
   // Keep checkout in its own stable container OUTSIDE customerProducts.
-  // Product refreshes replace customerProducts.innerHTML; nesting checkout
-  // inside a product card caused the checkout DOM to be deleted seconds later.
+  // Move the selected product card to the end so checkout sits immediately
+  // beneath that product, while product refreshes cannot delete the checkout.
+  const selectedCard=Array.from(grid.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===String(activeOfferAnchorId));
+  if(selectedCard)grid.appendChild(selectedCard);
   if(flow.parentElement!==mount)mount.appendChild(flow);
   if(mount.parentElement!==grid.parentElement)grid.insertAdjacentElement('afterend',mount);
   mount.style.display='block';
