@@ -546,6 +546,15 @@ async function loadCustomerProducts(){
     const [r,m,pay]=await Promise.all([api('/api/customer/offers'),api('/api/customer/my-offers'),api('/api/customer/payment-settings').catch(()=>({qrData:""}))]);
     customerPaymentQr=pay.qrData||"";
     customerProductsCache=r.products||[];pendingOfferCart=pendingOfferCart.map(item=>{const latest=customerProductsCache.find(p=>p.id===item.productId);return latest?{...item,productName:latest.name,offerPrice:Number(latest.offerPrice),photoUrls:Array.isArray(latest.photoUrls)?latest.photoUrls.slice(0,2):item.photoUrls}:item});savePendingOfferCart();
+    // An earlier/background offers request can finish after the customer opens
+    // checkout. Replacing customerProducts.innerHTML at that moment destroys
+    // the checkout DOM because the inline order-flow mount lives inside a card.
+    // Keep the live checkout DOM intact; only refresh its backing product cache.
+    const liveOrderFlow=$('orderFlowBackdrop');
+    if(liveOrderFlow&&!liveOrderFlow.classList.contains('hidden')){
+      renderBuyAgain();
+      return;
+    }
     $('customerProducts').innerHTML=r.products.map(x=>{
       const pendingCount=pendingOfferCart.filter(p=>p.productId===x.id).reduce((n,p)=>n+Math.max(1,Number(p.quantity)||1),0);
       const available=Math.max(0,Number(x.availableStock??x.stock??0));const canAddMore=available>pendingCount;
