@@ -718,7 +718,7 @@ onAuthStateChanged(auth,async u=>{
     msg('adminMsg','Admin verification failed: '+(e.message||'Could not read the admin permission record. Check Firestore access and network.'));
   }
 });
-async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');restorePendingOfferCart(h.profile.mobile);customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings()}
+async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');restorePendingOfferCart(h.profile.mobile);customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings();if(window.showTanmayiInstallPopup)window.showTanmayiInstallPopup(customerProfile.mobile)}
 $('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
 document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventListener('change',()=>{$('approvedPointsInfo').classList.toggle('hidden',el.value!=='points'||!el.checked)}));
 $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemMsg');$('customerTaken').disabled=true;try{const choice=document.querySelector('input[name="rewardChoice"]:checked')?.value||'gift';await api('/api/customer/redeem-taken','POST',{redemptionId:pendingId,choice});msg('customerRedeemMsg','Redemption completed. Stamps and current cycle reset successfully.');await loadCustomer()}catch(e){msg('customerRedeemMsg',e.message)}finally{$('customerTaken').disabled=false}};
@@ -800,7 +800,8 @@ window.addEventListener("unhandledrejection", function (event) {
   const close = document.getElementById('installChoiceClose');
   let deferredInstallPrompt = null;
   let popupShown = false;
-  const dismissedKey = 'tanmayi_install_choice_dismissed_v2';
+  let currentCustomerInstallKey = '';
+  const dismissedKeyBase = 'tanmayi_install_choice_dismissed_v2_';
   const installedKey = 'tanmayi_app_install_completed_v2';
 
   function hidePopup(remember = true) {
@@ -809,8 +810,8 @@ window.addEventListener("unhandledrejection", function (event) {
       popup.style.setProperty('display', 'none', 'important');
       popup.setAttribute('aria-hidden', 'true');
     }
-    if (remember) {
-      try { localStorage.setItem(dismissedKey, 'yes'); } catch (_) {}
+    if (remember && currentCustomerInstallKey) {
+      try { localStorage.setItem(currentCustomerInstallKey, 'yes'); } catch (_) {}
     }
   }
 
@@ -835,16 +836,19 @@ window.addEventListener("unhandledrejection", function (event) {
       window.navigator.standalone === true;
   }
 
-  function maybeShowPopup() {
+  window.showTanmayiInstallPopup = function(customerMobile) {
     if (!popup || popupShown || adminPageIsVisible() || isInstalled()) return;
+    const mobile = String(customerMobile || '').replace(/\\D/g, '');
+    if (!/^\\d{10}$/.test(mobile)) return;
+    currentCustomerInstallKey = dismissedKeyBase + mobile;
     try {
-      if (localStorage.getItem(dismissedKey) === 'yes') return;
+      if (localStorage.getItem(currentCustomerInstallKey) === 'yes') return;
     } catch (_) {}
     popupShown = true;
     popup.classList.remove('hidden');
     popup.style.removeProperty('display');
     popup.setAttribute('aria-hidden', 'false');
-  }
+  };
 
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
@@ -892,16 +896,8 @@ window.addEventListener("unhandledrejection", function (event) {
     hidePopup(false);
   }
 
-  window.addEventListener('load', () => {
-    // Give the existing login/auth routing time to reveal the correct page.
-    window.setTimeout(() => {
-      if (adminPageIsVisible()) {
-        hidePopup(false);
-      } else {
-        maybeShowPopup();
-      }
-    }, 1800);
-  });
+  // The popup is triggered only after a customer successfully logs in.
+  // Admin pages and the customer login screen never trigger it.
 })();
 </script>
 
