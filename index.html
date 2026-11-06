@@ -127,6 +127,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #publicProducts .public-selected-info img{width:60px;height:60px;flex:0 0 60px;object-fit:contain;background:#fff;border:1px solid #d9e8da;border-radius:7px}
 #publicProducts .public-selected-info span{display:flex;flex-direction:column;gap:3px;font-size:13px}
 #publicProducts .public-selected-info small{font-weight:800;color:#8d1d24}
+#publicProducts .public-inline-checkout{display:block;width:100%;margin-top:10px;padding:12px 10px;font-size:14px;font-weight:900;border-radius:10px;background:#a87922;color:#fff}
 #publicCartPanel{position:static;z-index:auto;width:100%;max-width:none;max-height:none;overflow:visible;margin:14px 0;box-shadow:0 3px 12px #00000012;padding:12px}
 #publicCartPanel h3{font-size:15px;margin:0 0 6px}
 .public-cart-line{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid #eadfc9}
@@ -400,7 +401,8 @@ function readGuestOrderCart(){try{const x=JSON.parse(sessionStorage.getItem('tan
 function saveGuestOrderCart(){try{sessionStorage.setItem('tanmayi_guest_order_cart_v1',JSON.stringify(guestOrderCart))}catch(_){}renderPublicCart()}
 function renderPublicCart(){
   const panel=$('publicCartPanel'),items=$('publicCartItems'),total=$('publicCartTotal');if(!panel||!items)return;
-  panel.classList.toggle('hidden',!guestOrderCart.length||guestCheckoutStarted);
+  // The selected-product card itself is the checkout entry point; keep the old page-bottom cart hidden.
+  panel.classList.add('hidden');
   items.innerHTML=guestOrderCart.map(p=>`<div class="public-cart-line"><img src="${esc((p.photoUrls||[])[0]||'')}" alt="${esc(p.productName)}"><span><b>${esc(p.productName)}</b><small>${moneyPrice(p.offerPrice)} × ${Math.max(1,Number(p.quantity)||1)}</small></span><button type="button" class="secondary" data-guest-remove="${esc(p.productId)}">Remove</button></div>`).join('');
   const amount=guestOrderCart.reduce((n,p)=>n+Number(p.offerPrice||0)*Math.max(1,Number(p.quantity)||1),0);
   if(total)total.textContent='Selected items: '+guestOrderCart.reduce((n,p)=>n+Math.max(1,Number(p.quantity)||1),0)+' · Total: '+moneyPrice(amount);
@@ -414,7 +416,7 @@ function renderPublicCart(){
     const qty=Math.max(1,Number(selected.quantity)||1);
     const photo=(selected.photoUrls||[])[0]||'';
     area.hidden=false;
-    area.innerHTML='<span class="public-selected-badge">✓ ADDED TO YOUR ORDER</span><div class="public-selected-info">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(selected.productName)+' selected">':'')+'<span><b>Selected quantity: '+qty+'</b><small>'+moneyPrice(Number(selected.offerPrice)*qty)+'</small></span></div>';
+    area.innerHTML='<span class="public-selected-badge">✓ ADDED TO YOUR ORDER</span><div class="public-selected-info">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(selected.productName)+' selected">':'')+'<span><b>Selected quantity: '+qty+'</b><small>'+moneyPrice(Number(selected.offerPrice)*qty)+'</small></span></div><button type="button" class="gold public-inline-checkout" data-public-checkout>Continue to Order · Login / Register</button>';
     button.textContent='Add One More';
   });
 }
@@ -452,6 +454,15 @@ async function loadPublicProducts(){
   }catch(e){console.error('Public shop catalogue failed:',e);mount.innerHTML='<p class="muted">Products could not load right now. Please tap Refresh to try again.</p><button type="button" class="secondary" id="retryPublicProducts">Refresh Products</button>'}
 }
 $('publicProducts')?.addEventListener('click',event=>{
+  const checkout=event.target.closest('[data-public-checkout]');
+  if(checkout){
+    if(!guestOrderCart.length)return;
+    guestCheckoutStarted=true;
+    $('publicCartPanel')?.classList.add('hidden');
+    show('customerLogin');
+    requestAnimationFrame(()=> $('customerLogin')?.scrollIntoView({behavior:'smooth',block:'start'}));
+    return;
+  }
   const button=event.target.closest('[data-guest-add]');if(!button)return;
   const product=publicProductsCache.find(p=>p.id===button.dataset.guestAdd);if(!product)return;
   const available=Math.max(0,Number(product.availableStock??0));
