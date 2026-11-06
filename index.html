@@ -426,6 +426,11 @@ async function loadPublicProducts(){
     const data=await response.json().catch(()=>({error:'Shop products could not be loaded.'}));
     if(!response.ok)throw Error(data.error||'Shop products could not be loaded.');
     publicProductsCache=Array.isArray(data.products)?data.products:[];
+    guestOrderCart=guestOrderCart.map(item=>{
+      const latest=publicProductsCache.find(p=>p.id===item.productId);
+      return latest?{...item,productName:latest.name,offerPrice:Number(latest.offerPrice)||0,photoUrls:Array.isArray(latest.photoUrls)?latest.photoUrls.slice(0,2):item.photoUrls||[]}:item;
+    });
+    saveGuestOrderCart();
     mount.innerHTML=publicProductsCache.map(p=>{
       const photos=Array.isArray(p.photoUrls)?p.photoUrls.slice(0,2):[];
       const available=Math.max(0,Number(p.availableStock??0));
