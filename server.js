@@ -1575,10 +1575,23 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
     let todayCustomers = [];
     let stats = {};
 
+    let completedTotal = null, completedHasMore = false, completedNextOffset = 0;
     if (scope === "completed") {
-      // Dedicated lightweight query for the Completed Orders History page.
+      // Page completed orders so the admin history response stays small and fast,
+      // even when orders contain large product-image data URLs.
       const snap = await orderCollection.where("orderStatus", "==", "completed").get();
-      rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
+      const sorted = snap.docs.map(d => ({ id:d.id, data:d.data() }))
+        .sort((a,b) => {
+          const av = a.data.completedAt?.toMillis?.() || a.data.confirmedAt?.toMillis?.() || a.data.createdAt?.toMillis?.() || 0;
+          const bv = b.data.completedAt?.toMillis?.() || b.data.confirmedAt?.toMillis?.() || b.data.createdAt?.toMillis?.() || 0;
+          return bv-av;
+        });
+      const offset = Math.max(0, Math.min(1000000, Number.parseInt(req.query.offset || "0",10) || 0));
+      const pageSize = 20;
+      completedTotal = sorted.length;
+      rawOrders = sorted.slice(offset, offset+pageSize);
+      completedHasMore = offset+pageSize < sorted.length;
+      completedNextOffset = offset+rawOrders.length;
     } else if (scope === "history") {
       // Cancelled/expired history is fetched separately from completed orders.
       const snap = await orderCollection.where("orderStatus", "in", ["cancelled", "expired"]).get();
@@ -1684,7 +1697,8 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
     const cancelledOrders = orders.filter(x => ["cancelled", "expired"].includes(x.orderStatus)).slice(0, 2);
     res.json({
       scope, orders, runningOrders, completedOrdersList, cancelledOrders,
-      todayCustomers, stats
+      todayCustomers, stats,
+      ...(scope === "completed" ? {totalCount:completedTotal,hasMore:completedHasMore,nextOffset:completedNextOffset} : {})
     });
   } catch(e) {
     console.error("admin offer orders",e);
