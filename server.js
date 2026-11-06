@@ -1224,6 +1224,136 @@ app.post("/api/admin/orders/:id/verify-payment", requireAdmin, async (req,res)=>
   }
 });
 
+
+// Admin confirms physical collection after the payment has been received.
+app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
+  try{
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(String(req.params.id||"").trim());
+    let alreadyCollected=false;
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(orderRef);
+      if(!snap.exists) throw new Error("Order not found.");
+      const order=snap.data();
+      if(["cancelled","expired"].includes(order.orderStatus)) throw new Error("Cancelled or expired orders cannot be marked collected.");
+      if(order.orderStatus==="completed" || order.collectionStatus==="collected"){
+        alreadyCollected=true;
+        return;
+      }
+      if(order.paymentStatus!=="received") throw new Error("Confirm payment before marking this order collected.");
+      tx.update(orderRef,{
+        orderStatus:"collected",
+        collectionStatus:"collected",
+        collectedAt:admin.firestore.FieldValue.serverTimestamp(),
+        collectedBy:req.adminUid,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    res.json({ok:true,alreadyCollected,message:alreadyCollected?"This order was already marked collected.":"Order marked as collected. You can now give final approval."});
+  }catch(e){
+    res.status(400).json({error:e.message||"Could not mark order collected."});
+  }
+});
+
+// Admin confirms COD cash receipt. Online payments must use the separate verification step.
+app.post("/api/admin/orders/:id/payment", requireAdmin, async (req,res)=>{
+  try{
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(String(req.params.id||"").trim());
+    let alreadyReceived=false;
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(orderRef);
+      if(!snap.exists) throw new Error("Order not found.");
+      const order=snap.data();
+      if(order.paymentMethod!=="CASH_ON_DELIVERY") throw new Error("Cash received confirmation is only for Cash on Delivery orders.");
+      if(["cancelled","expired"].includes(order.orderStatus)) throw new Error("Cancelled or expired orders cannot receive payment.");
+      if(order.paymentStatus==="received"){
+        alreadyReceived=true;
+        return;
+      }
+      if(order.orderStatus==="completed") throw new Error("This order is already completed.");
+      tx.update(orderRef,{
+        paymentStatus:"received",
+        paymentReceivedAt:admin.firestore.FieldValue.serverTimestamp(),
+        paymentReceivedBy:req.adminUid,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    res.json({ok:true,alreadyReceived,message:alreadyReceived?"Cash payment was already recorded.":"Cash payment received. You can now mark the order collected."});
+  }catch(e){
+    res.status(400).json({error:e.message||"Could not record cash payment."});
+  }
+});
+
+// Final admin approval: atomically complete the order and add its bill/stamps exactly once.
+app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
+  try{
+    const orderId=String(req.params.id||"").trim();
+    if(!orderId) throw new Error("Invalid order ID.");
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(orderId);
+    let alreadyCompleted=false, stampsAdded=0, billAmount=0;
+    await db.runTransaction(async tx=>{
+      const orderSnap=await tx.get(orderRef);
+      if(!orderSnap.exists) throw new Error("Order not found.");
+      const order=orderSnap.data();
+      if(order.orderStatus==="completed" || order.stampsStatus==="added"){
+        alreadyCompleted=true;
+        return;
+      }
+      if(["cancelled","expired"].includes(order.orderStatus)) throw new Error("Cancelled or expired orders cannot be completed.");
+      if(order.collectionStatus!=="collected") throw new Error("Mark the products as collected before final approval.");
+      if(order.paymentStatus!=="received") throw new Error("Payment must be received before final approval.");
+      const uid=String(order.customerUid||"");
+      if(!uid) throw new Error("Customer account is missing for this order.");
+      billAmount=moneyNumber(order.total);
+      if(!(billAmount>0)) throw new Error("Order total is invalid; bill and stamps were not updated.");
+      const customerDoc=customerRef(uid);
+      const customerSnap=await tx.get(customerDoc);
+      if(!customerSnap.exists) throw new Error("Customer account not found; bill and stamps were not updated.");
+      const customer=customerSnap.data();
+      const billRef=customerDoc.collection("bills").doc("order_"+orderId);
+      const billSnap=await tx.get(billRef);
+      if(billSnap.exists) throw new Error("A bill already exists for this order. Please contact support before retrying.");
+      stampsAdded=billAmount<=800?1:2;
+      const oldCycle=moneyNumber(customer.cycleBillTotal ?? customer.billTotal);
+      const oldLifetime=moneyNumber(customer.lifetimeBillTotal ?? customer.billTotal);
+      tx.create(billRef,{
+        billTotal:billAmount,
+        stampsAdded,
+        date:admin.firestore.FieldValue.serverTimestamp(),
+        enteredBy:req.adminUid,
+        source:"customer_order",
+        orderId,
+        orderNumber:order.orderNumber||""
+      });
+      tx.update(customerDoc,{
+        stamps:moneyNumber(customer.stamps)+stampsAdded,
+        billTotal:oldCycle+billAmount,
+        cycleBillTotal:oldCycle+billAmount,
+        lifetimeBillTotal:oldLifetime+billAmount
+      });
+      tx.update(orderRef,{
+        orderStatus:"completed",
+        collectionStatus:"collected",
+        completedAt:admin.firestore.FieldValue.serverTimestamp(),
+        completedBy:req.adminUid,
+        stampsStatus:"added",
+        stampsAdded,
+        billAmount,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    res.json({
+      ok:true,
+      alreadyCompleted,
+      stampsAdded:alreadyCompleted?0:stampsAdded,
+      billAmount:alreadyCompleted?0:billAmount,
+      message:alreadyCompleted?"This order is already completed; no duplicate bill or stamps were added.":"Order completed successfully. Customer bill and stamps were updated."
+    });
+  }catch(e){
+    console.error("complete customer order:",e);
+    res.status(400).json({error:e.message||"Could not complete this order."});
+  }
+});
+
 app.post("/api/admin/orders/:id/cancel-cod", requireAdmin, async (req,res)=>{
   try{
     const orderRef=db.collection(ORDERS_COLLECTION).doc(req.params.id);
