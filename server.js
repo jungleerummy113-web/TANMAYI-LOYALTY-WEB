@@ -343,7 +343,17 @@ async function requireUser(req, res, next) {
 }
 const customerRef = (uid) => db.collection("customers").doc(uid);
 const moneyNumber = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
-const asMillis = (v) => v && typeof v.toMillis === "function" ? v.toMillis() : 0;
+const asMillis = (v) => v && typeof v.toMillis === "function" ? v.toMillis() : 0;function orderProductsForDisplay(products) {
+  const latestUpload = Math.max(0, ...products.map(p => Number(p.createdAtMillis) || 0));
+  return products
+    .map(p => ({ ...p, isNew: latestUpload > 0 && Number(p.createdAtMillis) === latestUpload }))
+    .sort((a, b) =>
+      Number(b.isNew) - Number(a.isNew) ||
+      (a.isNew ? Number(b.createdAtMillis) - Number(a.createdAtMillis) :
+        Number(a.offerPrice) - Number(b.offerPrice) || Number(b.createdAtMillis) - Number(a.createdAtMillis))
+    )
+    .map(({ createdAtMillis, ...p }) => p);
+}
 function safeDate(v) {
   if (!v) return null;
   if (typeof v.toDate === "function") return v.toDate().toISOString();
@@ -763,11 +773,11 @@ app.get("/api/public/products", async (_req, res) => {
         heldByProduct.set(reservation.productId, (heldByProduct.get(reservation.productId) || 0) + 1);
       }
     });
-    const products = snap.docs.map(d => {
+    const products = orderProductsForDisplay(snap.docs.map(d => {
       const x = d.data(), stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const held = heldByProduct.get(d.id) || 0;
-      return { id:d.id, name:String(x.name||""), size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), availableStock:Math.max(0,stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData.slice(0,2):(Array.isArray(x.photoUrls)?x.photoUrls.slice(0,2):[]) };
-    });
+      return { id:d.id, name:String(x.name||""), size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), availableStock:Math.max(0,stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData.slice(0,2):(Array.isArray(x.photoUrls)?x.photoUrls.slice(0,2):[]), createdAtMillis:asMillis(x.createdAt) };
+    }));
     res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
     res.json({ products });
   } catch (e) {
@@ -789,11 +799,11 @@ app.get("/api/customer/offers", requireUser, async (_req, res) => {
         heldByProduct.set(reservation.productId, (heldByProduct.get(reservation.productId) || 0) + 1);
       }
     });
-    const products = snap.docs.map(d => {
+    const products = orderProductsForDisplay(snap.docs.map(d => {
       const x = d.data(), stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const held = heldByProduct.get(d.id) || 0;
-      return { id:d.id, name:x.name, size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), stock, availableStock:Math.max(0, stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]) };
-    });
+      return { id:d.id, name:x.name, size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), stock, availableStock:Math.max(0, stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]), createdAtMillis:asMillis(x.createdAt) };
+    }));
     res.json({ products });
   } catch (e) { console.error("customer offers", e); res.status(500).json({ error:"Could not load offers." }); }
 });
