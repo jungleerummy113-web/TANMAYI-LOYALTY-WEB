@@ -765,13 +765,21 @@ function renderBuyAgain(){const el=$('customerBuyAgain');if(!el)return;const bou
 $('refreshMyOrders').onclick=loadCustomerOrders;
 
 function placeOrderFlowAfterProduct(productId){
-  const flow=$('orderFlowBackdrop');
-  if(!flow)return false;
+  let flow=$('orderFlowBackdrop');
+  // Recover the checkout shell if a stale/partial customer page is missing it.
+  if(!flow){
+    flow=document.createElement('div');
+    flow.id='orderFlowBackdrop';
+    flow.className='order-flow-backdrop hidden';
+    flow.setAttribute('aria-hidden','true');
+    flow.innerHTML='<section class="order-flow-card" role="dialog" aria-modal="true" aria-labelledby="orderFlowTitle"><header class="order-flow-head"><div class="order-flow-headline"><h2 id="orderFlowTitle">TANMAYI STORE AND GIFTS</h2><button type="button" class="order-flow-close" id="orderFlowClose" aria-label="Close">×</button></div><div class="order-flow-progress"><span id="orderProgress1" class="active"></span><span id="orderProgress2"></span><span id="orderProgress3"></span></div></header><div class="order-flow-body"><div id="customerReservations"></div></div></section>';
+    document.body.appendChild(flow);
+    const closeButton=$('orderFlowClose');
+    if(closeButton)closeButton.onclick=closeOrderFlow;
+  }
   activeOfferAnchorId=productId||activeOfferAnchorId;
   const selectedId=String(activeOfferAnchorId||'');
-  // Resolve the selected product card globally; the product grid can be temporarily
-  // detached/hidden while the customer switches between the cart and product tabs.
-  const selectedCard=Array.from(document.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===selectedId);
+  const selectedCard=Array.from(document.querySelectorAll('[data-product-card-id]')).find(card=>card.isConnected&&card.getAttribute('data-product-card-id')===selectedId);
   let mount=$('orderFlowMount');
   if(!mount){
     mount=document.createElement('div');
@@ -779,22 +787,21 @@ function placeOrderFlowAfterProduct(productId){
     mount.className='order-flow-inline-mount';
   }
   const grid=$('customerProducts');
-  // Clear legacy modal styles before positioning the checkout in the active product view.
+  const panel=$('customerPanel-myList');
   flow.removeAttribute('style');
   flow.classList.remove('hidden');
   flow.classList.add('inline-order-flow');
   flow.setAttribute('aria-hidden','false');
   if(flow.parentElement!==mount)mount.appendChild(flow);
-  // Prefer immediately below the selected card; fall back to the products grid,
-  // then the active My List panel. Never fail just because one container is absent.
+  // Keep checkout beside the selected product where possible; otherwise use a safe visible fallback.
   if(selectedCard){
     selectedCard.insertAdjacentElement('afterend',mount);
   }else if(grid){
     if(mount.parentElement!==grid)grid.appendChild(mount);
-  }else{
-    const panel=$('customerPanel-myList');
-    if(!panel)return false;
+  }else if(panel){
     if(mount.parentElement!==panel)panel.appendChild(mount);
+  }else if(!mount.isConnected){
+    document.body.appendChild(mount);
   }
   mount.hidden=false;
   mount.style.display='block';
