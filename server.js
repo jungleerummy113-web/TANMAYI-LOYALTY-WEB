@@ -93,6 +93,59 @@ async function sendRefundRequestNotification(refund, order, paymentScreenshotDat
   } finally { transporter.close(); }
 }
 
+async function sendRefundSuccessNotification(refund, order) {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
+  const missing = [];
+  if (!SMTP_HOST) missing.push("SMTP_HOST");
+  if (!SMTP_PORT) missing.push("SMTP_PORT");
+  if (!SMTP_USER) missing.push("SMTP_USER");
+  if (!SMTP_PASS) missing.push("SMTP_PASS");
+  if (missing.length) throw new Error(`Missing SMTP environment variables: ${missing.join(", ")}`);
+  const port = Number(SMTP_PORT);
+  if (!Number.isInteger(port) || port <= 0) throw new Error("SMTP_PORT must be a valid port number.");
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST, port,
+    secure: String(SMTP_SECURE || (port === 465 ? "true" : "false")).toLowerCase() === "true",
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000
+  });
+  const itemLines = (order.items || []).map(item => `${item.productName} | Qty ${item.quantity} | ₹${item.lineTotal}`).join("\n");
+  const screenshot = String(refund.screenshotData || "");
+  const match = screenshot.match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i);
+  const attachments = match ? [{
+    filename: `refund-order-${order.orderNumber}-proof.${match[1].toLowerCase() === "jpeg" ? "jpg" : match[1].toLowerCase()}`,
+    content: Buffer.from(match[2], "base64"),
+    contentType: `image/${match[1].toLowerCase() === "jpg" ? "jpeg" : match[1].toLowerCase()}`
+  }] : [];
+  try {
+    await transporter.verify();
+    const info = await transporter.sendMail({
+      from: MAIL_FROM || `TANMAYI STORE AND GIFTS <${SMTP_USER}>`,
+      to: ORDER_NOTIFICATION_EMAIL || SMTP_USER,
+      subject: `REFUND COMPLETED – Order #${order.orderNumber} – TANMAYI STORE AND GIFTS`,
+      text: [
+        "TANMAYI STORE AND GIFTS – REFUND SUCCESSFULLY COMPLETED",
+        `Order: #${order.orderNumber}`,
+        `Customer: ${order.customerName || refund.customerName || "Customer"}`,
+        `Mobile: ${order.mobile || refund.mobile || ""}`,
+        `Order amount: ₹${Number(order.total || 0).toLocaleString("en-IN")}`,
+        `Refund UTR: ${refund.refundUtr || ""}`,
+        `Refund date: ${new Date().toLocaleString("en-IN", {timeZone:"Asia/Kolkata"})}`,
+        `Admin message: ${refund.message || ""}`,
+        "", "PRODUCTS:", itemLines || "Product details unavailable.",
+        "", "Refund payment proof screenshot is attached."
+      ].join("\n"),
+      html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><h2 style="background:#171717;color:#d9b45b;padding:20px">TANMAYI STORE AND GIFTS</h2><h3>REFUND SUCCESSFULLY COMPLETED</h3><p><b>Order:</b> #${emailEscape(order.orderNumber)}<br><b>Customer:</b> ${emailEscape(order.customerName || refund.customerName || "Customer")}<br><b>Mobile:</b> ${emailEscape(order.mobile || refund.mobile || "")}<br><b>Order amount:</b> ₹${Number(order.total || 0).toLocaleString("en-IN")}<br><b>Refund UTR:</b> ${emailEscape(refund.refundUtr || "")}<br><b>Refund date:</b> ${emailEscape(new Date().toLocaleString("en-IN", {timeZone:"Asia/Kolkata"}))}<br><b>Admin message:</b> ${emailEscape(refund.message || "")}</p><h4>Products</h4><pre>${emailEscape(itemLines || "Product details unavailable.")}</pre><p>Refund payment proof screenshot is attached.</p></div>`,
+      attachments
+    });
+    console.info("REFUND_SUCCESS_EMAIL_SENT", {orderNumber:order.orderNumber,messageId:info.messageId});
+    return {sent:true,messageId:info.messageId};
+  } catch(error) {
+    console.error("REFUND_SUCCESS_EMAIL_FAILED", {orderNumber:order.orderNumber,message:String(error.message || "Email failed").slice(0,300)});
+    throw error;
+  } finally { transporter.close(); }
+}
+
 async function sendOrderNotification(order) {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
   const missing = [];
@@ -1101,6 +1154,7 @@ app.post("/api/admin/orders/:id/refund", requireAdmin, async (req,res)=>{
     const status=refundUtr && screenshotData ? "success" : "requested";
     const orderRef=db.collection(ORDERS_COLLECTION).doc(req.params.id);
     const refundRef=db.collection(ORDER_REFUNDS_COLLECTION).doc(req.params.id);
+    let completedRefund=null, completedOrder=null, sendSuccessEmail=false;
     await db.runTransaction(async tx=>{
       const [orderSnap,refundSnap]=await Promise.all([tx.get(orderRef),tx.get(refundRef)]);
       if(!orderSnap.exists) throw new Error("Order not found.");
@@ -1109,13 +1163,29 @@ app.post("/api/admin/orders/:id/refund", requireAdmin, async (req,res)=>{
       if(!refundSnap.exists) throw new Error("Customer refund request was not found.");
       const old=refundSnap.data();
       if(old.status==="success") throw new Error("This refund is already marked successful.");
-      tx.set(refundRef,{status,message,refundUtr:refundUtr||old.refundUtr||"",screenshotData:screenshotData||old.screenshotData||"",updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedBy:req.adminUid,successAt:status==="success"?admin.firestore.FieldValue.serverTimestamp():null},{merge:true});
+      const savedRefund={...old,status,message,refundUtr:refundUtr||old.refundUtr||"",screenshotData:screenshotData||old.screenshotData||"",updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedBy:req.adminUid,successAt:status==="success"?admin.firestore.FieldValue.serverTimestamp():null};
+      tx.set(refundRef,savedRefund,{merge:true});
       tx.update(orderRef,{refundStatus:status,refundUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
+      if(status==="success"){
+        completedRefund={...old,status,message,refundUtr,screenshotData,successAt:new Date().toISOString()};
+        completedOrder={...order,id:req.params.id};
+        sendSuccessEmail=true;
+      }
     });
-    res.json({ok:true,status,message:status==="success"?"Refund marked successful. Refund UTR and screenshot are now visible to the customer.":"Refund update saved. Your message and any issue screenshot are visible to the customer."});
+    let emailStatus="not_applicable";
+    if(sendSuccessEmail){
+      try{
+        const mail=await sendRefundSuccessNotification(completedRefund,completedOrder);
+        emailStatus="sent";
+        await refundRef.update({successEmailStatus:"sent",successEmailMessageId:mail.messageId||"",successEmailAt:admin.firestore.FieldValue.serverTimestamp()});
+      }catch(mailError){
+        emailStatus="failed";
+        await refundRef.update({successEmailStatus:"failed",successEmailError:String(mailError.message||"Email failed").slice(0,250),successEmailAt:admin.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+      }
+    }
+    res.json({ok:true,status,emailStatus,message:status==="success"?(emailStatus==="sent"?"Refund marked successful. Refund proof saved and emailed to the shop admin.":"Refund marked successful and proof saved. Admin email could not be sent; check Render SMTP settings."):"Refund update saved. Your message and any issue screenshot are visible to the customer."});
   }catch(e){res.status(400).json({error:e.message||"Could not update refund details."});}
 });
-
 
 // Admin verifies an online payment after visually checking the UTR and screenshot.
 app.post("/api/admin/orders/:id/verify-payment", requireAdmin, async (req,res)=>{
