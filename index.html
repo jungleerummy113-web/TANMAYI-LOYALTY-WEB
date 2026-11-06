@@ -397,8 +397,19 @@ async function api(path,method='GET',body=null){const controller=new AbortContro
 async function pinApi(path,body,token=''){const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify(body)});const d=await r.json().catch(()=>({error:'Unexpected response'}));if(!r.ok)throw Error(d.error||'PIN reset failed');return d}
 
 let publicProductsCache=[],guestOrderCart=[],guestCheckoutStarted=false;
-function readGuestOrderCart(){try{const x=JSON.parse(sessionStorage.getItem('tanmayi_guest_order_cart_v1')||'[]');guestOrderCart=Array.isArray(x)?x.filter(p=>p&&p.productId):[]}catch(_){guestOrderCart=[]}}
-function saveGuestOrderCart(){try{sessionStorage.setItem('tanmayi_guest_order_cart_v1',JSON.stringify(guestOrderCart))}catch(_){}renderPublicCart()}
+function readGuestOrderCart(){
+  // A guest cart is valid only during the current page visit.
+  // Clear any tab-restored/stale cart when the storefront is freshly initialized.
+  try{sessionStorage.removeItem('tanmayi_guest_order_cart_v1')}catch(_){}
+  guestOrderCart=[];
+  guestCheckoutStarted=false;
+}
+function saveGuestOrderCart(){
+  // Keep the cart only in this active tab so it can transfer to login.
+  // The key is cleared by readGuestOrderCart on refresh or a restored/new visit.
+  try{sessionStorage.setItem('tanmayi_guest_order_cart_v1',JSON.stringify(guestOrderCart))}catch(_){}
+  renderPublicCart();
+}
 function renderPublicCart(){
   const panel=$('publicCartPanel'),items=$('publicCartItems'),total=$('publicCartTotal');if(!panel||!items)return;
   // The selected-product card itself is the checkout entry point; keep the old page-bottom cart hidden.
