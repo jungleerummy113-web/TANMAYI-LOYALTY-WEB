@@ -193,7 +193,8 @@ body>header{display:none}
 <main class="wrap">
 <section id="adminLogin" class="card hidden"><h2>Admin Login</h2><label>Email</label><input id="email" type="email" placeholder="Admin email">
 <label>Password</label><input id="password" type="password" placeholder="Password"><button id="loginBtn">Admin Login</button><div id="adminMsg" class="msg hidden"></div></section>
-<section id="customerLogin" class="card portal">
+<section id="authBootMessage" class="card" role="status">Checking your saved login…</section>
+<section id="customerLogin" class="card portal hidden">
 <div class="portal-top"><div class="mark">🎁</div><h2>TANMAYI STORE AND GIFTS</h2><p>WELCOME TO OUR DIGITAL LOYALTY PROGRAM</p></div>
 <div class="portal-body"><h2>Customer Login / Register</h2><p class="muted">Login with your 10-digit mobile number and 6-digit PIN. No OTP required.</p>
 <label>10-digit mobile number</label><input id="phone" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="Enter mobile number">
@@ -284,6 +285,8 @@ const cfg={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-
 const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https://tanmayi-pin-reset-api.onrender.com';
 // Keep authenticated customer sessions across refresh; explicit sign-out clears this session.
 await setPersistence(auth,browserLocalPersistence);
+// Wait until Firebase restores the saved browser session before deciding which page to show.
+await auth.authStateReady();
 window.tanmayiAuth=auth;window.tanmayiFirebaseAuth={EmailAuthProvider,reauthenticateWithCredential,updatePassword};
 const $=id=>document.getElementById(id),money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),date=v=>v?new Date(v).toLocaleString('en-IN'):'—',customerEmail=m=>`${m}@tanmayi-loyalty.app`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -715,7 +718,7 @@ $('loginBtn').onclick=async()=>{
     msg('adminMsg',messages[e.code]||('Admin login failed: '+(e.message||e.code||'Unknown error')));
   }finally{button.disabled=false;button.textContent='Admin Login';}
 };
-window.customerLogoutNow=async()=>{try{await signOut(auth);$('customerPassword').value='';show(adminRoute?'adminLogin':'customerLogin');}catch(e){msg('phoneMsg','Could not logout. Please check your internet and try again.');}};
+window.customerLogoutNow=async()=>{try{try{sessionStorage.removeItem('tanmayi_customer_active_page')}catch(_){}await signOut(auth);$('customerPassword').value='';show(adminRoute?'adminLogin':'customerLogin');}catch(e){msg('phoneMsg','Could not logout. Please check your internet and try again.');}};
 $('logout').onclick=()=>signOut(auth);
 $('customerLogout').onclick=()=>window.customerLogoutNow();
 $('showRegister').onclick=()=>$('registerFields').classList.toggle('hidden');
@@ -739,6 +742,8 @@ $('customerSignIn').onclick=async()=>{
 };
 $('register').onclick=async()=>{clear('phoneMsg');const mobile=$('phone').value.trim(),password=$('customerPassword').value,name=$('name').value.trim(),village=$('village').value.trim();if(!/^\d{10}$/.test(mobile)||!/^\d{6}$/.test(password)||!name||!village)return msg('phoneMsg','Enter name, village, valid mobile and 6-digit PIN.');try{await createUserWithEmailAndPassword(auth,customerEmail(mobile),password);await api('/api/customer/register','POST',{name,mobile,village});await loadCustomer()}catch(e){msg('phoneMsg',e.code==='auth/email-already-in-use'?'This mobile number is already registered. Please login.':e.message)}};
 onAuthStateChanged(auth,async u=>{
+  $('authBootMessage')?.classList.add('hidden');
+  document.documentElement.classList.add('tanmayi-auth-ready');
   if(!u){pendingOfferCart=[];cartOwnerMobile='';cartRestoredForMobile='';renderFloatingCart();show(adminRoute?'adminLogin':'customerLogin');return;}
   if(!adminRoute){
     // Customer login must not depend on read access to the admins collection.
@@ -977,7 +982,7 @@ window.addEventListener("unhandledrejection", function (event) {
     shell.append(bar,pages);root.prepend(shell);[...root.children].forEach(ch=>{if(ch!==shell)ch.classList.add('hidden')});document.body.append(shade,drawer,nav);
     const menu=bar.querySelector('.app-menu-btn');
     function close(){drawer.classList.remove('open');shade.classList.remove('open')}
-    function go(id){items.forEach(it=>{const p=$(`${kind}Page-${it.id}`);if(p)p.classList.toggle('active',it.id===id)});drawer.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));nav.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));close();root.dataset.activePage=id;window.scrollTo({top:0,behavior:'smooth'});if(kind==='customer'){const target=items.find(x=>x.id===id);if(target&&target.onOpen)target.onOpen()}}
+    function go(id){if(kind==='customer'){try{sessionStorage.setItem('tanmayi_customer_active_page',id)}catch(_){}}items.forEach(it=>{const p=$(`${kind}Page-${it.id}`);if(p)p.classList.toggle('active',it.id===id)});drawer.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));nav.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));close();root.dataset.activePage=id;window.scrollTo({top:0,behavior:'smooth'});if(kind==='customer'){const target=items.find(x=>x.id===id);if(target&&target.onOpen)target.onOpen()}}
     menu.onclick=()=>{drawer.classList.add('open');shade.classList.add('open')};shade.onclick=close;
     drawer.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
     nav.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
@@ -1014,7 +1019,7 @@ window.addEventListener("unhandledrejection", function (event) {
      const shareLink=node('button','drawer-link','↗ Share Website with Friends');shareLink.type='button';shareLink.onclick=async()=>{const url=location.origin+location.pathname;try{if(navigator.share)await navigator.share({title:'TANMAYI STORE AND GIFTS',text:'Visit TANMAYI STORE AND GIFTS',url});else if(navigator.clipboard){await navigator.clipboard.writeText(url);alert('Website link copied. Share it with your friends.')}}catch(e){if(e.name!=='AbortError')alert('Could not share website link.')}};document.querySelector('.app-drawer[data-kind="customer"]')?.append(shareLink);
     tiles.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>nav.go(b.dataset.go));
     root.querySelectorAll('.customer-panel').forEach(p=>p.classList.add('hidden'));
-    nav.go('home');
+    let savedCustomerPage='home';try{const saved=sessionStorage.getItem('tanmayi_customer_active_page');if(items.some(it=>it.id===saved))savedCustomerPage=saved}catch(_){}nav.go(savedCustomerPage);
     if(window.tanmayiAuth?.currentUser)window.setTimeout(()=>window.refreshTanmayiStoreSettings?.(),0);
     const account=$('customerPanel-account');
     if(account&&!$('customerChangePin')){const box=node('div','card');box.id='customerChangePin';box.innerHTML='<h3>🔐 Change Login PIN</h3><p class="muted">Your current 6-digit PIN is required to update it.</p><label>Current PIN</label><input id="customerCurrentPin" type="password" inputmode="numeric" maxlength="6"><label>New PIN</label><input id="customerNewPin" type="password" inputmode="numeric" maxlength="6"><button type="button" id="customerChangePinBtn">Update PIN</button><div id="customerPinMsg" class="msg hidden"></div>';account.append(box);$('customerChangePinBtn').onclick=async()=>{const m=$('customerPinMsg');m.classList.remove('hidden');try{const user=window.tanmayiAuth?.currentUser;if(!user)throw Error('Please login again.');const oldPin=$('customerCurrentPin').value,newPin=$('customerNewPin').value;if(!/^\\d{6}$/.test(oldPin)||!/^\\d{6}$/.test(newPin))throw Error('Enter valid current and new 6-digit PIN.');const {EmailAuthProvider,reauthenticateWithCredential,updatePassword}=window.tanmayiFirebaseAuth;const mobile=customerProfile?.mobile||$('phone')?.value;const cred=EmailAuthProvider.credential(`${mobile}@tanmayi-loyalty.app`,oldPin);await reauthenticateWithCredential(user,cred);await updatePassword(user,newPin);m.textContent='PIN updated successfully.';$('customerCurrentPin').value='';$('customerNewPin').value=''}catch(e){m.textContent=e.message||'PIN update failed.'}}}
