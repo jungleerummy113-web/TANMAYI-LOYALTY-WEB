@@ -379,22 +379,11 @@ $('floatingCartCheckout')?.addEventListener('click',()=>{
   paymentStepOpen=true;
   selectedFulfilmentMode='SHOP_COLLECTION';
   selectedOrderPaymentMethod='CASH_ON_DELIVERY';
-  document.querySelectorAll('[id^="customerPanel-"]').forEach(panel=>panel.classList.add('hidden'));
-  $('customerPanel-myList')?.classList.remove('hidden');
-  const flow=$('orderFlowBackdrop');
-  if(flow){
-    document.body.appendChild(flow);
-    flow.classList.remove('hidden','inline-order-flow');
-    flow.removeAttribute('style');
-    flow.style.display='flex';
-    flow.style.position='fixed';
-    flow.style.inset='0';
-    flow.style.zIndex='10020';
-    flow.setAttribute('aria-hidden','false');
-  }
-  // Render and show the payment form immediately; QR refresh must not block checkout.
+  // Keep checkout directly below the selected product instead of opening a screen-covering popup.
+  placeOrderFlowAfterProduct(activeOfferAnchorId);
   renderReservations([]);
   checkoutButton.disabled=!pendingOfferCart.length;
+  // Refresh the configured QR in the background; never delay the visible checkout options.
   api('/api/customer/payment-settings').then(settings=>{
     if(settings&&settings.qrData){
       customerPaymentQr=settings.qrData;
