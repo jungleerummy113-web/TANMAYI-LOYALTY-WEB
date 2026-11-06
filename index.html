@@ -127,7 +127,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #publicProducts .public-selected-info img{width:60px;height:60px;flex:0 0 60px;object-fit:contain;background:#fff;border:1px solid #d9e8da;border-radius:7px}
 #publicProducts .public-selected-info span{display:flex;flex-direction:column;gap:3px;font-size:13px}
 #publicProducts .public-selected-info small{font-weight:800;color:#8d1d24}
-#publicCartPanel{position:fixed;z-index:1100;left:10px;right:10px;bottom:82px;margin:0 auto;max-width:560px;max-height:38vh;overflow:auto;box-shadow:0 8px 28px #0003;padding:12px}
+#publicCartPanel{position:static;z-index:auto;width:100%;max-width:none;max-height:none;overflow:visible;margin:14px 0;box-shadow:0 3px 12px #00000012;padding:12px}
 #publicCartPanel h3{font-size:15px;margin:0 0 6px}
 .public-cart-line{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid #eadfc9}
 .public-cart-line img{width:42px;height:42px;flex:0 0 42px;object-fit:contain;background:#fff;border-radius:6px}
@@ -395,12 +395,12 @@ let apiAuthUser=null;
 async function api(path,method='GET',body=null){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);try{let user=auth.currentUser||apiAuthUser;if(!user){await auth.authStateReady();user=auth.currentUser||apiAuthUser;}if(!user)throw Error('Please login to continue.');const token=await Promise.race([user.getIdToken(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Secure connection is taking longer than expected. Please wait and retry.')),15000))]);if(!token)throw Error('Secure connection is not ready yet. Please wait and retry.');const r=await fetch(API+path,{method,signal:controller.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}catch(e){if(e.name==='AbortError')throw Error('Server response timeout. Please check your internet and try again.');throw e}finally{clearTimeout(timer)}}
 async function pinApi(path,body,token=''){const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify(body)});const d=await r.json().catch(()=>({error:'Unexpected response'}));if(!r.ok)throw Error(d.error||'PIN reset failed');return d}
 
-let publicProductsCache=[],guestOrderCart=[];
+let publicProductsCache=[],guestOrderCart=[],guestCheckoutStarted=false;
 function readGuestOrderCart(){try{const x=JSON.parse(sessionStorage.getItem('tanmayi_guest_order_cart_v1')||'[]');guestOrderCart=Array.isArray(x)?x.filter(p=>p&&p.productId):[]}catch(_){guestOrderCart=[]}}
 function saveGuestOrderCart(){try{sessionStorage.setItem('tanmayi_guest_order_cart_v1',JSON.stringify(guestOrderCart))}catch(_){}renderPublicCart()}
 function renderPublicCart(){
   const panel=$('publicCartPanel'),items=$('publicCartItems'),total=$('publicCartTotal');if(!panel||!items)return;
-  panel.classList.toggle('hidden',!guestOrderCart.length);
+  panel.classList.toggle('hidden',!guestOrderCart.length||guestCheckoutStarted);
   items.innerHTML=guestOrderCart.map(p=>`<div class="public-cart-line"><img src="${esc((p.photoUrls||[])[0]||'')}" alt="${esc(p.productName)}"><span><b>${esc(p.productName)}</b><small>${moneyPrice(p.offerPrice)} × ${Math.max(1,Number(p.quantity)||1)}</small></span><button type="button" class="secondary" data-guest-remove="${esc(p.productId)}">Remove</button></div>`).join('');
   const amount=guestOrderCart.reduce((n,p)=>n+Number(p.offerPrice||0)*Math.max(1,Number(p.quantity)||1),0);
   if(total)total.textContent='Selected items: '+guestOrderCart.reduce((n,p)=>n+Math.max(1,Number(p.quantity)||1),0)+' · Total: '+moneyPrice(amount);
@@ -469,11 +469,11 @@ $('publicCartItems')?.addEventListener('click',event=>{
 });
 $('publicContinueOrder')?.addEventListener('click',()=>{
   if(!guestOrderCart.length)return;
-  // Hide the fixed cart overlay before navigating to login/register.
-  // The guest cart remains saved in sessionStorage for the order flow.
+  // Keep the selected cart saved, but remove its panel from the login screen.
+  guestCheckoutStarted=true;
   $('publicCartPanel')?.classList.add('hidden');
   show('customerLogin');
-  $('customerLogin')?.scrollIntoView({behavior:'smooth',block:'start'});
+  requestAnimationFrame(()=> $('customerLogin')?.scrollIntoView({behavior:'smooth',block:'start'}));
 });
 $('publicProducts')?.addEventListener('click',event=>{
   if(event.target?.id==='retryPublicProducts')loadPublicProducts();
