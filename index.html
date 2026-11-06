@@ -515,27 +515,26 @@ $('saveAdminPaymentQr').onclick=async()=>{
   finally{$('saveAdminPaymentQr').disabled=false}
 };
 
-async function loadAdminOfferOrders(){
+async function loadAdminOfferOrders(scope='active'){
   try{
-    const r=await api('/api/admin/offer-orders');
-    const s=r.stats||{};
-    $('newOrderCount').textContent=s.newOrders||0;
-    $('oldOrderCount').textContent=s.oldOrders||0;
-    $('completedOrderCount').textContent=s.completedOrders||0;
-    $('todayOrderCount').textContent=s.todayOrders||0;
-    $('pendingTodayCount').textContent=s.pendingToday||0;
-    $('completedTodayCount').textContent=s.completedToday||0;
-    const todayCustomers=r.todayCustomers||[];
-    $('todayCustomerOrders').innerHTML=todayCustomers.length?todayCustomers.map(c=>`<div class="today-customer-row"><span>${esc(c.name)} · ${esc(c.mobile)}</span><b>${Number(c.count)} order(s)</b></div>`).join(''):'<p class="muted">No customer orders received today.</p>';
+    const r=await api('/api/admin/offer-orders?scope='+encodeURIComponent(scope));
     const adminOrders=r.orders||[];
-    const latestCompletedOrder=adminOrders
-      .filter(x=>x.orderStatus==='completed')
-      .sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0))[0];
     const runningAdminOrders=adminOrders.filter(x=>!['completed','cancelled','expired'].includes(x.orderStatus));
-     const completedAdminOrders=adminOrders.filter(x=>x.orderStatus==='completed').sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0));
-     const onlineAdminOrders=adminOrders.filter(x=>x.paymentMethod==='ONLINE_PAYMENT'&&(runningAdminOrders.some(r=>r.id===x.id)||(x.refund&&['requested','processing','success'].includes(x.refund.status))));
-     const codAdminOrders=runningAdminOrders.filter(x=>x.paymentMethod==='CASH_ON_DELIVERY');
-     const latestCancelledAdminOrders=adminOrders.filter(x=>x.orderStatus==='cancelled').sort((a,b)=>new Date(b.cancelledAt||b.adminCancelledAt||b.confirmedAt||0)-new Date(a.cancelledAt||a.adminCancelledAt||a.confirmedAt||0));
+    const completedAdminOrders=adminOrders.filter(x=>x.orderStatus==='completed').sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0));
+    const onlineAdminOrders=adminOrders.filter(x=>x.paymentMethod==='ONLINE_PAYMENT'&&(runningAdminOrders.some(r=>r.id===x.id)||(x.refund&&['requested','processing','success'].includes(x.refund.status))));
+    const codAdminOrders=runningAdminOrders.filter(x=>x.paymentMethod==='CASH_ON_DELIVERY');
+    const latestCancelledAdminOrders=adminOrders.filter(x=>x.orderStatus==='cancelled'||x.orderStatus==='expired').sort((a,b)=>new Date(b.cancelledAt||b.adminCancelledAt||b.confirmedAt||0)-new Date(a.cancelledAt||a.adminCancelledAt||a.confirmedAt||0));
+    if(scope==='active'){
+      const s=r.stats||{};
+      $('newOrderCount').textContent=s.newOrders||0;
+      $('oldOrderCount').textContent=s.oldOrders||0;
+      $('completedOrderCount').textContent=s.completedOrders||0;
+      $('todayOrderCount').textContent=s.todayOrders||0;
+      $('pendingTodayCount').textContent=s.pendingToday||0;
+      $('completedTodayCount').textContent=s.completedToday||0;
+      const todayCustomers=r.todayCustomers||[];
+      $('todayCustomerOrders').innerHTML=todayCustomers.length?todayCustomers.map(c=>`<div class="today-customer-row"><span>${esc(c.name)} · ${esc(c.mobile)}</span><b>${Number(c.count)} order(s)</b></div>`).join(''):'<p class="muted">No customer orders received today.</p>';
+    }
     const renderAdminOrderCard=x=>{
       const items=(x.items||[]).map(i=>{
         const photo=(i.photoUrls||[])[0];
@@ -554,16 +553,19 @@ async function loadAdminOfferOrders(){
         <div class="compact-order-details">Collection: ${collected?'COLLECTED':'PENDING'} · Stamps: ${x.stampsStatus==='added'?'UPDATED':'PENDING'}</div>
         <div class="compact-order-actions">${!completed&&!["cancelled","expired"].includes(x.orderStatus)&&!x.cancelledByAdmin&&onlineSubmitted?`<button class="gold" data-order-verify="${esc(x.id)}">VERIFY ONLINE PAYMENT</button>`:''}${!completed&&!['cancelled','expired'].includes(x.orderStatus)&&x.orderStatus==='ready'&&!collected&&(!online||paid)?`<button class="gold" data-order-collect="${esc(x.id)}">COLLECTED</button>`:''}${!completed&&!["cancelled","expired"].includes(x.orderStatus)&&!collected&&!paid&&!online?`<button class="gold" data-order-payment="${esc(x.id)}">CASH RECEIVED</button>`:''}${!completed&&!["cancelled","expired"].includes(x.orderStatus)&&collected&&paid?`<button class="gold" data-order-complete="${esc(x.id)}">FINAL APPROVAL · ADD STAMPS</button>`:''}${!completed&&!collected&&!['cancelled','expired'].includes(x.orderStatus)&&!online?`<button class="cancel-reservation" data-order-cancel-cod="${esc(x.id)}">CANCEL COD ORDER</button>`:'' }${!completed&&!collected&&!['cancelled','expired'].includes(x.orderStatus)&&online?`<button class="cancel-reservation" data-order-cancel-online="${esc(x.id)}">CANCEL ONLINE ORDER</button>`:''}</div></article>`;
     };
-    const runningEl=$('dashboardRunningOrders');
-     if(runningEl)runningEl.innerHTML=runningAdminOrders.slice(0,6).map(x=>`<div class="today-customer-row"><span><b>#${esc(x.orderNumber)}</b> · ${esc(x.customerName)} · ${esc(x.orderStatus||'pending')}</span><b>${moneyPrice(x.total)}</b></div>`).join('')||'<p class="muted">No pending or running orders.</p>';
-     const historyEl=$('adminCompletedOrders');
-     if(historyEl)historyEl.innerHTML=completedAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No completed orders yet.</div>';
-     const runningList=$('adminRunningOrdersList');
-     if(runningList)runningList.innerHTML=runningAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No pending or running orders.</div>';
-     $('adminOnlineOrders').innerHTML=onlineAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No online payment orders found.</div>';
-     $('adminCodOrders').innerHTML=codAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No cash on delivery orders found.</div>';
-    const cancelledOrdersEl=$('adminCancelledOrdersAll');
-    if(cancelledOrdersEl)cancelledOrdersEl.innerHTML=latestCancelledAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No cancelled orders yet.</div>';
+    if(scope==='active'){
+      const runningEl=$('dashboardRunningOrders');
+      if(runningEl)runningEl.innerHTML=runningAdminOrders.slice(0,6).map(x=>`<div class="today-customer-row"><span><b>#${esc(x.orderNumber)}</b> · ${esc(x.customerName)} · ${esc(x.orderStatus||'pending')}</span><b>${moneyPrice(x.total)}</b></div>`).join('')||'<p class="muted">No pending or running orders.</p>';
+      const runningList=$('adminRunningOrdersList');
+      if(runningList)runningList.innerHTML=runningAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No pending or running orders.</div>';
+      $('adminOnlineOrders').innerHTML=onlineAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No online payment orders found.</div>';
+      $('adminCodOrders').innerHTML=codAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No cash on delivery orders found.</div>';
+    }else{
+      const historyEl=$('adminCompletedOrders');
+      if(historyEl)historyEl.innerHTML=completedAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No completed orders yet.</div>';
+      const cancelledOrdersEl=$('adminCancelledOrdersAll');
+      if(cancelledOrdersEl)cancelledOrdersEl.innerHTML=latestCancelledAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No cancelled orders yet.</div>';
+    }
     document.querySelectorAll('[data-order-cancel-cod],[data-order-cancel-online]').forEach(b=>b.onclick=async()=>{
       const reason=prompt('Enter the cancellation reason/message. This message will be shown to the customer:');
       if(reason===null)return;
@@ -1116,7 +1118,7 @@ window.addEventListener("unhandledrejection", function (event) {
     shell.append(bar,pages);root.prepend(shell);[...root.children].forEach(ch=>{if(ch!==shell)ch.classList.add('hidden')});document.body.append(shade,drawer,nav);
     const menu=bar.querySelector('.app-menu-btn');
     function close(){drawer.classList.remove('open');shade.classList.remove('open')}
-    function go(id){if(kind==='customer'){try{sessionStorage.setItem('tanmayi_customer_active_page',id)}catch(_){}}items.forEach(it=>{const p=$(`${kind}Page-${it.id}`);if(p)p.classList.toggle('active',it.id===id)});drawer.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));nav.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));close();root.dataset.activePage=id;window.scrollTo({top:0,behavior:'smooth'});if(kind==='customer'){const target=items.find(x=>x.id===id);if(target&&target.onOpen)target.onOpen()}}
+    function go(id){if(kind==='customer'){try{sessionStorage.setItem('tanmayi_customer_active_page',id)}catch(_){}}items.forEach(it=>{const p=$(`${kind}Page-${it.id}`);if(p)p.classList.toggle('active',it.id===id)});drawer.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));nav.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));close();root.dataset.activePage=id;window.scrollTo({top:0,behavior:'smooth'});const target=items.find(x=>x.id===id);if(target&&target.onOpen)target.onOpen();}
     menu.onclick=()=>{drawer.classList.add('open');shade.classList.add('open')};shade.onclick=close;
     drawer.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
     nav.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
@@ -1180,8 +1182,8 @@ window.addEventListener("unhandledrejection", function (event) {
       {id:'orders',label:'Pending / Running Orders',icon:'📦',content:[orders]},
       {id:'online',label:'Online Payment Orders',icon:'💳',content:[]},
       {id:'cod',label:'Cash on Delivery Orders',icon:'💵',content:[]},
-      {id:'history',label:'Completed Orders History',icon:'✅',content:[$('adminCompletedHistorySection')]},
-      {id:'cancelled',label:'Cancel Orders',icon:'❌',content:[cancelledHistoryPage]},
+      {id:'history',label:'Completed Orders History',icon:'✅',content:[$('adminCompletedHistorySection')],onOpen:()=>loadAdminOfferOrders('history')},
+      {id:'cancelled',label:'Cancel Orders',icon:'❌',content:[cancelledHistoryPage],onOpen:()=>loadAdminOfferOrders('history')},
       {id:'whatsapp',label:'WhatsApp',icon:'🟢',content:[]},
       {id:'promotions',label:'Promotions',icon:'🖼️',content:[]},
       {id:'products',label:'Products & Offers',icon:'🛍️',content:[products]},
