@@ -784,9 +784,24 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 
       const counterSnap = await tx.get(counterRef);
       const customerSnap = await tx.get(customerRef(req.user.uid));
+      let reusableRejectedUtr = false;
+      let previousUtrOrderId = "";
       if (utrKeyRef) {
         const utrSnap = await tx.get(utrKeyRef);
-        if (utrSnap.exists) throw new Error("This UTR number has already been submitted. Please check the number or contact the shop.");
+        if (utrSnap.exists) {
+          const previousOrderId = String(utrSnap.data().orderId || "");
+          if (!previousOrderId) throw new Error("This UTR number has already been submitted. Please contact the shop.");
+          const previousOrderSnap = await tx.get(db.collection(ORDERS_COLLECTION).doc(previousOrderId));
+          if (!previousOrderSnap.exists) throw new Error("This UTR number has already been submitted. Please contact the shop.");
+          const previousOrder = previousOrderSnap.data();
+          const wasAdminRejected = previousOrder.orderStatus === "cancelled"
+            && previousOrder.cancelledByAdmin === true
+            && ["submitted", "rejected"].includes(previousOrder.paymentStatus)
+            && String(previousOrder.paymentUtr || "") === paymentUtr;
+          if (!wasAdminRejected) throw new Error("This UTR number is already linked to another running or completed order. Duplicate UTR is not allowed.");
+          reusableRejectedUtr = true;
+          previousUtrOrderId = previousOrderId;
+        }
       }
       if (!customerSnap.exists) throw new Error("Customer profile not found. Please login again.");
       const productSnaps = new Map();
@@ -840,7 +855,14 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
           utr:paymentUtr, screenshotData:paymentScreenshot,
           status:"submitted", submittedAt:confirmedAt
         });
-        tx.create(utrKeyRef, { orderId:orderRef.id, customerUid:req.user.uid, createdAt:confirmedAt });
+        const utrKeyData = {
+          orderId:orderRef.id,
+          customerUid:req.user.uid,
+          createdAt:confirmedAt,
+          ...(reusableRejectedUtr ? { reusedAfterAdminRejection:true, previousOrderId:previousUtrOrderId, reusedAt:confirmedAt } : {})
+        };
+        if (reusableRejectedUtr) tx.set(utrKeyRef, utrKeyData);
+        else tx.create(utrKeyRef, utrKeyData);
       }
       tx.set(counterRef, { lastOrderNumber:orderNumber, updatedAt:admin.firestore.FieldValue.serverTimestamp() }, { merge:true });
       tx.create(requestRef, { orderId:orderRef.id, customerUid:req.user.uid, createdAt:admin.firestore.FieldValue.serverTimestamp() });
