@@ -380,9 +380,34 @@ const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https:/
 window.tanmayiAuth=auth;window.tanmayiFirebaseAuth={EmailAuthProvider,reauthenticateWithCredential,updatePassword};
 const $=id=>document.getElementById(id),money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),date=v=>v?new Date(v).toLocaleString('en-IN'):'—',customerEmail=m=>`${m}@tanmayi-loyalty.app`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null,customerProfile=null,customerOrdersCache=[],customerProductsCache=[],customerPaymentQr="",paymentStepOpen=false,orderConfirmedData=null,selectedOrderPaymentMethod="CASH_ON_DELIVERY",selectedFulfilmentMode="SHOP_COLLECTION",deliveryCoordinates=null,activeOfferAnchorId="",cartOwnerMobile="",cartRestoredForMobile="";
+let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null,customerProfile=null,customerOrdersCache=[],customerProductsCache=[],customerPaymentQr="",paymentStepOpen=false,orderConfirmedData=null,selectedOrderPaymentMethod="CASH_ON_DELIVERY",selectedFulfilmentMode="SHOP_COLLECTION",deliveryCoordinates=null,activeOfferAnchorId="",cartOwnerMobile="",cartRestoredForMobile="",pendingOfferCartExpiresAt=0;
+const CUSTOMER_CART_TTL_MS=30*60*1000;
+function customerCartExpiryKey(mobile){return customerCartStorageKey(mobile)+"_expires_at"}
+function clearExpiredCustomerCart(){
+  if(!pendingOfferCart.length||!pendingOfferCartExpiresAt||Date.now()<pendingOfferCartExpiresAt)return false;
+  pendingOfferCart=[];pendingOfferCartExpiresAt=0;pendingOrderRequestId=null;paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";
+  if(cartOwnerMobile){try{localStorage.removeItem(customerCartStorageKey(cartOwnerMobile));localStorage.removeItem(customerCartExpiryKey(cartOwnerMobile))}catch(_){}}
+  renderFloatingCart();renderInlineProductSelections();closeOrderFlow();
+  const mount=$('orderFlowMount');if(mount)mount.style.display='none';
+  if($('customerReservations'))$('customerReservations').innerHTML='<p class="muted">Your cart selection expired after 30 minutes. Please add the products again.</p>';
+  return true;
+}
+function startCustomerCartExpiry(){if(!pendingOfferCart.length)pendingOfferCartExpiresAt=Date.now()+CUSTOMER_CART_TTL_MS}
+setInterval(()=>{if(clearExpiredCustomerCart())loadCustomerProducts().catch(()=>{})},15000);
 function customerCartStorageKey(mobile){return 'tanmayi_customer_cart_v1_'+String(mobile||'').replace(/\D/g,'')}
-function savePendingOfferCart(){if(cartOwnerMobile){try{localStorage.setItem(customerCartStorageKey(cartOwnerMobile),JSON.stringify(pendingOfferCart))}catch(_){}}renderFloatingCart()}
+function savePendingOfferCart(){
+  if(!pendingOfferCart.length)pendingOfferCartExpiresAt=0;
+  if(cartOwnerMobile){try{
+    if(pendingOfferCart.length){
+      localStorage.setItem(customerCartStorageKey(cartOwnerMobile),JSON.stringify(pendingOfferCart));
+      if(pendingOfferCartExpiresAt)localStorage.setItem(customerCartExpiryKey(cartOwnerMobile),String(pendingOfferCartExpiresAt));
+    }else{
+      localStorage.removeItem(customerCartStorageKey(cartOwnerMobile));
+      localStorage.removeItem(customerCartExpiryKey(cartOwnerMobile));
+    }
+  }catch(_){}}
+  renderFloatingCart();
+}
 function restorePendingOfferCart(mobile){
   const key=String(mobile||'').replace(/\D/g,'');if(!key||cartRestoredForMobile===key)return;
   cartOwnerMobile=key;cartRestoredForMobile=key;
@@ -397,9 +422,13 @@ function restorePendingOfferCart(mobile){
       else merged.set(x.productId,{productId:x.productId,productName:String(x.productName||'Product'),offerPrice:Number(x.offerPrice)||0,quantity:Math.max(1,Number(x.quantity)||1),photoUrls:[]});
     });
     pendingOfferCart=[...merged.values()];
+    pendingOfferCartExpiresAt=Number(localStorage.getItem(customerCartExpiryKey(key))||0);
+    if(guestCart.length&&!pendingOfferCartExpiresAt)pendingOfferCartExpiresAt=Date.now()+CUSTOMER_CART_TTL_MS;
     sessionStorage.removeItem('tanmayi_guest_order_cart_v1');
-    localStorage.setItem(customerCartStorageKey(key),JSON.stringify(pendingOfferCart));
-  }catch(_){pendingOfferCart=[]}
+    if(clearExpiredCustomerCart())return;
+    if(pendingOfferCart.length&&!pendingOfferCartExpiresAt)pendingOfferCartExpiresAt=Date.now()+CUSTOMER_CART_TTL_MS;
+    savePendingOfferCart();
+  }catch(_){pendingOfferCart=[];pendingOfferCartExpiresAt=0}
   renderFloatingCart();
 }
 function renderFloatingCart(){const button=$('floatingCartButton'),badge=$('floatingCartBadge'),list=$('floatingCartItems'),totalEl=$('floatingCartTotal'),checkout=$('floatingCartCheckout');if(!button||!badge||!list)return;const count=pendingOfferCart.reduce((n,x)=>n+Math.max(1,Number(x.quantity)||1),0),total=pendingOfferCart.reduce((n,x)=>n+Number(x.offerPrice||0)*Math.max(1,Number(x.quantity)||1),0);badge.textContent=String(count);button.style.display=cartOwnerMobile?'flex':'none';list.innerHTML=pendingOfferCart.length?pendingOfferCart.map(x=>{const p=customerProductsCache.find(v=>v.id===x.productId),photo=p?.photoUrls?.[0]||x.photoUrls?.[0]||'';return '<div class="floating-cart-line">'+(photo?'<img src="'+esc(photo)+'" alt="">':'<div style="width:66px;height:66px;border-radius:10px;background:#eee;display:grid;place-items:center">🛍️</div>')+'<div class="floating-cart-line-info"><strong>'+esc(p?.name||x.productName)+'</strong><div>'+moneyPrice(p?.offerPrice??x.offerPrice)+' × '+Math.max(1,Number(x.quantity)||1)+'</div><b>'+moneyPrice(Number(p?.offerPrice??x.offerPrice)*Math.max(1,Number(x.quantity)||1))+'</b></div><button type="button" class="floating-cart-remove" data-floating-cart-remove="'+esc(x.productId)+'">Remove</button></div>'}).join(''):'<p class="muted">Your cart is empty. Select a product to add it here.</p>';if(totalEl)totalEl.textContent=pendingOfferCart.length?'Cart total: '+moneyPrice(total):'';if(checkout)checkout.disabled=!pendingOfferCart.length}
@@ -940,6 +969,7 @@ async function loadCustomerProducts(){
       paymentStepOpen=true;
       selectedOrderPaymentMethod=selectedOrderPaymentMethod||"CASH_ON_DELIVERY";
       const selectedProduct=customerProductsCache.find(p=>p.id===b.dataset.stageOffer)||{};
+      startCustomerCartExpiry();
       const existingSelection=pendingOfferCart.find(p=>p.productId===b.dataset.stageOffer);
       if(existingSelection){existingSelection.quantity=Math.max(1,Number(existingSelection.quantity)||1)+1;}
       else{pendingOfferCart.push({key:b.dataset.stageOffer,productId:b.dataset.stageOffer,productName:b.dataset.name,offerPrice:Number(b.dataset.price),quantity:1,photoUrls:Array.isArray(selectedProduct.photoUrls)?selectedProduct.photoUrls.slice(0,2):[]});}
