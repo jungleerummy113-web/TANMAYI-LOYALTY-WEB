@@ -177,21 +177,21 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #customerReservations .payment-choice{padding:8px!important;margin:7px 0!important}#customerReservations .payment-choice label{font-size:12px;margin:5px 0}#customerReservations .online-payment-fields{padding:8px!important;margin-top:7px!important}#customerReservations .online-payment-fields label{font-size:11px;margin:5px 0 3px}#customerReservations .online-payment-fields input{padding:8px;font-size:13px}#customerReservations .order-flow-actions{margin-top:7px}#customerReservations .order-flow-actions button{padding:9px;font-size:12px}.customer-promo-banner{display:flex;gap:10px;overflow-x:auto;margin:0 0 14px;border-radius:16px}.customer-promo-banner img{width:100%;min-width:100%;max-height:210px;object-fit:cover;border-radius:16px;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}.promotion-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.promotion-preview-grid img{width:100%;height:130px;object-fit:cover;border-radius:12px}.app-topbar-spacer{width:42px;height:42px;display:block}#adminApp #logout{display:none!important}.customer-promo-banner{display:flex;gap:10px;overflow-x:auto;margin:0 0 14px;border-radius:16px}.customer-promo-banner img{width:100%;min-width:100%;max-height:210px;object-fit:cover;border-radius:16px;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}.promotion-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.promotion-preview-grid img{width:100%;height:130px;object-fit:cover;border-radius:12px}.app-topbar-spacer{width:42px;height:42px;display:block}.order-stat:has(#completedOrderCount),.order-stat:has(#completedTodayCount){display:none!important}.customer-promo-banner{display:flex;gap:10px;overflow-x:auto;margin:0 0 14px;border-radius:16px}.customer-promo-banner img{width:100%;min-width:100%;max-height:210px;object-fit:cover;border-radius:16px;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}.promotion-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.promotion-preview-grid img{width:100%;height:130px;object-fit:cover;border-radius:12px}.app-topbar-spacer{width:42px;height:42px;display:block}
 /* Guest-only fixed customer login prompt */
 #guestCustomerLoginPrompt{
-  position:fixed;left:14px;bottom:92px;z-index:1190;
-  width:min(190px,calc(50vw - 22px));padding:10px 11px;
-  border:1px solid #d5ad58;border-radius:14px;
+  position:fixed;right:12px;bottom:150px;left:auto;z-index:1190;
+  width:min(158px,calc(44vw - 18px));padding:7px 8px;
+  border:1px solid #d5ad58;border-radius:12px;
   background:linear-gradient(135deg,#fff9e9,#f4dfad);
-  box-shadow:0 5px 18px #0003;color:#382714;text-align:center;
+  box-shadow:0 4px 14px #0003;color:#382714;text-align:center;
 }
-#guestCustomerLoginPrompt .guest-login-caption{display:block;font-size:11px;font-weight:800;line-height:1.2;margin-bottom:6px}
+#guestCustomerLoginPrompt .guest-login-caption{display:block;font-size:10px;font-weight:800;line-height:1.15;margin-bottom:5px}
 #guestCustomerLoginPrompt button{
-  width:100%;margin:0;padding:9px 8px;border:0;border-radius:9px;
+  width:100%;margin:0;padding:7px 5px;border:0;border-radius:8px;
   background:linear-gradient(120deg,#171717,#49331a);color:#f6d78d;
-  font-size:13px;font-weight:900;white-space:nowrap;
+  font-size:11px;font-weight:900;white-space:nowrap;
 }
 #guestCustomerLoginPrompt.hidden{display:none!important}
 @media(min-width:760px){
-  #guestCustomerLoginPrompt{left:max(14px,calc((100vw - 1050px)/2 + 14px))}
+  #guestCustomerLoginPrompt{right:max(12px,calc((100vw - 1050px)/2 + 12px))}
 }
 /* Additive customer floating cart */
 #floatingCartButton{position:fixed;right:16px;bottom:92px;z-index:1200;border:0;border-radius:999px;background:#963b49;color:#fff;padding:12px 17px;font-weight:800;box-shadow:0 5px 18px #0003;display:none;align-items:center;gap:8px}
