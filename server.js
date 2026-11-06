@@ -1567,7 +1567,7 @@ app.post("/api/admin/orders/:id/cancel", requireAdmin, async (req,res)=>{
 // Admin dashboard order API. Response fields match the Admin HTML dashboard.
 app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
   try {
-    const scope = req.query.scope === "history" ? "history" : "active";
+    const scope = ["history","completed"].includes(req.query.scope) ? req.query.scope : "active";
     // Expired COD orders are handled by the background timer below, not during dashboard requests.
 
     const orderCollection = db.collection(ORDERS_COLLECTION);
@@ -1575,9 +1575,13 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
     let todayCustomers = [];
     let stats = {};
 
-    if (scope === "history") {
-      // Completed/cancelled history is fetched only when an admin opens a history page.
-      const snap = await orderCollection.where("orderStatus", "in", ["completed", "cancelled", "expired"]).get();
+    if (scope === "completed") {
+      // Dedicated lightweight query for the Completed Orders History page.
+      const snap = await orderCollection.where("orderStatus", "==", "completed").get();
+      rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
+    } else if (scope === "history") {
+      // Cancelled/expired history is fetched separately from completed orders.
+      const snap = await orderCollection.where("orderStatus", "in", ["cancelled", "expired"]).get();
       rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
     } else {
       // Dashboard refresh reads only orders that still need attention, plus refunds in progress.
