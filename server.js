@@ -1022,6 +1022,45 @@ app.post("/api/admin/orders/:id/cancel-cod", requireAdmin, async (req,res)=>{
   }catch(e){res.status(400).json({error:e.message||"Could not cancel COD order."});}
 });
 
+// Admin can cancel an uncollected COD or online-payment order and explain the reason to the customer.
+app.post("/api/admin/orders/:id/cancel", requireAdmin, async (req,res)=>{
+  try{
+    const orderId=String(req.params.id||"");
+    const message=String(req.body?.message||"").trim().slice(0,500);
+    if(!message) return res.status(400).json({error:"Enter a cancellation message for the customer."});
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(orderId);
+    let cancelledOrder=null;
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(orderRef);
+      if(!snap.exists)throw new Error("Order not found.");
+      const order=snap.data();
+      if(!["CASH_ON_DELIVERY","ONLINE_PAYMENT"].includes(order.paymentMethod))throw new Error("Unsupported payment method.");
+      if(["completed","cancelled","expired"].includes(order.orderStatus)||order.collectionStatus==="collected")throw new Error("This order can no longer be cancelled.");
+      const reservations=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",orderId));
+      const paymentRef=db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(orderId);
+      const paymentSnap=order.paymentMethod==="ONLINE_PAYMENT"?await tx.get(paymentRef):null;
+      reservations.docs.filter(d=>d.data().status==="active").forEach(d=>tx.update(d.ref,{status:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),cancelReason:"admin_cancelled"}));
+      tx.update(orderRef,{
+        orderStatus:"cancelled",
+        cancelledAt:admin.firestore.FieldValue.serverTimestamp(),
+        customerCancelled:false,
+        cancelledByAdmin:true,
+        cancelReason:"admin_cancelled",
+        adminCancellationMessage:message,
+        adminCancelledAt:admin.firestore.FieldValue.serverTimestamp(),
+        adminCancelledBy:req.adminUid,
+        ...(order.paymentMethod==="ONLINE_PAYMENT"?{paymentRejectionMessage:message}: {})
+      });
+      if(paymentSnap?.exists && paymentSnap.data().status==="submitted"){
+        tx.update(paymentRef,{status:"rejected",rejectionMessage:message,rejectedAt:admin.firestore.FieldValue.serverTimestamp(),rejectedBy:req.adminUid});
+      }
+      cancelledOrder={...order,id:orderId};
+    });
+    if(!cancelledOrder)return res.json({ok:true,message:"Order was already cancelled."});
+    res.json({ok:true,message:"Order cancelled. The customer's order page will show your message."});
+  }catch(e){res.status(400).json({error:e.message||"Could not cancel order."});}
+});
+
 // Admin dashboard order API. Response fields match the Admin HTML dashboard.
 app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   try {
@@ -1062,7 +1101,8 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
       return { id, ...x, confirmedAt, expiresAt, orderStatus:effectiveStatus,
         total:moneyNumber(x.total), items,
         paymentUtr:x.paymentUtr || payment.utr || "",
-        paymentScreenshotData:(payment.status === "submitted" || refundByOrder.has(id)) ? (payment.screenshotData || "") : "",
+        paymentScreenshotData:(x.orderStatus === "cancelled" || payment.status === "submitted" || refundByOrder.has(id)) ? (payment.screenshotData || "") : "",
+        adminCancellationMessage:x.adminCancellationMessage || "", cancelledByAdmin:Boolean(x.cancelledByAdmin),
         paymentSubmissionStatus:payment.status || "",
         refund:refundByOrder.get(id) || null,
         customerName:x.customerName || "Customer", mobile:x.mobile || "" };
