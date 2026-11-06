@@ -1195,21 +1195,82 @@ app.post("/api/admin/orders/:id/cancel", requireAdmin, async (req,res)=>{
 });
 
 // Admin dashboard order API. Response fields match the Admin HTML dashboard.
-app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
+app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
   try {
-    await cancelExpiredCodOrders();
-    const [snap, paymentSnap, refundSnap] = await Promise.all([
-      db.collection(ORDERS_COLLECTION).get(),
-      db.collection(PAYMENT_SUBMISSIONS_COLLECTION).get(),
-      db.collection(ORDER_REFUNDS_COLLECTION).get()
+    const scope = req.query.scope === "history" ? "history" : "active";
+    if (scope === "active") await cancelExpiredCodOrders();
+
+    const orderCollection = db.collection(ORDERS_COLLECTION);
+    let rawOrders = [];
+    let todayCustomers = [];
+    let stats = {};
+
+    if (scope === "history") {
+      // Completed/cancelled history is fetched only when an admin opens a history page.
+      const snap = await orderCollection.where("orderStatus", "in", ["completed", "cancelled", "expired"]).get();
+      rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
+    } else {
+      // Dashboard refresh reads only orders that still need attention, plus refunds in progress.
+      const [activeSnap, refundOrdersSnap, todaySnap, readyCountSnap, oldCountSnap, completedCountSnap] = await Promise.all([
+        orderCollection.where("orderStatus", "in", ["ready", "collected"]).get(),
+        orderCollection.where("refundStatus", "in", ["requested", "success"]).get(),
+        (() => {
+          const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
+          const todayStart = new Date(todayKey + "T00:00:00+05:30");
+          const tomorrow = new Date(todayStart.getTime() + 86400000);
+          return orderCollection
+            .where("confirmedAt", ">=", admin.firestore.Timestamp.fromDate(todayStart))
+            .where("confirmedAt", "<", admin.firestore.Timestamp.fromDate(tomorrow)).get();
+        })(),
+        orderCollection.where("orderStatus", "==", "ready").count().get(),
+        orderCollection.where("orderStatus", "in", ["cancelled", "expired"]).count().get(),
+        orderCollection.where("orderStatus", "==", "completed").count().get()
+      ]);
+      const byId = new Map();
+      activeSnap.docs.forEach(d => byId.set(d.id, { id:d.id, data:d.data() }));
+      refundOrdersSnap.docs.forEach(d => {
+        const x = d.data();
+        if (x.paymentMethod === "ONLINE_PAYMENT" && x.orderStatus === "cancelled") {
+          byId.set(d.id, { id:d.id, data:x });
+        }
+      });
+      rawOrders = [...byId.values()];
+
+      const today = todaySnap.docs.map(d => ({ id:d.id, ...d.data(), orderStatus:d.data().orderStatus || "ready" }));
+      const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
+      const todayCustomersMap = new Map();
+      for (const x of today) {
+        const key = x.customerUid || x.mobile || x.customerName;
+        const current = todayCustomersMap.get(key) || { name:x.customerName || "Customer", mobile:x.mobile || "", count:0 };
+        current.count += 1;
+        todayCustomersMap.set(key, current);
+      }
+      todayCustomers = [...todayCustomersMap.values()];
+      stats = {
+        newOrders:readyCountSnap.data().count || 0,
+        oldOrders:oldCountSnap.data().count || 0,
+        completedOrders:completedCountSnap.data().count || 0,
+        todayOrders:today.length,
+        pendingToday:today.filter(x => !["completed", "cancelled", "expired"].includes(x.orderStatus)).length,
+        completedToday:today.filter(x => x.orderStatus === "completed").length
+      };
+    }
+
+    // Fetch payment/refund documents only for the orders included in this response.
+    const paymentIds = [...new Set(rawOrders
+      .filter(({data}) => data.paymentMethod === "ONLINE_PAYMENT")
+      .map(({id}) => id))];
+    const refundIds = [...new Set(rawOrders
+      .filter(({data}) => Boolean(data.refundStatus))
+      .map(({id}) => id))];
+    const [paymentDocs, refundDocs] = await Promise.all([
+      Promise.all(paymentIds.map(id => db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(id).get())),
+      Promise.all(refundIds.map(id => db.collection(ORDER_REFUNDS_COLLECTION).doc(id).get()))
     ]);
-    const paymentByOrder = new Map(paymentSnap.docs.map(d => [d.id, d.data()]));
-    const refundByOrder = new Map(refundSnap.docs.map(d => [d.id, d.data()]));
-    const now = Date.now();
-    const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
-    const rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
-    // Older orders may not contain a photo snapshot. Load their current product photos
-    // as a fallback, while new orders keep the photo snapshot saved at order time.
+    const paymentByOrder = new Map(paymentDocs.filter(d => d.exists).map(d => [d.id, d.data()]));
+    const refundByOrder = new Map(refundDocs.filter(d => d.exists).map(d => [d.id, d.data()]));
+
+    // Keep the legacy-photo fallback limited to the orders being displayed.
     const missingPhotoProductIds = [...new Set(rawOrders.flatMap(({data}) =>
       (Array.isArray(data.items) ? data.items : [])
         .filter(item => !Array.isArray(item.photoUrls) || !item.photoUrls.length)
@@ -1220,10 +1281,9 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
       const p=d.data();
       return [d.id, Array.isArray(p.photoData) ? p.photoData : (Array.isArray(p.photoUrls) ? p.photoUrls : [])];
     }));
-    const all = rawOrders.map(({id, data:x}) => {
+
+    const orders = rawOrders.map(({id, data:x}) => {
       const confirmedAt = safeDate(x.confirmedAt || x.createdAt);
-      const expiresAt = asMillis(x.expiresAt);
-      const effectiveStatus = x.orderStatus || "ready";
       const items = (Array.isArray(x.items) ? x.items : []).map(item => ({
         ...item,
         photoUrls:Array.isArray(item.photoUrls) && item.photoUrls.length
@@ -1231,156 +1291,31 @@ app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
           : (productPhotos.get(String(item.productId || "")) || [])
       }));
       const payment = paymentByOrder.get(id) || {};
-      return { id, ...x, confirmedAt, expiresAt, orderStatus:effectiveStatus,
-        total:moneyNumber(x.total), items,
+      const refund = refundByOrder.get(id) || null;
+      return {
+        id, ...x, confirmedAt, expiresAt:asMillis(x.expiresAt),
+        orderStatus:x.orderStatus || "ready", total:moneyNumber(x.total), items,
         paymentUtr:x.paymentUtr || payment.utr || "",
-        paymentScreenshotData:(x.orderStatus === "cancelled" || payment.status === "submitted" || refundByOrder.has(id)) ? (payment.screenshotData || "") : "",
-        adminCancellationMessage:x.adminCancellationMessage || "", cancelledByAdmin:Boolean(x.cancelledByAdmin),
+        paymentScreenshotData:(x.orderStatus === "cancelled" || payment.status === "submitted" || refund) ? (payment.screenshotData || "") : "",
+        adminCancellationMessage:x.adminCancellationMessage || "",
+        cancelledByAdmin:Boolean(x.cancelledByAdmin),
         paymentSubmissionStatus:payment.status || "",
-        refund:refundByOrder.get(id) || null,
-        customerName:x.customerName || "Customer", mobile:x.mobile || "" };
+        refund,
+        customerName:x.customerName || "Customer", mobile:x.mobile || ""
+      };
     }).sort((a,b) => new Date(b.confirmedAt || 0) - new Date(a.confirmedAt || 0));
-    const keyOf = x => x.confirmedAt ? new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date(x.confirmedAt)) : "";
-    const today = all.filter(x => keyOf(x) === todayKey);
-    const runningOrders = all.filter(x => !["completed", "cancelled", "expired"].includes(x.orderStatus));
-    const completedOrdersList = all.filter(x => x.orderStatus === "completed");
-    const cancelledOrders = all.filter(x => ["cancelled", "expired"].includes(x.orderStatus)).slice(0, 2);
-    const todayCustomersMap = new Map();
-    for (const x of today) {
-      const key = x.customerUid || x.mobile || x.customerName;
-      const current = todayCustomersMap.get(key) || { name:x.customerName, mobile:x.mobile, count:0 };
-      current.count += 1;
-      todayCustomersMap.set(key, current);
-    }
+
+    const runningOrders = orders.filter(x => !["completed", "cancelled", "expired"].includes(x.orderStatus));
+    const completedOrdersList = orders.filter(x => x.orderStatus === "completed");
+    const cancelledOrders = orders.filter(x => ["cancelled", "expired"].includes(x.orderStatus)).slice(0, 2);
     res.json({
-      orders:all, runningOrders, completedOrdersList, cancelledOrders,
-      todayCustomers:[...todayCustomersMap.values()],
-      stats:{ newOrders:runningOrders.filter(x=>x.collectionStatus !== "collected").length,
-        oldOrders:all.filter(x=>["expired", "cancelled"].includes(x.orderStatus)).length,
-        completedOrders:completedOrdersList.length, todayOrders:today.length,
-        pendingToday:today.filter(x=>x.orderStatus !== "completed" && x.orderStatus !== "cancelled" && x.orderStatus !== "expired").length,
-        completedToday:today.filter(x=>x.orderStatus === "completed").length }
+      scope, orders, runningOrders, completedOrdersList, cancelledOrders,
+      todayCustomers, stats
     });
-  } catch(e) { console.error("admin offer orders",e); res.status(500).json({error:"Could not load customer orders."}); }
-});
-
-app.post("/api/admin/orders/:id/verify-payment", requireAdmin, async (req,res)=>{
-  try {
-    const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id);
-    await db.runTransaction(async tx=>{
-      const snap=await tx.get(ref);
-      if(!snap.exists) throw new Error("Order not found.");
-      const x=snap.data();
-      if(x.paymentMethod !== "ONLINE_PAYMENT") throw new Error("This order is not an online payment order.");
-      if(x.orderStatus === "cancelled" || x.cancelledByAdmin) throw new Error("This order was cancelled by the shop. Payment verification is disabled.");
-      if(["completed","expired"].includes(x.orderStatus)) throw new Error("This order is no longer active.");
-      if(x.paymentStatus === "received") return;
-      if(x.paymentStatus !== "submitted") throw new Error("No online payment submission is waiting for verification.");
-      const paymentRef=db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(req.params.id);
-      const paymentSnap=await tx.get(paymentRef);
-      if(!paymentSnap.exists || paymentSnap.data().status !== "submitted") throw new Error("Payment screenshot or submission record is missing.");
-      tx.update(ref,{paymentStatus:"received",paymentVerifiedAt:admin.firestore.FieldValue.serverTimestamp(),paymentVerifiedBy:req.adminUid});
-      tx.update(paymentRef,{status:"verified",verifiedAt:admin.firestore.FieldValue.serverTimestamp(),verifiedBy:req.adminUid});
-    });
-    res.json({ok:true,message:"Online payment verified. Home delivery orders will be delivered within 1 hour; shop collection orders can be collected at the shop."});
-  } catch(e) { res.status(400).json({error:e.message || "Could not verify online payment."}); }
-});
-
-app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
-  try {
-    const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id);
-    let onlinePayment = false;
-    await db.runTransaction(async tx=>{
-      const snap=await tx.get(ref);
-      if(!snap.exists) throw new Error("Order not found.");
-      const x=snap.data();
-      onlinePayment = x.paymentMethod === "ONLINE_PAYMENT";
-      if(x.orderStatus !== "ready") throw new Error("This order is no longer awaiting collection.");
-      if(onlinePayment && x.paymentStatus !== "received") throw new Error("Verify the online payment before marking the product collected.");
-      if(x.collectionStatus === "collected") return;
-      tx.update(ref,{collectionStatus:"collected",orderStatus:"collected",collectedAt:admin.firestore.FieldValue.serverTimestamp(),collectedBy:req.adminUid});
-    });
-    res.json({ok:true,message:onlinePayment ? "Product collection marked. Online payment is verified; final approval can now add billing stamps." : "Order collection marked. Next, confirm cash payment."});
-  } catch(e) { res.status(400).json({error:e.message || "Could not update collection status."}); }
-});
-
-app.post("/api/admin/orders/:id/payment", requireAdmin, async (req,res)=>{
-  try {
-    const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id);
-    await db.runTransaction(async tx=>{
-      const snap=await tx.get(ref);
-      if(!snap.exists) throw new Error("Order not found.");
-      const x=snap.data();
-      if(x.collectionStatus !== "collected") throw new Error("Mark the order collected before receiving payment.");
-      if(x.paymentStatus === "received") return;
-      tx.update(ref,{paymentStatus:"received",paymentReceivedAt:admin.firestore.FieldValue.serverTimestamp(),paymentReceivedBy:req.adminUid});
-    });
-    res.json({ok:true,message:"Cash payment received. Final approval will add the billing stamps."});
-  } catch(e) { res.status(400).json({error:e.message || "Could not update payment status."}); }
-});
-
-app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
-  try {
-    const orderRef=db.collection(ORDERS_COLLECTION).doc(req.params.id);
-    let result={};
-    await db.runTransaction(async tx=>{
-      const orderSnap=await tx.get(orderRef);
-      if(!orderSnap.exists) throw new Error("Order not found.");
-      const order=orderSnap.data();
-      if(order.orderStatus === "completed") throw new Error("This order is already completed. Stamps cannot be added twice.");
-      if(order.collectionStatus !== "collected" || order.paymentStatus !== "received") throw new Error("Complete collection and cash payment first.");
-      const cRef=customerRef(order.customerUid), customerSnap=await tx.get(cRef);
-      if(!customerSnap.exists) throw new Error("Customer account not found.");
-      const reservationSnap=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",req.params.id));
-      const activeReservations=reservationSnap.docs.filter(d=>d.data().status === "active");
-      if(!activeReservations.length) throw new Error("No active order items found. Please contact support.");
-      const qtyByProduct=new Map();
-      for(const d of activeReservations){const pid=d.data().productId;qtyByProduct.set(pid,(qtyByProduct.get(pid)||0)+1);}
-      const productSnaps=new Map();
-      for(const pid of qtyByProduct.keys()) productSnaps.set(pid,await tx.get(db.collection(PRODUCTS_COLLECTION).doc(pid)));
-      for(const [pid,qty] of qtyByProduct){const ps=productSnaps.get(pid);if(!ps?.exists)throw new Error("An order product no longer exists.");const stock=Number(ps.data().stock||0);if(stock<qty)throw new Error("Physical stock is lower than this order quantity. Please correct stock before completing.");}
-      const amount=moneyNumber(order.productTotal ?? order.total);
-      if(!(amount>0)) throw new Error("Order total is invalid.");
-      const stampsAdded=amount<=800?1:2;
-      const c=customerSnap.data(),cycle=moneyNumber(c.cycleBillTotal ?? c.billTotal),life=moneyNumber(c.lifetimeBillTotal ?? cycle);
-      const billRef=cRef.collection("bills").doc();
-      for(const [pid,qty] of qtyByProduct){const ps=productSnaps.get(pid);tx.update(ps.ref,{stock:Number(ps.data().stock||0)-qty,updatedAt:admin.firestore.FieldValue.serverTimestamp(),lastCollectedAt:admin.firestore.FieldValue.serverTimestamp()});}
-      tx.update(cRef,{stamps:moneyNumber(c.stamps)+stampsAdded,billTotal:cycle+amount,cycleBillTotal:cycle+amount,lifetimeBillTotal:life+amount});
-      tx.create(billRef,{billTotal:amount,stampsAdded,source:"shop-order",productName:(order.items||[]).map(x=>x.productName).join(", "),orderNumber:order.orderNumber,items:order.items||[],date:admin.firestore.FieldValue.serverTimestamp(),enteredBy:req.adminUid});
-      activeReservations.forEach(d=>tx.update(d.ref,{status:"collected",collectedAt:admin.firestore.FieldValue.serverTimestamp(),collectedBy:req.adminUid}));
-      tx.update(orderRef,{orderStatus:"completed",stampsStatus:"added",stampsAdded,completedAt:admin.firestore.FieldValue.serverTimestamp(),completedBy:req.adminUid});
-      result={orderNumber:order.orderNumber,amount,stampsAdded};
-    });
-    res.json({ok:true,...result,message:`Order #${result.orderNumber} completed. Cash received, stock updated, bill ₹${result.amount} added and ${result.stampsAdded} stamp(s) awarded.`});
-  } catch(e) { console.error("complete customer order",e); res.status(400).json({error:e.message || "Could not complete this order."}); }
-});
-
-app.post("/api/admin/orders/:id/resend-email", requireAdmin, async (req,res)=>{
-  try {
-    const ref=db.collection(ORDERS_COLLECTION).doc(req.params.id),snap=await ref.get();
-    if(!snap.exists) return res.status(404).json({error:"Order not found."});
-    const x=snap.data();
-    if(x.emailStatus === "sent") return res.json({ok:true,message:"Order email was already sent."});
-    const sent=await sendOrderNotification({...x,id:snap.id,confirmedAtText:safeDate(x.confirmedAt)});
-    await ref.update({emailStatus:sent.sent?"sent":"not_configured",emailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
-    if(!sent.sent) return res.status(400).json({error:"Gmail SMTP is not configured in Render environment variables."});
-    res.json({ok:true,message:"Order notification email sent."});
-  } catch(e) { console.error("resend order email",e); res.status(500).json({error:"Could not send order notification email."}); }
-});
-
-app.post("/api/customer/cancel-offer", requireUser, async (req, res) => {
-  try {
-    const reservationId = String(req.body?.reservationId || "");
-    if (!reservationId) return res.status(400).json({ error:"Selected offer not found." });
-    const ref = db.collection(RESERVATIONS_COLLECTION).doc(reservationId);
-    await db.runTransaction(async tx => {
-      const snap = await tx.get(ref);
-      if (!snap.exists || snap.data().customerUid !== req.user.uid) throw new Error("You cannot cancel this selection.");
-      if (snap.data().status !== "active") throw new Error("This selection is no longer active.");
-      tx.update(ref, { status:"cancelled", cancelledAt:admin.firestore.FieldValue.serverTimestamp() });
-    });
-    res.json({ ok:true });
-  } catch (e) { res.status(400).json({ error:e.message || "Could not cancel selected offer." }); }
+  } catch(e) {
+    console.error("admin offer orders",e);
+    res.status(500).json({error:"Could not load customer orders."});
+  }
 });
 
 // Admin view: confirmed reservations waiting for the customer to collect in-store.
@@ -1507,7 +1442,7 @@ async function cancelExpiredCodOrders(){
   if(codExpiryCheckRunning)return;
   codExpiryCheckRunning=true;
   try{
-    const snap=await db.collection(ORDERS_COLLECTION).where("paymentMethod","==","CASH_ON_DELIVERY").get();
+    const snap=await db.collection(ORDERS_COLLECTION).where("orderStatus","==","ready").get();
     const now=Date.now();
     for(const doc of snap.docs){
       const order=doc.data();
