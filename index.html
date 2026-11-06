@@ -279,14 +279,12 @@ body>header{display:none}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider,setPersistence,browserLocalPersistence}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider,}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import{getFirestore,doc,getDoc}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 const cfg={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-store-and-gifts.firebaseapp.com',projectId:'tanmayi-store-and-gifts',storageBucket:'tanmayi-store-and-gifts.firebasestorage.app',messagingSenderId:'1061146758363',appId:'1:1061146758363:web:3260ea51094ba5fbab10fe',measurementId:'G-3RWVE6G0W9'};
 const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https://tanmayi-pin-reset-api.onrender.com';
-// Keep authenticated customer sessions across refresh; explicit sign-out clears this session.
-await setPersistence(auth,browserLocalPersistence);
-// Wait until Firebase restores the saved browser session before deciding which page to show.
-await auth.authStateReady();
+// Firebase Auth's default browser persistence restores the saved session asynchronously.
+// Do not block module startup; onAuthStateChanged below selects the page after restoration.
 window.tanmayiAuth=auth;window.tanmayiFirebaseAuth={EmailAuthProvider,reauthenticateWithCredential,updatePassword};
 const $=id=>document.getElementById(id),money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),date=v=>v?new Date(v).toLocaleString('en-IN'):'—',customerEmail=m=>`${m}@tanmayi-loyalty.app`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
