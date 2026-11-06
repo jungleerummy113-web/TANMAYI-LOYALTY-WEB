@@ -234,6 +234,61 @@ async function sendOrderNotification(order) {
 
 
 
+
+async function sendAdminOrderCompletedNotification(order) {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
+  const missing=[];
+  if(!SMTP_HOST)missing.push("SMTP_HOST");
+  if(!SMTP_PORT)missing.push("SMTP_PORT");
+  if(!SMTP_USER)missing.push("SMTP_USER");
+  if(!SMTP_PASS)missing.push("SMTP_PASS");
+  if(missing.length)throw new Error("Missing SMTP environment variables: "+missing.join(", "));
+  const port=Number(SMTP_PORT);
+  if(!Number.isInteger(port)||port<=0)throw new Error("SMTP_PORT must be a valid port number.");
+  const transporter=nodemailer.createTransport({
+    host:SMTP_HOST,port,
+    secure:String(SMTP_SECURE||(port===465?"true":"false")).toLowerCase()==="true",
+    auth:{user:SMTP_USER,pass:SMTP_PASS},
+    connectionTimeout:15000,greetingTimeout:15000,socketTimeout:20000
+  });
+  const items=(order.items||[]).map(item=>({
+    name:String(item.productName||"Product"),
+    quantity:Number(item.quantity||0),
+    unitPrice:Number(item.offerPrice||0),
+    lineTotal:Number(item.lineTotal||0)
+  }));
+  const itemText=items.map(x=>x.name+" | Qty "+x.quantity+" | Unit ₹"+x.unitPrice+" | Line ₹"+x.lineTotal).join("\n");
+  const itemRows=items.map(x=>"<tr><td style=\"padding:9px;border-bottom:1px solid #eee\">"+emailEscape(x.name)+"</td><td style=\"padding:9px;text-align:center;border-bottom:1px solid #eee\">"+x.quantity+"</td><td style=\"padding:9px;text-align:right;border-bottom:1px solid #eee\">₹"+x.unitPrice.toLocaleString("en-IN")+"</td><td style=\"padding:9px;text-align:right;border-bottom:1px solid #eee\">₹"+x.lineTotal.toLocaleString("en-IN")+"</td></tr>").join("");
+  const completedAt=new Date().toLocaleString("en-IN",{timeZone:"Asia/Kolkata"});
+  const text=[
+    "TANMAYI STORE AND GIFTS – ORDER COMPLETED",
+    "Order: #"+(order.orderNumber||order.id),
+    "Customer: "+(order.customerName||"Customer"),
+    "Mobile: "+(order.mobile||""),
+    "Payment: "+(order.paymentMethod==="ONLINE_PAYMENT"?"ONLINE PAYMENT":"CASH ON DELIVERY"),
+    "Payment status: "+(order.paymentStatus||"received"),
+    "Products:",itemText||"Product details unavailable.",
+    "Total: ₹"+Number(order.total||0).toLocaleString("en-IN"),
+    "Stamps added: "+Number(order.stampsAdded||0),
+    "Completed at: "+completedAt
+  ].join("\n");
+  const html="<div style=\"font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222\"><h2 style=\"background:#171717;color:#d9b45b;padding:20px\">TANMAYI STORE AND GIFTS</h2><h3>ORDER COMPLETED SUCCESSFULLY</h3><p><b>Order:</b> #"+emailEscape(order.orderNumber||order.id)+"<br><b>Customer:</b> "+emailEscape(order.customerName||"Customer")+"<br><b>Mobile:</b> "+emailEscape(order.mobile||"")+"<br><b>Payment:</b> "+(order.paymentMethod==="ONLINE_PAYMENT"?"ONLINE PAYMENT":"CASH ON DELIVERY")+"<br><b>Payment status:</b> "+emailEscape(order.paymentStatus||"received")+"</p><table style=\"width:100%;border-collapse:collapse\"><thead><tr><th align=\"left\">Product</th><th>Qty</th><th align=\"right\">Unit Price</th><th align=\"right\">Line Total</th></tr></thead><tbody>"+itemRows+"</tbody></table><h2 style=\"text-align:right\">Total: ₹"+Number(order.total||0).toLocaleString("en-IN")+"</h2><p><b>Stamps added:</b> "+Number(order.stampsAdded||0)+"</p><p>Completed at: "+emailEscape(completedAt)+"</p></div>";
+  try{
+    await transporter.verify();
+    const info=await transporter.sendMail({
+      from:MAIL_FROM||("TANMAYI STORE AND GIFTS <"+SMTP_USER+">"),
+      to:ORDER_NOTIFICATION_EMAIL||SMTP_USER,
+      subject:"ORDER COMPLETED · #"+(order.orderNumber||order.id)+" · TANMAYI STORE AND GIFTS",
+      text,html
+    });
+    console.info("ORDER_COMPLETION_EMAIL_SENT",{orderNumber:order.orderNumber,messageId:info.messageId});
+    return {sent:true,messageId:info.messageId};
+  }catch(error){
+    console.error("ORDER_COMPLETION_EMAIL_FAILED",{orderNumber:order.orderNumber,message:String(error.message||"Email failed").slice(0,300)});
+    throw error;
+  }finally{transporter.close();}
+}
+
 async function sendAdminOrderCancellationNotification(order, reason) {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
   const missing=[];
@@ -1332,7 +1387,7 @@ app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
     const orderId=String(req.params.id||"").trim();
     if(!orderId) throw new Error("Invalid order ID.");
     const orderRef=db.collection(ORDERS_COLLECTION).doc(orderId);
-    let alreadyCompleted=false, stampsAdded=0, billAmount=0;
+    let alreadyCompleted=false, stampsAdded=0, billAmount=0, completedOrderForEmail=null;
     await db.runTransaction(async tx=>{
       const orderSnap=await tx.get(orderRef);
       if(!orderSnap.exists) throw new Error("Order not found.");
@@ -1392,15 +1447,39 @@ app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
         stampsStatus:"added",
         stampsAdded,
         billAmount,
+        completionEmailStatus:"pending",
         updatedAt:admin.firestore.FieldValue.serverTimestamp()
       });
     });
+    let completionEmailSent=false;
+    if(!alreadyCompleted){
+      try{
+        const completedSnap=await orderRef.get();
+        if(!completedSnap.exists)throw new Error("Completed order could not be reloaded for email.");
+        const completedOrder={id:orderId,...completedSnap.data()};
+        const mail=await sendAdminOrderCompletedNotification(completedOrder);
+        completionEmailSent=mail.sent;
+        await orderRef.update({
+          completionEmailStatus:"sent",
+          completionEmailMessageId:mail.messageId||"",
+          completionEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()
+        });
+      }catch(mailError){
+        console.error("completed order admin email failed:",mailError);
+        await orderRef.update({
+          completionEmailStatus:"failed",
+          completionEmailError:String(mailError.message||"Email failed").slice(0,250),
+          completionEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()
+        }).catch(()=>{});
+      }
+    }
     res.json({
       ok:true,
       alreadyCompleted,
+      completionEmailSent,
       stampsAdded:alreadyCompleted?0:stampsAdded,
       billAmount:alreadyCompleted?0:billAmount,
-      message:alreadyCompleted?"This order is already completed; no duplicate bill or stamps were added.":"Order completed successfully. Customer bill and stamps were updated."
+      message:alreadyCompleted?"This order is already completed; no duplicate bill or stamps were added.":(completionEmailSent?"Order completed. Customer bill and stamps were updated; completion email sent to admin.":"Order completed and customer bill/stamps updated, but admin email failed. Check Render SMTP settings.")
     });
   }catch(e){
     console.error("complete customer order:",e);
