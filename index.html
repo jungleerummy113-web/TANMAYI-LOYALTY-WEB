@@ -738,7 +738,7 @@ async function loadAdminOfferOrders(scope='active'){
 }
 $('refreshOfferOrders').onclick=loadAdminOfferOrders;
 $('refreshOrderDashboard').onclick=loadAdminOfferOrders;
-$('refreshCompletedHistory')?.addEventListener('click',()=>loadAdminOfferOrders('history'));
+$('refreshCompletedHistory')?.addEventListener('click',()=>loadAdminOfferOrders('completed'));
 
 async function loadCustomerOrders(){
   try{
@@ -1391,7 +1391,7 @@ window.addEventListener("unhandledrejection", function (event) {
       {id:'orders',label:'Pending / Running Orders',icon:'📦',content:[orders]},
       {id:'online',label:'Online Payment Orders',icon:'💳',content:[]},
       {id:'cod',label:'Cash on Delivery Orders',icon:'💵',content:[]},
-      {id:'history',label:'Completed Orders History',icon:'✅',content:[$('adminCompletedHistorySection')],onOpen:()=>{const el=$('adminCompletedOrders');if(el)el.innerHTML='<div class="order-empty">Loading completed orders…</div>';loadAdminOfferOrders('history')}},
+      {id:'history',label:'Completed Orders History',icon:'✅',content:[$('adminCompletedHistorySection')],onOpen:()=>{const el=$('adminCompletedOrders');if(el)el.innerHTML='<div class="order-empty">Loading completed orders…</div>';loadAdminOfferOrders('completed')}},
       {id:'cancelled',label:'Cancel Orders',icon:'❌',content:[cancelledHistoryPage],onOpen:()=>loadAdminOfferOrders('history')},
       {id:'whatsapp',label:'WhatsApp',icon:'🟢',content:[]},
       {id:'promotions',label:'Promotions',icon:'🖼️',content:[]},
