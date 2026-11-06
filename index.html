@@ -766,22 +766,35 @@ $('refreshMyOrders').onclick=loadCustomerOrders;
 
 function placeOrderFlowAfterProduct(productId){
   const flow=$('orderFlowBackdrop');
-  const mount=$('orderFlowMount');
-  const grid=$('customerProducts');
-  if(!flow||!mount||!grid)return false;
+  if(!flow)return false;
   activeOfferAnchorId=productId||activeOfferAnchorId;
-  const selectedCard=Array.from(grid.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===String(activeOfferAnchorId));
-  // Clear legacy modal inline styles before applying the inline product-card layout.
+  const selectedId=String(activeOfferAnchorId||'');
+  // Resolve the selected product card globally; the product grid can be temporarily
+  // detached/hidden while the customer switches between the cart and product tabs.
+  const selectedCard=Array.from(document.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===selectedId);
+  let mount=$('orderFlowMount');
+  if(!mount){
+    mount=document.createElement('div');
+    mount.id='orderFlowMount';
+    mount.className='order-flow-inline-mount';
+  }
+  const grid=$('customerProducts');
+  // Clear legacy modal styles before positioning the checkout in the active product view.
   flow.removeAttribute('style');
   flow.classList.remove('hidden');
   flow.classList.add('inline-order-flow');
   flow.setAttribute('aria-hidden','false');
   if(flow.parentElement!==mount)mount.appendChild(flow);
-  // Mount the checkout directly after the selected product card.
+  // Prefer immediately below the selected card; fall back to the products grid,
+  // then the active My List panel. Never fail just because one container is absent.
   if(selectedCard){
     selectedCard.insertAdjacentElement('afterend',mount);
-  }else if(mount.parentElement!==grid){
-    grid.appendChild(mount);
+  }else if(grid){
+    if(mount.parentElement!==grid)grid.appendChild(mount);
+  }else{
+    const panel=$('customerPanel-myList');
+    if(!panel)return false;
+    if(mount.parentElement!==panel)panel.appendChild(mount);
   }
   mount.hidden=false;
   mount.style.display='block';
