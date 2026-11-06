@@ -1332,11 +1332,11 @@ async function cancelExpiredCodOrders(){
   if(codExpiryCheckRunning)return;
   codExpiryCheckRunning=true;
   try{
-    const snap=await db.collection(ORDERS_COLLECTION).where("paymentMethod","==","CASH_ON_DELIVERY").where("orderStatus","==","ready").get();
+    const snap=await db.collection(ORDERS_COLLECTION).where("paymentMethod","==","CASH_ON_DELIVERY").get();
     const now=Date.now();
     for(const doc of snap.docs){
       const order=doc.data();
-      if(order.collectionStatus==="collected")continue;
+      if(order.orderStatus!=="ready"||order.collectionStatus==="collected")continue;
       const confirmedAt=asMillis(order.confirmedAt||order.createdAt);
       if(!confirmedAt||now-confirmedAt<COD_COLLECTION_DEADLINE_MS)continue;
       let cancelledOrder=null;
