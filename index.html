@@ -306,7 +306,7 @@ body>header{display:none}
 <section class="card"><h2>Manage Shop Photos &amp; Offers</h2><p class="muted">Upload up to 8 active products. Add two photos of each product and set its original and offer prices.</p><label>Product name</label><input id="productName" maxlength="80" placeholder="Product name"><label>Product size (example: 10 × 24 inch)</label><input id="productSize" maxlength="80" placeholder="10 × 24 inch"><label>Product description / details</label><textarea id="productDescription" rows="4" maxlength="1200" placeholder="Enter product material, colour, design and other details"></textarea><label>Original price (₹)</label><input id="productOriginal" type="number" min="1" step="1" placeholder="Original price"><label>Offer price (₹)</label><input id="productOffer" type="number" min="1" step="1" placeholder="Offer price"><label>Available stock (number of same items)</label><input id="productStock" type="number" min="0" step="1" placeholder="How many pieces are available"><label>Photo 1</label><input id="productPhoto1" type="file" accept="image/*"><label>Photo 2 (different angle)</label><input id="productPhoto2" type="file" accept="image/*"><button id="saveProduct" class="gold">Upload Product &amp; Offer</button><div id="productAdminMsg" class="msg hidden"></div><h3>Uploaded Products</h3><div id="adminProducts" class="product-grid"></div></section>
 <section class="card" id="adminPaymentSettings"><h2>💳 Online Payment QR Settings</h2><p class="muted">Upload or replace the shop UPI QR code. Customers will see the latest saved QR code when they choose Online Payment.</p><div id="adminPaymentQrPreview" class="qr-area hidden"></div><label>Upload / Replace Payment QR Code</label><input id="adminPaymentQrFile" type="file" accept="image/*"><button type="button" class="gold" id="saveAdminPaymentQr">Save Payment QR Code</button><div id="adminPaymentQrMsg" class="msg hidden"></div></section>
 <section class="card" id="offerOrdersSection"><div class="row"><h2>Customer Orders</h2><button type="button" class="secondary" id="refreshOfferOrders">Refresh</button></div><p class="muted">Order details, selected product photo, collection and cash status. Final approval చేసినప్పుడే bill & stamps update అవుతాయి.</p><h3>💳 Online Payment Orders</h3><div id="adminOnlineOrders" class="compact-orders">Loading online payment orders…</div><h3 style="margin-top:22px">💵 Cash on Delivery Orders</h3><div id="adminCodOrders" class="compact-orders">Loading COD orders…</div><h3 style="margin-top:22px">✅ Completed Orders</h3><div id="adminCompletedOrdersActive" class="compact-orders">Loading completed orders…</div><div id="offerOrderMsg" class="msg hidden"></div></section>
-<section class="card" id="adminCompletedHistorySection"><h2>✅ Completed Orders History</h2><div id="adminCompletedOrders" class="compact-orders"></div></section><section class="card"><div class="row"><div><h2>Customer Login QR Code</h2><small class="muted">Customers scan this QR to open the login / registration page.</small></div></div>
+<section class="card" id="adminCompletedHistorySection"><div class="row"><h2>✅ Completed Orders History</h2><button type="button" class="secondary" id="refreshCompletedHistory">Refresh</button></div><div id="adminCompletedOrders" class="compact-orders"><div class="order-empty">Open this page to load completed orders.</div></div></section><section class="card"><div class="row"><div><h2>Customer Login QR Code</h2><small class="muted">Customers scan this QR to open the login / registration page.</small></div></div>
 <button id="makeQR" class="gold">Generate Customer QR Code</button>
 <div id="qrWrap" class="qr-area hidden"><div id="qrCode"></div><small id="qrUrl" class="muted"></small>
 <div class="portal-actions"><button id="downloadQR" class="secondary">Download QR PNG</button></div></div>
@@ -715,7 +715,7 @@ async function loadAdminOfferOrders(scope='active'){
     });
     document.querySelectorAll('[data-order-collect]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderCollect)+'/collect','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
     document.querySelectorAll('[data-order-payment]').forEach(b=>b.onclick=async()=>{if(!confirm('Confirm that you received the full cash payment for this order?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderPayment)+'/payment','POST',{});msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
-    document.querySelectorAll('[data-order-complete]').forEach(b=>b.onclick=async()=>{if(!confirm('Final approval: cash is received and customer has collected all products. Add bill and stamps now?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderComplete)+'/complete','POST',{});msg('offerOrderMsg',z.message);await Promise.all([loadAdminOfferOrders(),loadAdminProducts(),loadCustomers(),loadRewardEligible()])}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
+    document.querySelectorAll('[data-order-complete]').forEach(b=>b.onclick=async()=>{if(!confirm('Final approval: cash is received and customer has collected all products. Add bill and stamps now?'))return;b.disabled=true;try{const z=await api('/api/admin/orders/'+encodeURIComponent(b.dataset.orderComplete)+'/complete','POST',{});msg('offerOrderMsg',z.message);await Promise.all([loadAdminOfferOrders(),loadAdminProducts(),loadCustomers(),loadRewardEligible()]);if($('adminApp')?.dataset.activePage==='history')await loadAdminOfferOrders('history')}catch(e){msg('offerOrderMsg',e.message);b.disabled=false}});
     document.querySelectorAll('[data-refund-update]').forEach(b=>b.onclick=async()=>{
       const id=b.dataset.refundUpdate;
       const message=$('refund-msg-'+id)?.value.trim()||'';
@@ -729,10 +729,18 @@ async function loadAdminOfferOrders(scope='active'){
       catch(e){msg('offerOrderMsg',e.message);b.disabled=false}
     });
 
-  }catch(e){$('adminOfferOrders').textContent=e.message||'Could not load customer orders.'}
+  }catch(e){
+    console.error('loadAdminOfferOrders failed:',e);
+    const message=esc(e.message||'Could not load customer orders.');
+    const targets=scope==='history'?[$('adminCompletedOrders'),$('adminCancelledOrdersAll')]:[$('adminRunningOrdersList'),$('adminOnlineOrders'),$('adminCodOrders'),$('adminCompletedOrdersActive')];
+    targets.filter(Boolean).forEach(el=>{el.innerHTML='<div class="order-empty">Could not load orders: '+message+'</div>';});
+    const notice=$('offerOrderMsg');
+    if(notice){notice.textContent='Could not load orders: '+(e.message||'Please refresh and try again.');notice.classList.remove('hidden');}
+  }
 }
 $('refreshOfferOrders').onclick=loadAdminOfferOrders;
 $('refreshOrderDashboard').onclick=loadAdminOfferOrders;
+$('refreshCompletedHistory')?.addEventListener('click',()=>loadAdminOfferOrders('history'));
 
 async function loadCustomerOrders(){
   try{
@@ -1385,7 +1393,7 @@ window.addEventListener("unhandledrejection", function (event) {
       {id:'orders',label:'Pending / Running Orders',icon:'📦',content:[orders]},
       {id:'online',label:'Online Payment Orders',icon:'💳',content:[]},
       {id:'cod',label:'Cash on Delivery Orders',icon:'💵',content:[]},
-      {id:'history',label:'Completed Orders History',icon:'✅',content:[$('adminCompletedHistorySection')],onOpen:()=>loadAdminOfferOrders('history')},
+      {id:'history',label:'Completed Orders History',icon:'✅',content:[$('adminCompletedHistorySection')],onOpen:()=>{const el=$('adminCompletedOrders');if(el)el.innerHTML='<div class="order-empty">Loading completed orders…</div>';loadAdminOfferOrders('history')}},
       {id:'cancelled',label:'Cancel Orders',icon:'❌',content:[cancelledHistoryPage],onOpen:()=>loadAdminOfferOrders('history')},
       {id:'whatsapp',label:'WhatsApp',icon:'🟢',content:[]},
       {id:'promotions',label:'Promotions',icon:'🖼️',content:[]},
