@@ -645,9 +645,12 @@ $('saveAdminPaymentQr').onclick=async()=>{
   finally{$('saveAdminPaymentQr').disabled=false}
 };
 
-async function loadAdminOfferOrders(scope='active'){
+let completedHistoryOffset=0;
+async function loadAdminOfferOrders(scope='active',append=false){
   try{
-    const r=await api('/api/admin/offer-orders?scope='+encodeURIComponent(scope));
+    if(scope==='completed'&&!append)completedHistoryOffset=0;
+    const query='/api/admin/offer-orders?scope='+encodeURIComponent(scope)+(scope==='completed'?'&offset='+completedHistoryOffset:'');
+    const r=await api(query);
     const adminOrders=r.orders||[];
     const runningAdminOrders=adminOrders.filter(x=>!['completed','cancelled','expired'].includes(x.orderStatus));
     const completedAdminOrders=adminOrders.filter(x=>x.orderStatus==='completed').sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0));
@@ -692,7 +695,18 @@ async function loadAdminOfferOrders(scope='active'){
       $('adminCodOrders').innerHTML=codAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No cash on delivery orders found.</div>';
     }else{
       const historyEl=$('adminCompletedOrders');
-      if(historyEl)historyEl.innerHTML=completedAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No completed orders yet.</div>';
+      if(historyEl){
+        const cards=completedAdminOrders.map(renderAdminOrderCard).join('');
+        historyEl.innerHTML=(append?historyEl.innerHTML.replace(/<div id="loadMoreCompletedOrdersWrap"[\s\S]*?<\/div>$/,''): '')+
+          (cards||(!append?'<div class="order-empty">No completed orders yet.</div>':''));
+        completedHistoryOffset=Number(r.nextOffset||0);
+        if(r.hasMore){
+          const wrap=document.createElement('div');wrap.id='loadMoreCompletedOrdersWrap';wrap.style='text-align:center;margin:16px 0';
+          wrap.innerHTML='<button type="button" class="secondary" id="loadMoreCompletedOrders">LOAD OLDER COMPLETED ORDERS</button>';
+          historyEl.appendChild(wrap);
+          $('loadMoreCompletedOrders').onclick=()=>loadAdminOfferOrders('completed',true);
+        }
+      }
       const cancelledOrdersEl=$('adminCancelledOrdersAll');
       if(cancelledOrdersEl)cancelledOrdersEl.innerHTML=latestCancelledAdminOrders.map(renderAdminOrderCard).join('')||'<div class="order-empty">No cancelled orders yet.</div>';
     }
@@ -738,7 +752,7 @@ async function loadAdminOfferOrders(scope='active'){
 }
 $('refreshOfferOrders').onclick=loadAdminOfferOrders;
 $('refreshOrderDashboard').onclick=loadAdminOfferOrders;
-$('refreshCompletedHistory')?.addEventListener('click',()=>loadAdminOfferOrders('completed'));
+$('refreshCompletedHistory')?.addEventListener('click',()=>{completedHistoryOffset=0;const el=$('adminCompletedOrders');if(el)el.innerHTML='<div class="order-empty">Loading completed orders…</div>';loadAdminOfferOrders('completed')});
 
 async function loadCustomerOrders(){
   try{
