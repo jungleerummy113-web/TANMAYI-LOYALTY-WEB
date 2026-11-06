@@ -469,6 +469,9 @@ $('publicCartItems')?.addEventListener('click',event=>{
 });
 $('publicContinueOrder')?.addEventListener('click',()=>{
   if(!guestOrderCart.length)return;
+  // Hide the fixed cart overlay before navigating to login/register.
+  // The guest cart remains saved in sessionStorage for the order flow.
+  $('publicCartPanel')?.classList.add('hidden');
   show('customerLogin');
   $('customerLogin')?.scrollIntoView({behavior:'smooth',block:'start'});
 });
