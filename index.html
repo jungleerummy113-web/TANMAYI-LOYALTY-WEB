@@ -175,6 +175,24 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #customerReservations .order-flow-body{padding:8px!important}
 #customerReservations .order-flow-step-title{font-size:13px!important;margin-bottom:6px!important}
 #customerReservations .payment-choice{padding:8px!important;margin:7px 0!important}#customerReservations .payment-choice label{font-size:12px;margin:5px 0}#customerReservations .online-payment-fields{padding:8px!important;margin-top:7px!important}#customerReservations .online-payment-fields label{font-size:11px;margin:5px 0 3px}#customerReservations .online-payment-fields input{padding:8px;font-size:13px}#customerReservations .order-flow-actions{margin-top:7px}#customerReservations .order-flow-actions button{padding:9px;font-size:12px}.customer-promo-banner{display:flex;gap:10px;overflow-x:auto;margin:0 0 14px;border-radius:16px}.customer-promo-banner img{width:100%;min-width:100%;max-height:210px;object-fit:cover;border-radius:16px;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}.promotion-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.promotion-preview-grid img{width:100%;height:130px;object-fit:cover;border-radius:12px}.app-topbar-spacer{width:42px;height:42px;display:block}#adminApp #logout{display:none!important}.customer-promo-banner{display:flex;gap:10px;overflow-x:auto;margin:0 0 14px;border-radius:16px}.customer-promo-banner img{width:100%;min-width:100%;max-height:210px;object-fit:cover;border-radius:16px;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}.promotion-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.promotion-preview-grid img{width:100%;height:130px;object-fit:cover;border-radius:12px}.app-topbar-spacer{width:42px;height:42px;display:block}.order-stat:has(#completedOrderCount),.order-stat:has(#completedTodayCount){display:none!important}.customer-promo-banner{display:flex;gap:10px;overflow-x:auto;margin:0 0 14px;border-radius:16px}.customer-promo-banner img{width:100%;min-width:100%;max-height:210px;object-fit:cover;border-radius:16px;background:linear-gradient(120deg,#f7a4bd,#ffb45e)}.promotion-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.promotion-preview-grid img{width:100%;height:130px;object-fit:cover;border-radius:12px}.app-topbar-spacer{width:42px;height:42px;display:block}
+/* Guest-only fixed customer login prompt */
+#guestCustomerLoginPrompt{
+  position:fixed;left:14px;bottom:92px;z-index:1190;
+  width:min(190px,calc(50vw - 22px));padding:10px 11px;
+  border:1px solid #d5ad58;border-radius:14px;
+  background:linear-gradient(135deg,#fff9e9,#f4dfad);
+  box-shadow:0 5px 18px #0003;color:#382714;text-align:center;
+}
+#guestCustomerLoginPrompt .guest-login-caption{display:block;font-size:11px;font-weight:800;line-height:1.2;margin-bottom:6px}
+#guestCustomerLoginPrompt button{
+  width:100%;margin:0;padding:9px 8px;border:0;border-radius:9px;
+  background:linear-gradient(120deg,#171717,#49331a);color:#f6d78d;
+  font-size:13px;font-weight:900;white-space:nowrap;
+}
+#guestCustomerLoginPrompt.hidden{display:none!important}
+@media(min-width:760px){
+  #guestCustomerLoginPrompt{left:max(14px,calc((100vw - 1050px)/2 + 14px))}
+}
 /* Additive customer floating cart */
 #floatingCartButton{position:fixed;right:16px;bottom:92px;z-index:1200;border:0;border-radius:999px;background:#963b49;color:#fff;padding:12px 17px;font-weight:800;box-shadow:0 5px 18px #0003;display:none;align-items:center;gap:8px}
 #floatingCartBadge{background:#fff;color:#963b49;border-radius:50%;min-width:23px;height:23px;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
@@ -264,6 +282,10 @@ body>header{display:none}
   </div>
   <p class="muted" style="font-size:12px;text-align:center">You can browse products without an account. Login or register only when you are ready to place an order.</p>
 </section>
+<div id="guestCustomerLoginPrompt" class="hidden" role="region" aria-label="Customer login">
+  <span class="guest-login-caption">Already a customer?</span>
+  <button type="button" id="guestCustomerLoginButton">👤 CUSTOMER LOGIN</button>
+</div>
 <section id="customerLogin" class="card portal hidden">
 <div class="portal-top"><div class="mark">🎁</div><h2>TANMAYI STORE AND GIFTS</h2><p>WELCOME TO OUR DIGITAL LOYALTY PROGRAM</p></div>
 <div class="portal-body"><h2>Customer Login / Register</h2><p class="muted">Login with your 10-digit mobile number and 6-digit PIN. No OTP required.</p>
@@ -441,6 +463,8 @@ function show(id){
   if(publicStore)publicStore.classList.toggle('hidden',id==='adminLogin'||id==='adminApp'||id==='customerView');
   // During guest checkout, keep the public catalogue visible behind the login/register form.
   if(id==='customerLogin'&&!adminRoute)publicStore?.classList.remove('hidden');
+  const guestLogin=$('guestCustomerLoginPrompt');
+  if(guestLogin)guestLogin.classList.toggle('hidden',id!=='publicStorefront'||!!auth.currentUser||adminRoute);
 }
 let apiAuthUser=null;
 async function api(path,method='GET',body=null){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);try{let user=auth.currentUser||apiAuthUser;if(!user){await auth.authStateReady();user=auth.currentUser||apiAuthUser;}if(!user)throw Error('Please login to continue.');const token=await Promise.race([user.getIdToken(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Secure connection is taking longer than expected. Please wait and retry.')),15000))]);if(!token)throw Error('Secure connection is not ready yet. Please wait and retry.');const r=await fetch(API+path,{method,signal:controller.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}catch(e){if(e.name==='AbortError')throw Error('Server response timeout. Please check your internet and try again.');throw e}finally{clearTimeout(timer)}}
@@ -552,6 +576,12 @@ $('publicCartItems')?.addEventListener('click',event=>{
   guestOrderCart=guestOrderCart.filter(p=>p.productId!==button.dataset.guestRemove);saveGuestOrderCart();
   const card=$('publicProducts')?.querySelector('[data-guest-add="'+CSS.escape(button.dataset.guestRemove)+'"]');
   if(card)card.textContent='Add to Order';
+});
+$('guestCustomerLoginButton')?.addEventListener('click',()=>{
+  if(adminRoute||auth.currentUser)return;
+  show('customerLogin');
+  $('publicStorefront')?.classList.add('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
 });
 $('publicContinueOrder')?.addEventListener('click',()=>{
   if(!guestOrderCart.length)return;
