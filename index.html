@@ -379,17 +379,26 @@ $('floatingCartCheckout')?.addEventListener('click',()=>{
   paymentStepOpen=true;
   selectedFulfilmentMode='SHOP_COLLECTION';
   selectedOrderPaymentMethod='CASH_ON_DELIVERY';
-  // Keep checkout directly below the selected product instead of opening a screen-covering popup.
-  placeOrderFlowAfterProduct(activeOfferAnchorId);
+  const placed=placeOrderFlowAfterProduct(activeOfferAnchorId);
+  if(!placed){
+    checkoutButton.disabled=false;
+    alert('Could not open checkout under the selected product. Please refresh and try again.');
+    return;
+  }
+  // Render the existing delivery and payment controls inside the selected product's checkout area.
   renderReservations([]);
+  requestAnimationFrame(()=>{
+    const flow=$('orderFlowBackdrop');
+    flow?.scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
   checkoutButton.disabled=!pendingOfferCart.length;
-  // Refresh the configured QR in the background; never delay the visible checkout options.
+  // Refresh the configured QR in the background; do not change payment methods or validation.
   api('/api/customer/payment-settings').then(settings=>{
     if(settings&&settings.qrData){
       customerPaymentQr=settings.qrData;
       if(paymentStepOpen&&$('orderFlowBackdrop')&&!$('orderFlowBackdrop').classList.contains('hidden'))renderReservations([]);
     }
-  }).catch(error=>console.warn('Payment settings could not be refreshed:',error.message));
+  }).catch(error=>console.warn('Customer payment QR refresh failed:',error.message));
 });
 function msg(id,t){$(id).textContent=t;$(id).classList.remove('hidden')}function clear(id){$(id).classList.add('hidden');$(id).textContent=''}
 function show(id){
@@ -725,23 +734,33 @@ function placeOrderFlowAfterProduct(productId){
   const flow=$('orderFlowBackdrop');
   const mount=$('orderFlowMount');
   const grid=$('customerProducts');
-  if(!flow||!mount||!grid)return;
+  if(!flow||!mount||!grid)return false;
   activeOfferAnchorId=productId||activeOfferAnchorId;
   const selectedCard=Array.from(grid.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===String(activeOfferAnchorId));
+  // Clear legacy modal inline styles before applying the inline product-card layout.
+  flow.removeAttribute('style');
+  flow.classList.remove('hidden');
+  flow.classList.add('inline-order-flow');
+  flow.setAttribute('aria-hidden','false');
   if(flow.parentElement!==mount)mount.appendChild(flow);
-  // Put checkout immediately after the selected product, not at the end of the page.
+  // Mount the checkout directly after the selected product card.
   if(selectedCard){
     selectedCard.insertAdjacentElement('afterend',mount);
   }else if(mount.parentElement!==grid){
     grid.appendChild(mount);
   }
+  mount.hidden=false;
   mount.style.display='block';
+  mount.style.position='static';
   mount.style.width='100%';
+  mount.style.maxWidth='100%';
   mount.style.gridColumn='1 / -1';
-  flow.classList.add('inline-order-flow');
-  flow.classList.remove('hidden');
+  mount.style.margin='10px 0 0';
   flow.style.display='block';
-  flow.setAttribute('aria-hidden','false');
+  flow.style.position='static';
+  flow.style.inset='auto';
+  flow.style.zIndex='auto';
+  return true;
 }
 function renderInlineProductSelections(){
   const grid=$('customerProducts');
