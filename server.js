@@ -751,14 +751,22 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
 });
 app.get("/api/customer/offers", requireUser, async (_req, res) => {
   try {
-    const snap = await db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(), now = Date.now();
-    const products = [];
-    for (const d of snap.docs) {
-      const x = d.data(), heldSnap = await db.collection(RESERVATIONS_COLLECTION).where("productId", "==", d.id).get();
-      const held = heldSnap.docs.filter(r => r.data().status === "active" && (Boolean(r.data().orderId) || asMillis(r.data().expiresAt) > now)).length;
-      const stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
-      products.push({ id:d.id, name:x.name, size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), stock, availableStock:Math.max(0, stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]) });
-    }
+    const [snap, reservationSnap] = await Promise.all([
+      db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(),
+      db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
+    ]);
+    const now = Date.now(), heldByProduct = new Map();
+    reservationSnap.docs.forEach(r => {
+      const reservation = r.data();
+      if (reservation.orderId || asMillis(reservation.expiresAt) > now) {
+        heldByProduct.set(reservation.productId, (heldByProduct.get(reservation.productId) || 0) + 1);
+      }
+    });
+    const products = snap.docs.map(d => {
+      const x = d.data(), stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
+      const held = heldByProduct.get(d.id) || 0;
+      return { id:d.id, name:x.name, size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), stock, availableStock:Math.max(0, stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]) };
+    });
     res.json({ products });
   } catch (e) { console.error("customer offers", e); res.status(500).json({ error:"Could not load offers." }); }
 });
