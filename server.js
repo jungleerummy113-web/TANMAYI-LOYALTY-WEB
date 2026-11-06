@@ -919,7 +919,7 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
         holderName=String(req.body?.holderName||"").trim().slice(0,100);
         upiId=String(req.body?.upiId||"").trim().slice(0,100);
         if(!holderName||!upiId) throw new Error("Enter bank account holder name and UPI ID / number to request a refund.");
-        if(!["submitted","received"].includes(order.paymentStatus)) throw new Error("Online payment has not been submitted. Please contact the shop.");
+        if(order.paymentStatus !== "received") throw new Error("Refund is available only after the shop has verified and received your online payment.");
         const refundRef=db.collection(ORDER_REFUNDS_COLLECTION).doc(orderId);
         const existingRefund=await tx.get(refundRef);
         if(existingRefund.exists && ["requested","processing","success"].includes(existingRefund.data().status)) throw new Error("A refund request already exists for this order.");
