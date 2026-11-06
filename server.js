@@ -875,6 +875,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 // Customer order history, including the completed order and stamp confirmation.
 app.get("/api/customer/my-orders", requireUser, async (req, res) => {
   try {
+    await cancelExpiredCodOrders();
     const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).get();
     const [paymentDocs, refundDocs] = await Promise.all([
       Promise.all(snap.docs.map(d=>db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(d.id).get())),
@@ -1024,6 +1025,7 @@ app.post("/api/admin/orders/:id/cancel-cod", requireAdmin, async (req,res)=>{
 // Admin dashboard order API. Response fields match the Admin HTML dashboard.
 app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   try {
+    await cancelExpiredCodOrders();
     const [snap, paymentSnap, refundSnap] = await Promise.all([
       db.collection(ORDERS_COLLECTION).get(),
       db.collection(PAYMENT_SUBMISSIONS_COLLECTION).get(),
