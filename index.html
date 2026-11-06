@@ -206,6 +206,42 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 .floating-cart-remove{border:0;border-radius:9px;background:#8f3440;color:#fff;padding:8px 11px;font-weight:700}
 #floatingCartCheckout{width:100%;margin-top:14px;background:#963b49;color:#fff;border:0;border-radius:12px;padding:14px;font-weight:800}
 @media(min-width:700px){#floatingCartBackdrop{align-items:center}}
+
+/* Compact signed-in product cards and checkout controls; presentation only. */
+#customerProducts .product-card{padding:7px!important;gap:4px!important;border-radius:10px}
+#customerProducts .product-card>strong{font-size:13px!important;line-height:1.2;margin:0}
+#customerProducts .product-photos{gap:5px!important;padding-bottom:2px!important}
+#customerProducts .product-photos img{height:148px!important;aspect-ratio:4/3!important;max-height:148px!important;border-radius:7px!important}
+#customerProducts .product-photo-hint{font-size:9px!important;gap:4px!important;padding:3px 6px!important;border-radius:12px!important;box-shadow:none!important}
+#customerProducts .product-photo-hint .photo-arrow{font-size:12px!important}
+#customerProducts .customer-product-prices{margin:2px 0!important;gap:6px!important}
+#customerProducts .customer-product-prices .price-offer{font-size:16px!important}
+#customerProducts .stock-line{font-size:10px!important;line-height:1.2!important;margin:2px 0!important}
+#customerProducts .customer-product-description{margin:2px 0!important}
+#customerProducts .customer-product-description summary{font-size:10px!important;padding:4px 7px!important;border-radius:6px!important}
+#customerProducts .customer-product-description p{font-size:10px!important;line-height:1.3!important;padding:6px!important;margin:4px 0 0!important}
+#customerProducts .product-card>button{width:auto!important;justify-self:start!important;margin:2px 0 0!important;padding:5px 8px!important;font-size:10px!important;line-height:1.15!important;border-radius:6px!important}
+#floatingCartButton{padding:7px 10px!important;font-size:12px!important;gap:5px!important;right:10px!important;bottom:84px!important}
+#floatingCartBadge{min-width:19px!important;height:19px!important;font-size:10px!important}
+#customerProducts .order-flow-inline-mount{grid-column:auto!important;width:100%!important;max-width:100%!important;margin:6px 0 0!important;padding-top:6px;border-top:1px dashed #d6ad55}
+#customerProducts .order-flow-backdrop.inline-order-flow{margin:0!important;padding:0!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .order-flow-card{border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .order-flow-head{padding:6px 7px!important;border-radius:7px!important;border-bottom-width:2px!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .order-flow-head h2{font-size:12px!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .order-flow-progress{margin-top:5px!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .order-flow-body{padding:6px 0 0!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .order-flow-stage{padding:6px!important;margin:4px 0!important;border-width:1px!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .order-flow-step-title{font-size:11px!important;margin:0 0 4px!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .payment-choice{padding:5px!important;margin:4px 0!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .payment-choice label{font-size:10px!important;gap:5px!important;margin:3px 0!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .online-payment-fields{padding:6px!important;margin-top:5px!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .online-payment-fields label{font-size:10px!important;margin:4px 0 2px!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .online-payment-fields input,
+#customerProducts .order-flow-backdrop.inline-order-flow .online-payment-fields textarea{font-size:11px!important;padding:6px!important;margin:2px 0 5px!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .order-flow-actions{gap:5px!important;margin-top:5px!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .order-flow-actions button{min-width:0!important;padding:7px!important;font-size:10px!important}
+#customerProducts .online-payment-fields img.customer-payment-qr{width:3in!important;height:3in!important;max-width:78vw!important;max-height:78vw!important;aspect-ratio:1/1!important;object-fit:contain!important;padding:5px!important;margin:5px auto!important}
+
 </style>
 <style id="tanmayi-app-redesign">
 :root{--app-bg:#f5f3ed;--app-card:#fff;--app-ink:#201b14;--app-gold:#d9ad55;--app-red:#8d1d24}
@@ -877,7 +913,7 @@ function placeOrderFlowAfterProduct(productId){
   if(flow.parentElement!==mount)mount.appendChild(flow);
   // Keep checkout beside the selected product where possible; otherwise use a safe visible fallback.
   if(selectedCard){
-    selectedCard.insertAdjacentElement('afterend',mount);
+    selectedCard.appendChild(mount);
   }else if(grid){
     if(mount.parentElement!==grid)grid.appendChild(mount);
   }else if(panel){
