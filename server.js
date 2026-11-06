@@ -1581,10 +1581,9 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
       rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
     } else {
       // Dashboard refresh reads only orders that still need attention, plus refunds in progress.
-      const [activeSnap, refundOrdersSnap, completedOrdersSnap, todaySnap, readyCountSnap, oldCountSnap, completedCountSnap] = await Promise.all([
+      const [activeSnap, refundOrdersSnap, todaySnap, readyCountSnap, oldCountSnap, completedCountSnap] = await Promise.all([
         orderCollection.where("orderStatus", "in", ["ready", "collected"]).get(),
         orderCollection.where("refundStatus", "in", ["requested", "success"]).get(),
-        orderCollection.where("orderStatus", "==", "completed").get(),
         (() => {
           const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
           const todayStart = new Date(todayKey + "T00:00:00+05:30");
@@ -1599,7 +1598,6 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
       ]);
       const byId = new Map();
       activeSnap.docs.forEach(d => byId.set(d.id, { id:d.id, data:d.data() }));
-      completedOrdersSnap.docs.forEach(d => byId.set(d.id, { id:d.id, data:d.data() }));
       refundOrdersSnap.docs.forEach(d => {
         const x = d.data();
         if (x.paymentMethod === "ONLINE_PAYMENT" && x.orderStatus === "cancelled") {
