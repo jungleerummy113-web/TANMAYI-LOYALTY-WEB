@@ -652,11 +652,9 @@ function placeOrderFlowAfterProduct(productId){
   // Move the selected product card to the end so checkout sits immediately
   // beneath that product, while product refreshes cannot delete the checkout.
   const selectedCard=Array.from(grid.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===String(activeOfferAnchorId));
-  if(selectedCard)grid.appendChild(selectedCard);
   if(flow.parentElement!==mount)mount.appendChild(flow);
-  // Keep checkout directly under the selected product card, inside the product grid.
-  if(mount.parentElement!==grid)grid.appendChild(mount);
-  if(selectedCard)selectedCard.insertAdjacentElement('afterend',mount);
+  // Keep the checkout container outside customerProducts so product refreshes never remove it.
+  if(mount.parentElement!==grid.parentElement)grid.insertAdjacentElement('afterend',mount);
   mount.style.display='block';
   mount.style.width='100%';
   mount.style.gridColumn='1 / -1';
@@ -664,10 +662,7 @@ function placeOrderFlowAfterProduct(productId){
   flow.classList.remove('hidden');
   flow.style.display='block';
   flow.setAttribute('aria-hidden','false');
-  requestAnimationFrame(()=>{
-    mount.scrollIntoView({behavior:'smooth',block:'center'});
-    flow.scrollIntoView({behavior:'smooth',block:'center'});
-  });
+  // Selection details are shown on the product card; do not force customers to the page bottom.
 }
 async function loadCustomerProducts(){
   const productsMount=$('customerProducts');
