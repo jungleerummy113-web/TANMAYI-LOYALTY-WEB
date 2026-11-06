@@ -2,6 +2,9 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#171717">
 <meta name="description" content="TANMAYI STORE AND GIFTS Digital Loyalty System">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://tanmayi-pin-reset-api.onrender.com" crossorigin>
 <link id="tanmayiManifestLink" rel="manifest" href="./manifest.json">
 <script>
 /* Admin URL uses its own PWA identity; customer URL keeps manifest.json unchanged. */
@@ -552,17 +555,25 @@ function placeOrderFlowAfterProduct(productId){
   });
 }
 async function loadCustomerProducts(){
-  const productsMount=$('customerProducts');if(productsMount)productsMount.textContent='Loading products, please wait…';
+  const productsMount=$('customerProducts');
+  if(productsMount)productsMount.textContent='Loading products, please wait…';
+  let reservations=[];
   try{
-    const [r,m,pay]=await Promise.all([api('/api/customer/offers'),api('/api/customer/my-offers').catch(error=>({reservations:[],loadError:error.message})),api('/api/customer/payment-settings').catch(()=>({qrData:""}))]);
-    customerPaymentQr=pay.qrData||"";
-    customerProductsCache=r.products||[];pendingOfferCart=pendingOfferCart.map(item=>{const latest=customerProductsCache.find(p=>p.id===item.productId);return latest?{...item,productName:latest.name,offerPrice:Number(latest.offerPrice),photoUrls:Array.isArray(latest.photoUrls)?latest.photoUrls.slice(0,2):item.photoUrls}:item});savePendingOfferCart();
-    $('customerProducts').innerHTML=r.products.map(x=>{
+    // Show the product catalogue as soon as its essential request completes.
+    // Reservations and payment QR are secondary and must not delay product cards.
+    const r=await api('/api/customer/offers');
+    customerProductsCache=r.products||[];
+    pendingOfferCart=pendingOfferCart.map(item=>{
+      const latest=customerProductsCache.find(p=>p.id===item.productId);
+      return latest?{...item,productName:latest.name,offerPrice:Number(latest.offerPrice),photoUrls:Array.isArray(latest.photoUrls)?latest.photoUrls.slice(0,2):item.photoUrls}:item;
+    });
+    savePendingOfferCart();
+    $('customerProducts').innerHTML=customerProductsCache.map((x,index)=>{
       const pendingCount=pendingOfferCart.filter(p=>p.productId===x.id).reduce((n,p)=>n+Math.max(1,Number(p.quantity)||1),0);
       const available=Math.max(0,Number(x.availableStock??x.stock??0));const canAddMore=available>pendingCount;
       const photos=Array.isArray(x.photoUrls)?x.photoUrls.slice(0,2):[];
       return `<div class="product-card" data-product-card-id="${esc(x.id)}"><strong>${esc(x.name)}</strong>
-        <div class="product-photos">${photos.map((u,i)=>`<img src="${esc(u)}" alt="${esc(x.name)} photo ${i+1}" data-zoom-product-image="${esc(u)}" loading="lazy">`).join('')}</div>
+        <div class="product-photos">${photos.map((u,i)=>`<img src="${esc(u)}" alt="${esc(x.name)} photo ${i+1}" data-zoom-product-image="${esc(u)}" loading="lazy" decoding="async">`).join('')}</div>
         <p class="customer-product-prices"><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>
         ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
         ${x.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(x.description)}</p></details>`:''}
@@ -576,13 +587,28 @@ async function loadCustomerProducts(){
       e.preventDefault();e.stopPropagation();
       if(!pendingOfferCart.length){paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";}
       const selectedProduct=customerProductsCache.find(p=>p.id===b.dataset.stageOffer)||{};
-      const existingSelection=pendingOfferCart.find(p=>p.productId===b.dataset.stageOffer);if(existingSelection){existingSelection.quantity=Math.max(1,Number(existingSelection.quantity)||1)+1;}else{pendingOfferCart.push({key:b.dataset.stageOffer,productId:b.dataset.stageOffer,productName:b.dataset.name,offerPrice:Number(b.dataset.price),quantity:1,photoUrls:Array.isArray(selectedProduct.photoUrls)?selectedProduct.photoUrls.slice(0,2):[]});}
+      const existingSelection=pendingOfferCart.find(p=>p.productId===b.dataset.stageOffer);
+      if(existingSelection){existingSelection.quantity=Math.max(1,Number(existingSelection.quantity)||1)+1;}
+      else{pendingOfferCart.push({key:b.dataset.stageOffer,productId:b.dataset.stageOffer,productName:b.dataset.name,offerPrice:Number(b.dataset.price),quantity:1,photoUrls:Array.isArray(selectedProduct.photoUrls)?selectedProduct.photoUrls.slice(0,2):[]});}
       savePendingOfferCart();orderConfirmedData=null;
       placeOrderFlowAfterProduct(b.dataset.stageOffer);
-      renderReservations(m.reservations);
+      renderReservations(reservations);
     });
-    renderReservations(m.reservations);renderBuyAgain();
-  }catch(e){console.error('Customer product offers failed:',e);const mount=$('customerProducts');if(mount)mount.textContent='Products are taking longer to load. Please wait a moment and tap Refresh to try again.'}
+    renderReservations(reservations);
+    renderBuyAgain();
+
+    // Load order reservations in the background; the catalogue is already usable.
+    api('/api/customer/my-offers').then(m=>{
+      reservations=Array.isArray(m.reservations)?m.reservations:[];
+      const flow=$('orderFlowBackdrop');
+      const orderFlowOpen=flow&&!flow.classList.contains('hidden');
+      if(!orderFlowOpen&&!paymentStepOpen&&!orderConfirmedData)renderReservations(reservations);
+    }).catch(error=>console.warn('Customer reservations loaded later:',error.message));
+  }catch(e){
+    console.error('Customer product offers failed:',e);
+    const mount=$('customerProducts');
+    if(mount)mount.textContent='Products are taking longer to load. Please wait a moment and tap Refresh to try again.';
+  }
 }
 function renderReservations(items){
   const el=$('customerReservations');if(!el)return;
@@ -752,8 +778,8 @@ onAuthStateChanged(auth,async u=>{
     try{
       await loadCustomer();
       show('customerView');
-      if(window.refreshTanmayiStoreSettings) await window.refreshTanmayiStoreSettings();
-      // Product/offer loading is secondary; a product API error must not undo login.
+      // Start store settings in the background so they do not delay the product catalogue.
+      if(window.refreshTanmayiStoreSettings) window.refreshTanmayiStoreSettings().catch(error=>console.warn('Store settings loaded later:',error));
       loadCustomerProducts();
     }catch(e){
       show('customerLogin');
