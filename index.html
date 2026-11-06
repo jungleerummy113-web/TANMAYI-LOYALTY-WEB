@@ -648,13 +648,14 @@ function placeOrderFlowAfterProduct(productId){
   const grid=$('customerProducts');
   if(!flow||!mount||!grid)return;
   activeOfferAnchorId=productId||activeOfferAnchorId;
-  // Keep checkout in its own stable container OUTSIDE customerProducts.
-  // Move the selected product card to the end so checkout sits immediately
-  // beneath that product, while product refreshes cannot delete the checkout.
   const selectedCard=Array.from(grid.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===String(activeOfferAnchorId));
   if(flow.parentElement!==mount)mount.appendChild(flow);
-  // Keep the checkout container outside customerProducts so product refreshes never remove it.
-  if(mount.parentElement!==grid.parentElement)grid.insertAdjacentElement('afterend',mount);
+  // Put checkout immediately after the selected product, not at the end of the page.
+  if(selectedCard){
+    selectedCard.insertAdjacentElement('afterend',mount);
+  }else if(mount.parentElement!==grid){
+    grid.appendChild(mount);
+  }
   mount.style.display='block';
   mount.style.width='100%';
   mount.style.gridColumn='1 / -1';
@@ -662,7 +663,26 @@ function placeOrderFlowAfterProduct(productId){
   flow.classList.remove('hidden');
   flow.style.display='block';
   flow.setAttribute('aria-hidden','false');
-  // Selection details are shown on the product card; do not force customers to the page bottom.
+}
+function renderInlineProductSelections(){
+  const grid=$('customerProducts');
+  if(!grid)return;
+  grid.querySelectorAll('[data-product-card-id]').forEach(card=>{
+    const id=card.getAttribute('data-product-card-id');
+    const selected=pendingOfferCart.find(item=>item.productId===id);
+    const area=card.querySelector('[data-inline-selection]');
+    const button=card.querySelector('[data-stage-offer]');
+    if(!area||!button)return;
+    if(!selected){area.hidden=true;area.innerHTML='';return;}
+    const qty=Math.max(1,Number(selected.quantity)||1);
+    const product=customerProductsCache.find(item=>item.id===id)||{};
+    const photo=(Array.isArray(product.photoUrls)&&product.photoUrls[0])||(selected.photoUrls||[])[0]||'';
+    area.hidden=false;
+    area.innerHTML='<span class="inline-selected-badge">✓ ADDED TO YOUR ORDER</span><div class="inline-selected-summary">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(selected.productName)+' selected product">':'<span class="inline-selected-no-photo">No image</span>')+'<span><b>Selected quantity: '+qty+'</b><small>'+moneyPrice(Number(selected.offerPrice)*qty)+'</small></span></div>';
+    const available=Math.max(0,Number(product.availableStock??product.stock??0));
+    button.textContent=available<=qty?'Added to order':'Add another';
+    button.disabled=available<=qty;
+  });
 }
 async function loadCustomerProducts(){
   const productsMount=$('customerProducts');
@@ -698,6 +718,7 @@ async function loadCustomerProducts(){
       </div>`;
     }).join('')||'<p class="muted">No active offers right now.</p>';
     if(pendingOfferCart.length&&!orderConfirmedData)placeOrderFlowAfterProduct(activeOfferAnchorId||pendingOfferCart[pendingOfferCart.length-1].productId);
+    renderInlineProductSelections();
 
     document.querySelectorAll('[data-stage-offer]').forEach(b=>b.onclick=e=>{
       e.preventDefault();e.stopPropagation();
@@ -708,6 +729,7 @@ async function loadCustomerProducts(){
       else{pendingOfferCart.push({key:b.dataset.stageOffer,productId:b.dataset.stageOffer,productName:b.dataset.name,offerPrice:Number(b.dataset.price),quantity:1,photoUrls:Array.isArray(selectedProduct.photoUrls)?selectedProduct.photoUrls.slice(0,2):[]});}
       savePendingOfferCart();orderConfirmedData=null;
       placeOrderFlowAfterProduct(b.dataset.stageOffer);
+      renderInlineProductSelections();
       renderReservations(reservations);
     });
     renderReservations(reservations);
