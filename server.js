@@ -1198,7 +1198,7 @@ app.post("/api/admin/orders/:id/cancel", requireAdmin, async (req,res)=>{
 app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
   try {
     const scope = req.query.scope === "history" ? "history" : "active";
-    if (scope === "active") await cancelExpiredCodOrders();
+    // Expired COD orders are handled by the background timer below, not during dashboard requests.
 
     const orderCollection = db.collection(ORDERS_COLLECTION);
     let rawOrders = [];
