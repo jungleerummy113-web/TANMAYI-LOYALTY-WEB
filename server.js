@@ -1136,8 +1136,10 @@ app.post("/api/admin/orders/:id/verify-payment", requireAdmin, async (req,res)=>
         return;
       }
       if(order.paymentStatus!=="submitted") throw new Error("This order has no pending online payment submission.");
-      if(!/^\d{12}$/.test(String(order.paymentUtr||""))) throw new Error("A valid 12-digit UTR is missing.");
-      if(!order.paymentScreenshotData) throw new Error("Customer payment screenshot is missing.");
+      const submittedUtr=String(order.paymentUtr||paymentSnap.data()?.utr||"");
+      const submittedScreenshot=String(paymentSnap.exists?paymentSnap.data().screenshotData||"":order.paymentScreenshotData||"");
+      if(!/^\d{12}$/.test(submittedUtr)) throw new Error("A valid 12-digit UTR is missing.");
+      if(!submittedScreenshot) throw new Error("Customer payment screenshot is missing from the payment submission record.");
       if(paymentSnap.exists && paymentSnap.data().status==="rejected") throw new Error("This payment submission was rejected and cannot be verified.");
       const verifiedAt=admin.firestore.FieldValue.serverTimestamp();
       tx.update(orderRef,{paymentStatus:"received",paymentVerifiedAt:verifiedAt,paymentVerifiedBy:req.adminUid});
