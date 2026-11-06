@@ -1117,6 +1117,41 @@ app.post("/api/admin/orders/:id/refund", requireAdmin, async (req,res)=>{
 });
 
 
+// Admin verifies an online payment after visually checking the UTR and screenshot.
+app.post("/api/admin/orders/:id/verify-payment", requireAdmin, async (req,res)=>{
+  try{
+    const orderId=String(req.params.id||"").trim();
+    if(!orderId) return res.status(400).json({error:"Invalid order ID."});
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(orderId);
+    const paymentRef=db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(orderId);
+    let alreadyVerified=false;
+    await db.runTransaction(async tx=>{
+      const [orderSnap,paymentSnap]=await Promise.all([tx.get(orderRef),tx.get(paymentRef)]);
+      if(!orderSnap.exists) throw new Error("Order not found.");
+      const order=orderSnap.data();
+      if(order.paymentMethod!=="ONLINE_PAYMENT") throw new Error("This order is not an online payment order.");
+      if(["cancelled","expired"].includes(order.orderStatus)) throw new Error("Cancelled or expired orders cannot be payment-verified.");
+      if(order.paymentStatus==="received"){
+        alreadyVerified=true;
+        return;
+      }
+      if(order.paymentStatus!=="submitted") throw new Error("This order has no pending online payment submission.");
+      if(!/^\d{12}$/.test(String(order.paymentUtr||""))) throw new Error("A valid 12-digit UTR is missing.");
+      if(!order.paymentScreenshotData) throw new Error("Customer payment screenshot is missing.");
+      if(paymentSnap.exists && paymentSnap.data().status==="rejected") throw new Error("This payment submission was rejected and cannot be verified.");
+      const verifiedAt=admin.firestore.FieldValue.serverTimestamp();
+      tx.update(orderRef,{paymentStatus:"received",paymentVerifiedAt:verifiedAt,paymentVerifiedBy:req.adminUid});
+      if(paymentSnap.exists){
+        tx.set(paymentRef,{status:"verified",verifiedAt,verifiedBy:req.adminUid},{merge:true});
+      }
+    });
+    return res.json({ok:true,alreadyVerified,message:alreadyVerified?"This online payment was already verified.":"Online payment verified successfully. You can now mark the order as collected."});
+  }catch(e){
+    console.error("verify online payment:",e);
+    return res.status(400).json({error:e.message||"Could not verify online payment."});
+  }
+});
+
 app.post("/api/admin/orders/:id/cancel-cod", requireAdmin, async (req,res)=>{
   try{
     const orderRef=db.collection(ORDERS_COLLECTION).doc(req.params.id);
