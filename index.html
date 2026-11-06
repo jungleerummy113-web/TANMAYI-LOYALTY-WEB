@@ -112,6 +112,14 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #publicProducts .customer-product-description,#customerProducts .customer-product-description{margin:5px 0}
 #publicProducts .customer-product-description summary,#customerProducts .customer-product-description summary{display:inline-block;cursor:pointer;list-style:none;background:#39342d;color:#fff;border-radius:8px;padding:8px 13px;font-size:13px;font-weight:800}
 #publicProducts .customer-product-description summary::-webkit-details-marker,#customerProducts .customer-product-description summary::-webkit-details-marker{display:none}
+#customerProducts .inline-product-selection{margin-top:7px;padding:8px;border:1px solid #b9d9bf;border-radius:10px;background:#f0faf1}
+#customerProducts .inline-product-selection[hidden]{display:none!important}
+#customerProducts .inline-selected-badge{display:inline-block;font-size:11px;font-weight:900;color:#176b31;background:#d9f2df;border-radius:20px;padding:4px 8px}
+#customerProducts .inline-selected-summary{display:flex;align-items:center;gap:9px;margin-top:7px}
+#customerProducts .inline-selected-summary img,#customerProducts .inline-selected-no-photo{width:54px;height:54px;flex:0 0 54px;object-fit:contain;background:#fff;border:1px solid #d9e8da;border-radius:7px}
+#customerProducts .inline-selected-no-photo{display:grid;place-items:center;font-size:10px;color:#777}
+#customerProducts .inline-selected-summary span{display:flex;flex-direction:column;gap:3px;font-size:13px}
+#customerProducts .inline-selected-summary small{font-weight:800;color:#8d1d24}
 #publicProducts .customer-product-description[open] summary,#customerProducts .customer-product-description[open] summary{background:#a87922}
 #publicProducts .customer-product-description p,#customerProducts .customer-product-description p{white-space:pre-wrap;margin:7px 0 2px;padding:9px;background:#faf7ef;border-radius:8px}
 .product-photo-hint{display:inline-flex;align-items:center;gap:7px;width:max-content;max-width:100%;padding:7px 11px;border-radius:20px;background:#fff0bf;border:1.5px solid #d49a22;color:#6b3900;font-size:12px;font-weight:900;box-shadow:0 2px 7px #8b5b1825}
@@ -646,7 +654,9 @@ function placeOrderFlowAfterProduct(productId){
   const selectedCard=Array.from(grid.querySelectorAll('[data-product-card-id]')).find(card=>card.getAttribute('data-product-card-id')===String(activeOfferAnchorId));
   if(selectedCard)grid.appendChild(selectedCard);
   if(flow.parentElement!==mount)mount.appendChild(flow);
-  if(mount.parentElement!==grid.parentElement)grid.insertAdjacentElement('afterend',mount);
+  // Keep checkout directly under the selected product card, inside the product grid.
+  if(mount.parentElement!==grid)grid.appendChild(mount);
+  if(selectedCard)selectedCard.insertAdjacentElement('afterend',mount);
   mount.style.display='block';
   mount.style.width='100%';
   mount.style.gridColumn='1 / -1';
@@ -687,6 +697,9 @@ async function loadCustomerProducts(){
         ${x.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(x.description)}</p></details>`:''}
         <button type="button" class="secondary" disabled>${available<=0?'NO STOCK AVAILABLE':`Available Stock: ${available} pieces`}</button>
         <button type="button" data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${!canAddMore?'disabled':''}>${available<=0?'No stock available':!canAddMore?'Added to cart':'Select &amp; Add'}</button>
+        <div class="inline-product-selection" data-inline-selection="${esc(x.id)}" ${pendingCount?'':'hidden'}>
+          ${pendingCount?'<span class="inline-selected-badge">✓ ADDED TO YOUR ORDER</span><div class="inline-selected-summary">'+(photos[0]?'<img src="'+esc(photos[0])+'" alt="'+esc(x.name)+' selected product">':'<span class="inline-selected-no-photo">Product</span>')+'<span><b>'+pendingCount+' selected</b><small>'+moneyPrice(Number(x.offerPrice)*pendingCount)+'</small></span></div>':''}
+        </div>
       </div>`;
     }).join('')||'<p class="muted">No active offers right now.</p>';
     if(pendingOfferCart.length&&!orderConfirmedData)placeOrderFlowAfterProduct(activeOfferAnchorId||pendingOfferCart[pendingOfferCart.length-1].productId);
