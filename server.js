@@ -35,6 +35,40 @@ const RESET_COLLECTION = "pinResetAuthorizations";
 const ORDERS_COLLECTION = "customerOrders";
 const ORDER_REQUEST_KEYS = "orderRequestKeys";
 const CODE_TTL_MS = 10 * 60 * 1000;
+/**
+ * Count only reservations that still hold physical stock.
+ * Confirmed reservations stop holding stock once their linked order is
+ * completed/collected, cancelled, or expired. Unconfirmed selections use TTL.
+ */
+async function countHeldReservations(reservationDocs, now, getOrder) {
+  const orderIds = [...new Set(reservationDocs
+    .map(d => d.data())
+    .filter(x => x.status === "active" && x.orderId)
+    .map(x => String(x.orderId)))];
+  const orderSnaps = await Promise.all(orderIds.map(id => getOrder(id)));
+  const orderById = new Map(orderSnaps.map(x => [x.id, x]));
+  const counts = new Map();
+  for (const doc of reservationDocs) {
+    const x = doc.data();
+    if (x.status !== "active") continue;
+    let holds = false;
+    if (x.orderId) {
+      const order = orderById.get(String(x.orderId));
+      // Fail closed if a linked order is unexpectedly missing.
+      if (!order || !order.exists) holds = true;
+      else {
+        const o = order.data();
+        holds = !["completed", "cancelled", "expired"].includes(o.orderStatus)
+          && o.collectionStatus !== "collected";
+      }
+    } else {
+      holds = asMillis(x.expiresAt) > now;
+    }
+    if (holds) counts.set(x.productId, (counts.get(x.productId) || 0) + 1);
+  }
+  return counts;
+}
+
 
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const makeCode = () => crypto.randomInt(0, 1000000).toString().padStart(6, "0");
@@ -724,11 +758,8 @@ app.get("/api/admin/products", requireAdmin, async (_req, res) => {
       db.collection(PRODUCTS_COLLECTION).orderBy("createdAt", "desc").get(),
       db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
     ]);
-    const now = Date.now(), heldByProduct = new Map();
-    reservationSnap.docs.forEach(r => {
-      const x = r.data();
-      if (x.orderId || asMillis(x.expiresAt) > now) heldByProduct.set(x.productId, (heldByProduct.get(x.productId) || 0) + 1);
-    });
+    const now = Date.now();
+    const heldByProduct = await countHeldReservations(reservationSnap.docs, now, id => db.collection(ORDERS_COLLECTION).doc(id).get());
     res.json({ products: snap.docs.map(d => {
       const x=d.data(), stock=Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const reservedCount=heldByProduct.get(d.id) || 0;
@@ -796,7 +827,8 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
       const stock = Number(req.body.stock);
       if (!Number.isInteger(stock) || stock < 0 || stock > 100000) return res.status(400).json({ error:"Stock must be a whole number from 0 to 100000." });
       const reservations = await db.collection(RESERVATIONS_COLLECTION).where("productId", "==", req.params.id).get();
-      const held = reservations.docs.filter(d => d.data().status === "active" && (Boolean(d.data().orderId) || asMillis(d.data().expiresAt) > Date.now())).length;
+      const heldCounts = await countHeldReservations(reservations.docs, Date.now(), id => db.collection(ORDERS_COLLECTION).doc(id).get());
+      const held = heldCounts.get(req.params.id) || 0;
       if (stock < held) return res.status(400).json({ error:`${held} item(s) are currently confirmed by customers. Stock cannot be lower than this.` });
       updates.stock = stock;
     }
@@ -821,13 +853,8 @@ app.get("/api/public/products", async (_req, res) => {
       db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(),
       db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
     ]);
-    const now = Date.now(), heldByProduct = new Map();
-    reservationSnap.docs.forEach(r => {
-      const reservation = r.data();
-      if (reservation.orderId || asMillis(reservation.expiresAt) > now) {
-        heldByProduct.set(reservation.productId, (heldByProduct.get(reservation.productId) || 0) + 1);
-      }
-    });
+    const now = Date.now();
+    const heldByProduct = await countHeldReservations(reservationSnap.docs, now, id => db.collection(ORDERS_COLLECTION).doc(id).get());
     const products = orderProductsForDisplay(snap.docs.map(d => {
       const x = d.data(), stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const held = heldByProduct.get(d.id) || 0;
@@ -847,13 +874,8 @@ app.get("/api/customer/offers", requireUser, async (_req, res) => {
       db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(),
       db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
     ]);
-    const now = Date.now(), heldByProduct = new Map();
-    reservationSnap.docs.forEach(r => {
-      const reservation = r.data();
-      if (reservation.orderId || asMillis(reservation.expiresAt) > now) {
-        heldByProduct.set(reservation.productId, (heldByProduct.get(reservation.productId) || 0) + 1);
-      }
-    });
+    const now = Date.now();
+    const heldByProduct = await countHeldReservations(reservationSnap.docs, now, id => db.collection(ORDERS_COLLECTION).doc(id).get());
     const products = orderProductsForDisplay(snap.docs.map(d => {
       const x = d.data(), stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const held = heldByProduct.get(d.id) || 0;
@@ -871,7 +893,8 @@ app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
       const product = await tx.get(productRef); if (!product.exists || product.data().active !== true) throw new Error("This offer is no longer available.");
       const existing = await tx.get(db.collection(RESERVATIONS_COLLECTION).where("productId", "==", productId));
       const now = Date.now(), stock = Number.isInteger(Number(product.data().stock)) ? Number(product.data().stock) : 0;
-      const held = existing.docs.filter(d => d.data().status === "active" && (Boolean(d.data().orderId) || asMillis(d.data().expiresAt) > now)).length;
+      const heldCounts = await countHeldReservations(existing.docs, now, id => tx.get(db.collection(ORDERS_COLLECTION).doc(id)));
+      const held = heldCounts.get(productId) || 0;
       if (held >= stock) throw new Error("Sorry, this product is out of stock or all pieces are currently selected.");
       const expiresAt = now + OFFER_HOLD_MS;
       tx.create(reservationRef, { customerUid:req.user.uid, productId, productName:product.data().name, offerPrice:moneyNumber(product.data().offerPrice), status:"active", createdAt:admin.firestore.FieldValue.serverTimestamp(), expiresAt:admin.firestore.Timestamp.fromMillis(expiresAt) });
@@ -967,12 +990,17 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
       }
 
       const now = Date.now();
+      const heldByProduct = new Map();
+      for (const [id] of quantities) {
+        const counts = await countHeldReservations(existingByProduct.get(id).docs, now, orderId => tx.get(db.collection(ORDERS_COLLECTION).doc(orderId)));
+        heldByProduct.set(id, counts.get(id) || 0);
+      }
       for (const [id, quantity] of quantities) {
         const productSnap = productSnaps.get(id);
         if (!productSnap?.exists || productSnap.data().active !== true) throw new Error("One of your selected offers is no longer available. Please refresh the offers.");
         const product = productSnap.data();
         const stock = Number.isInteger(Number(product.stock)) ? Number(product.stock) : 0;
-        const held = existingByProduct.get(id).docs.filter(d => d.data().status === "active" && (Boolean(d.data().orderId) || asMillis(d.data().expiresAt) > now)).length;
+        const held = heldByProduct.get(id) || 0;
         if (held + quantity > stock) throw new Error(`${product.name || "A selected product"} has only ${Math.max(0, stock-held)} piece(s) available now. Please update your selection.`);
       }
 
@@ -1294,7 +1322,13 @@ app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
       const orderSnap=await tx.get(orderRef);
       if(!orderSnap.exists) throw new Error("Order not found.");
       const order=orderSnap.data();
+      const reservationSnap = await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId", "==", orderId));
       if(order.orderStatus==="completed" || order.stampsStatus==="added"){
+        reservationSnap.docs.filter(d => d.data().status === "active").forEach(d => tx.update(d.ref, {
+          status:"collected",
+          collectedAt:admin.firestore.FieldValue.serverTimestamp(),
+          collectedBy:req.adminUid
+        }));
         alreadyCompleted=true;
         return;
       }
@@ -1330,6 +1364,11 @@ app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
         cycleBillTotal:oldCycle+billAmount,
         lifetimeBillTotal:oldLifetime+billAmount
       });
+      reservationSnap.docs.filter(d => d.data().status === "active").forEach(d => tx.update(d.ref, {
+        status:"collected",
+        collectedAt:admin.firestore.FieldValue.serverTimestamp(),
+        collectedBy:req.adminUid
+      }));
       tx.update(orderRef,{
         orderStatus:"completed",
         collectionStatus:"collected",
@@ -1560,7 +1599,8 @@ app.get("/api/admin/offer-reservations", requireAdmin, async (_req, res) => {
   try {
     const snap = await db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get();
     const now = Date.now();
-    const live = snap.docs.filter(d => d.data().orderId || asMillis(d.data().expiresAt) > now);
+    const heldCounts = await countHeldReservations(snap.docs, now, id => db.collection(ORDERS_COLLECTION).doc(id).get());
+    const live = snap.docs.filter(d => (heldCounts.get(d.data().productId) || 0) > 0 && (d.data().orderId || asMillis(d.data().expiresAt) > now));
     const groups = new Map();
     for (const d of live) {
       const x = d.data();
