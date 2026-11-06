@@ -135,6 +135,50 @@ async function sendOrderNotification(order) {
 }
 
 
+
+async function sendAdminOrderCancellationNotification(order, reason) {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
+  const missing=[];
+  if(!SMTP_HOST)missing.push("SMTP_HOST");
+  if(!SMTP_PORT)missing.push("SMTP_PORT");
+  if(!SMTP_USER)missing.push("SMTP_USER");
+  if(!SMTP_PASS)missing.push("SMTP_PASS");
+  if(missing.length)throw new Error("Missing SMTP environment variables: "+missing.join(", "));
+  const port=Number(SMTP_PORT);
+  if(!Number.isInteger(port)||port<=0)throw new Error("SMTP_PORT must be a valid port number.");
+  const transporter=nodemailer.createTransport({host:SMTP_HOST,port,secure:String(SMTP_SECURE||(port===465?"true":"false")).toLowerCase()==="true",auth:{user:SMTP_USER,pass:SMTP_PASS},connectionTimeout:15000,greetingTimeout:15000,socketTimeout:20000});
+  const items=(order.items||[]).map(x=>(x.productName||"Product")+" | Qty "+Number(x.quantity||0)+" | ₹"+Number(x.lineTotal||0)).join("\n");
+  const when=new Date().toLocaleString("en-IN",{timeZone:"Asia/Kolkata"});
+  const method=order.paymentMethod==="ONLINE_PAYMENT"?"ONLINE PAYMENT":"CASH ON DELIVERY · VISIT SHOP & COLLECT";
+  const text=[
+    "ORDER CANCELLED BY ADMIN – TANMAYI STORE AND GIFTS",
+    "Order: #"+order.orderNumber,
+    "Customer: "+(order.customerName||"Customer"),
+    "Mobile: "+(order.mobile||""),
+    "Payment method: "+method,
+    "Payment status: "+(order.paymentStatus||"pending"),
+    "Payment UTR: "+(order.paymentUtr||"Not supplied"),
+    "Admin cancellation message: "+reason,
+    "Cancellation time: "+when,
+    "Order total: ₹"+Number(order.total||0).toLocaleString("en-IN"),
+    "",
+    "PRODUCTS:",
+    items||"Product details unavailable."
+  ].join("\n");
+  try {
+    await transporter.verify();
+    const info=await transporter.sendMail({
+      from:MAIL_FROM||("TANMAYI STORE AND GIFTS <"+SMTP_USER+">"),
+      to:ORDER_NOTIFICATION_EMAIL||SMTP_USER,
+      subject:"ADMIN CANCELLED ORDER · #"+order.orderNumber+" · TANMAYI STORE AND GIFTS",
+      text,
+      html:"<div style=\"font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222\"><h2 style=\"background:#171717;color:#d9b45b;padding:20px\">TANMAYI STORE AND GIFTS</h2><h3>ORDER CANCELLED BY ADMIN</h3><p><b>Order:</b> #"+emailEscape(order.orderNumber)+"<br><b>Customer:</b> "+emailEscape(order.customerName||"Customer")+"<br><b>Mobile:</b> "+emailEscape(order.mobile||"")+"<br><b>Payment method:</b> "+emailEscape(method)+"<br><b>Payment status:</b> "+emailEscape(order.paymentStatus||"pending")+"<br><b>Payment UTR:</b> "+emailEscape(order.paymentUtr||"Not supplied")+"<br><b>Admin message:</b> "+emailEscape(reason)+"<br><b>Cancellation time:</b> "+emailEscape(when)+"<br><b>Order total:</b> ₹"+Number(order.total||0).toLocaleString("en-IN")+"</p><h4>Products</h4><pre>"+emailEscape(items||"Product details unavailable.")+"</pre></div>"
+    });
+    return {sent:true,messageId:info.messageId||""};
+  } finally { transporter.close(); }
+}
+
+
 async function sendCodCancellationNotification(order, reason) {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
   const missing=[];
@@ -1079,7 +1123,16 @@ app.post("/api/admin/orders/:id/cancel", requireAdmin, async (req,res)=>{
       cancelledOrder={...order,id:orderId};
     });
     if(!cancelledOrder)return res.json({ok:true,message:"Order was already cancelled."});
-    res.json({ok:true,message:"Order cancelled. The customer's order page will show your message."});
+    let cancellationEmailSent=false;
+    try{
+      const mail=await sendAdminOrderCancellationNotification(cancelledOrder,message);
+      cancellationEmailSent=mail.sent;
+      await orderRef.update({adminCancellationEmailStatus:"sent",adminCancellationEmailMessageId:mail.messageId||"",adminCancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    }catch(mailError){
+      console.error("admin order cancellation email failed:",mailError);
+      await orderRef.update({adminCancellationEmailStatus:"failed",adminCancellationEmailError:String(mailError.message||"Email failed").slice(0,250),adminCancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+    }
+    res.json({ok:true,emailSent:cancellationEmailSent,message:cancellationEmailSent?"Order cancelled. Customer message saved and admin email sent.":"Order cancelled and customer message saved, but admin email failed. Check Render SMTP settings."});
   }catch(e){res.status(400).json({error:e.message||"Could not cancel order."});}
 });
 
