@@ -593,7 +593,7 @@ async function loadAdminOfferOrders(scope='active'){
       if(refundUtr && !/^\d{12}$/.test(refundUtr))return msg('offerOrderMsg','Enter the exact 12-digit refund UTR number.');
       if(refundUtr&&!file)return msg('offerOrderMsg','For successful refund, upload the refund payment screenshot along with the 12-digit refund UTR.');
       b.disabled=true;
-      try{const body={message,refundUtr};if(file)body.screenshotData=await imageData(file);const z=await api('/api/admin/orders/'+encodeURIComponent(id)+'/refund','POST',body);msg('offerOrderMsg',z.message);await loadAdminOfferOrders()}
+      try{const body={message,refundUtr};if(file)body.screenshotData=await imageData(file);const z=await api('/api/admin/orders/'+encodeURIComponent(id)+'/refund','POST',body);msg('offerOrderMsg',z.message);await loadAdminOfferOrders(scope)}
       catch(e){msg('offerOrderMsg',e.message);b.disabled=false}
     });
 
