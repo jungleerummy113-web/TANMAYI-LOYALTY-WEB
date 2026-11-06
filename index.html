@@ -805,7 +805,16 @@ function renderInlineProductSelections(){
     const area=card.querySelector('[data-inline-selection]');
     const button=card.querySelector('[data-stage-offer]');
     if(!area||!button)return;
-    if(!selected){area.hidden=true;area.innerHTML='';return;}
+    if(!selected){
+      area.hidden=true;
+      area.innerHTML='';
+      // Reset the product button after cart cancellation so it can be selected again.
+      const product=customerProductsCache.find(item=>item.id===id)||{};
+      const available=Math.max(0,Number(product.availableStock??product.stock??0));
+      button.textContent=available>0?'Select & Add':'No stock available';
+      button.disabled=available<=0;
+      return;
+    }
     const qty=Math.max(1,Number(selected.quantity)||1);
     const product=customerProductsCache.find(item=>item.id===id)||{};
     const photo=(Array.isArray(product.photoUrls)&&product.photoUrls[0])||(selected.photoUrls||[])[0]||'';
