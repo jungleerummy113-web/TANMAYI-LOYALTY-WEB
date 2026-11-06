@@ -1049,7 +1049,7 @@ app.post("/api/admin/orders/:id/cancel", requireAdmin, async (req,res)=>{
         adminCancellationMessage:message,
         adminCancelledAt:admin.firestore.FieldValue.serverTimestamp(),
         adminCancelledBy:req.adminUid,
-        ...(order.paymentMethod==="ONLINE_PAYMENT"?{paymentRejectionMessage:message}: {})
+        ...(order.paymentMethod==="ONLINE_PAYMENT"?{paymentRejectionMessage:message,...(order.paymentStatus==="submitted"?{paymentStatus:"rejected"}:{})}: {})
       });
       if(paymentSnap?.exists && paymentSnap.data().status==="submitted"){
         tx.update(paymentRef,{status:"rejected",rejectionMessage:message,rejectedAt:admin.firestore.FieldValue.serverTimestamp(),rejectedBy:req.adminUid});
@@ -1139,6 +1139,8 @@ app.post("/api/admin/orders/:id/verify-payment", requireAdmin, async (req,res)=>
       if(!snap.exists) throw new Error("Order not found.");
       const x=snap.data();
       if(x.paymentMethod !== "ONLINE_PAYMENT") throw new Error("This order is not an online payment order.");
+      if(x.orderStatus === "cancelled" || x.cancelledByAdmin) throw new Error("This order was cancelled by the shop. Payment verification is disabled.");
+      if(["completed","expired"].includes(x.orderStatus)) throw new Error("This order is no longer active.");
       if(x.paymentStatus === "received") return;
       if(x.paymentStatus !== "submitted") throw new Error("No online payment submission is waiting for verification.");
       const paymentRef=db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(req.params.id);
