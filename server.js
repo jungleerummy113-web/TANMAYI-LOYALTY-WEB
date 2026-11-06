@@ -749,6 +749,33 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
     res.json({ ok:true });
   } catch (e) { console.error("update product", e); res.status(400).json({ error:e.message || "Could not update offer." }); }
 });
+// Public, read-only product catalogue. No customer login is needed to browse the shop.
+app.get("/api/public/products", async (_req, res) => {
+  try {
+    const [snap, reservationSnap] = await Promise.all([
+      db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(),
+      db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
+    ]);
+    const now = Date.now(), heldByProduct = new Map();
+    reservationSnap.docs.forEach(r => {
+      const reservation = r.data();
+      if (reservation.orderId || asMillis(reservation.expiresAt) > now) {
+        heldByProduct.set(reservation.productId, (heldByProduct.get(reservation.productId) || 0) + 1);
+      }
+    });
+    const products = snap.docs.map(d => {
+      const x = d.data(), stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
+      const held = heldByProduct.get(d.id) || 0;
+      return { id:d.id, name:String(x.name||""), size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), availableStock:Math.max(0,stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData.slice(0,2):(Array.isArray(x.photoUrls)?x.photoUrls.slice(0,2):[]) };
+    });
+    res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
+    res.json({ products });
+  } catch (e) {
+    console.error("public product catalogue", e);
+    res.status(500).json({ error:"Could not load shop products." });
+  }
+});
+
 app.get("/api/customer/offers", requireUser, async (_req, res) => {
   try {
     const [snap, reservationSnap] = await Promise.all([
