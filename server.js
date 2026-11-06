@@ -1088,9 +1088,24 @@ app.get("/api/customer/my-orders", requireUser, async (req, res) => {
     ]);
     const paymentById=new Map(paymentDocs.filter(d=>d.exists).map(d=>[d.id,d.data()]));
     const refundById=new Map(refundDocs.filter(d=>d.exists).map(d=>[d.id,d.data()]));
+    const missingPhotoProductIds=[...new Set(snap.docs.flatMap(d=>(Array.isArray(d.data().items)?d.data().items:[])
+      .filter(item=>!Array.isArray(item.photoUrls)||!item.photoUrls.length)
+      .map(item=>String(item.productId||"")).filter(Boolean)))];
+    const photoProductDocs=await Promise.all(missingPhotoProductIds.map(id=>db.collection(PRODUCTS_COLLECTION).doc(id).get()));
+    const productPhotos=new Map(photoProductDocs.filter(d=>d.exists).map(d=>{
+      const p=d.data();
+      return [d.id,Array.isArray(p.photoData)?p.photoData:(Array.isArray(p.photoUrls)?p.photoUrls:[])];
+    }));
     const orders = snap.docs.map(d => {
       const x=d.data(),payment=paymentById.get(d.id)||{},refund=refundById.get(d.id)||{};
-      return { id:d.id, orderNumber:x.orderNumber, items:x.items || [], total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH_ON_DELIVERY", paymentStatus:x.paymentStatus || "pending", paymentUtr:x.paymentUtr || payment.utr || "",
+      const items=(Array.isArray(x.items)?x.items:[]).map(item=>({
+        ...item,
+        photoUrls:Array.isArray(item.photoUrls)&&item.photoUrls.length?item.photoUrls:(productPhotos.get(String(item.productId||""))||[])
+      }));
+      return { id:d.id, orderNumber:x.orderNumber, items, total:moneyNumber(x.total), paymentMethod:x.paymentMethod || "CASH_ON_DELIVERY", paymentStatus:x.paymentStatus || payment.status || "pending", paymentUtr:x.paymentUtr || payment.utr || "",
+        paymentRejectionMessage:x.paymentRejectionMessage || payment.rejectionMessage || "",
+        adminCancellationMessage:x.adminCancellationMessage || "",
+        cancelledByAdmin:Boolean(x.cancelledByAdmin),
         paymentScreenshotData:x.orderStatus === "cancelled" ? (payment.screenshotData || "") : "",
         refund:refund.status ? {status:refund.status,holderName:refund.holderName||"",upiId:refund.upiId||"",refundUtr:refund.refundUtr||"",customerMessage:refund.customerMessage||"",message:refund.message||"",screenshotData:refund.screenshotData||"",updatedAt:safeDate(refund.updatedAt)} : null,
         orderStatus:(x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending",
