@@ -1186,6 +1186,7 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
       if (!orderSnap.exists || orderSnap.data().customerUid !== req.user.uid) throw new Error("You cannot cancel this order.");
       const order=orderSnap.data();
       if (order.orderStatus === "cancelled") return;
+      if (order.orderStatus === "processing" || order.processingStartedAt) throw new Error("Your order is already being processed / packed and can no longer be cancelled. Please contact the shop.");
       if (order.orderStatus === "completed" || order.collectionStatus === "collected") throw new Error("This order can no longer be cancelled online. Please contact the shop.");
       const online=order.paymentMethod === "ONLINE_PAYMENT";
       if(!online && order.paymentMethod === "CASH_ON_DELIVERY") codCancellationPayload={...order, id:orderId};
@@ -1315,13 +1316,33 @@ app.post("/api/admin/orders/:id/verify-payment", requireAdmin, async (req,res)=>
         tx.set(paymentRef,{status:"verified",verifiedAt,verifiedBy:req.adminUid},{merge:true});
       }
     });
-    return res.json({ok:true,alreadyVerified,message:alreadyVerified?"This online payment was already verified.":"Online payment verified successfully. You can now mark the order as collected."});
+    return res.json({ok:true,alreadyVerified,message:alreadyVerified?"This online payment was already verified.":"Online payment verified successfully. You can now start processing the order."});
   }catch(e){
     console.error("verify online payment:",e);
     return res.status(400).json({error:e.message||"Could not verify online payment."});
   }
 });
 
+
+// Admin starts packing only after online payment verification. This locks customer cancellation.
+app.post("/api/admin/orders/:id/processing", requireAdmin, async (req,res)=>{
+  try{
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(String(req.params.id||"").trim());
+    let alreadyProcessing=false;
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(orderRef);
+      if(!snap.exists) throw new Error("Order not found.");
+      const order=snap.data();
+      if(order.paymentMethod!=="ONLINE_PAYMENT") throw new Error("Processing is only available for online payment orders.");
+      if(!["HOME_DELIVERY","SHOP_COLLECTION"].includes(order.fulfilmentMode)) throw new Error("Order fulfilment type is invalid.");
+      if(["cancelled","expired","completed"].includes(order.orderStatus)) throw new Error("This order cannot be processed.");
+      if(order.paymentStatus!=="received") throw new Error("Verify the online payment before starting processing.");
+      if(order.orderStatus==="processing" || order.processingStartedAt){alreadyProcessing=true;return;}
+      tx.update(orderRef,{orderStatus:"processing",processingStartedAt:admin.firestore.FieldValue.serverTimestamp(),processingStartedBy:req.adminUid,updatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    });
+    res.json({ok:true,alreadyProcessing,message:alreadyProcessing?"Order processing was already started.":"Order processing started. Customer cancellation is now disabled."});
+  }catch(e){res.status(400).json({error:e.message||"Could not start order processing."});}
+});
 
 // Admin confirms physical collection after the payment has been received.
 app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
@@ -1338,6 +1359,7 @@ app.post("/api/admin/orders/:id/collect", requireAdmin, async (req,res)=>{
         return;
       }
       if(order.paymentStatus!=="received") throw new Error("Confirm payment before marking this order collected.");
+      if(order.paymentMethod==="ONLINE_PAYMENT" && order.orderStatus!=="processing") throw new Error("Start order processing before marking this order collected or delivered.");
       tx.update(orderRef,{
         orderStatus:"collected",
         collectionStatus:"collected",
