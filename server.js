@@ -1416,6 +1416,28 @@ app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
       const billRef=customerDoc.collection("bills").doc("order_"+orderId);
       const billSnap=await tx.get(billRef);
       if(billSnap.exists) throw new Error("A bill already exists for this order. Please contact support before retrying.");
+
+      // Deduct purchased quantities from physical stock in the same transaction
+      // that marks this order completed. The completed-order guard above makes
+      // this operation idempotent and prevents a second deduction on retries.
+      const orderItems=Array.isArray(order.items)?order.items:[];
+      if(!orderItems.length) throw new Error("Order has no product items; stock was not changed.");
+      const quantityByProduct=new Map();
+      for(const item of orderItems){
+        const productId=String(item.productId||"").trim();
+        const quantity=Number(item.quantity);
+        if(!productId||!Number.isInteger(quantity)||quantity<=0) throw new Error("A product or quantity is invalid in this order; stock was not changed.");
+        quantityByProduct.set(productId,(quantityByProduct.get(productId)||0)+quantity);
+      }
+      const productStockUpdates=[];
+      for(const [productId,quantity] of quantityByProduct){
+        const productRef=db.collection(PRODUCTS_COLLECTION).doc(productId);
+        const productSnap=await tx.get(productRef);
+        if(!productSnap.exists) throw new Error("A product in this order no longer exists; stock was not changed.");
+        const currentStock=Number(productSnap.data().stock);
+        if(!Number.isInteger(currentStock)||currentStock<quantity) throw new Error("Insufficient physical stock for "+(productSnap.data().name||"a product in this order")+". Stock was not changed.");
+        productStockUpdates.push({ref:productRef,newStock:currentStock-quantity});
+      }
       stampsAdded=billAmount<=800?1:2;
       const oldCycle=moneyNumber(customer.cycleBillTotal ?? customer.billTotal);
       const oldLifetime=moneyNumber(customer.lifetimeBillTotal ?? customer.billTotal);
@@ -1434,6 +1456,10 @@ app.post("/api/admin/orders/:id/complete", requireAdmin, async (req,res)=>{
         cycleBillTotal:oldCycle+billAmount,
         lifetimeBillTotal:oldLifetime+billAmount
       });
+      productStockUpdates.forEach(x=>tx.update(x.ref,{
+        stock:x.newStock,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()
+      }));
       reservationSnap.docs.filter(d => d.data().status === "active").forEach(d => tx.update(d.ref, {
         status:"collected",
         collectedAt:admin.firestore.FieldValue.serverTimestamp(),
