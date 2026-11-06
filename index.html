@@ -887,6 +887,13 @@ async function loadCustomerProducts(){
       placeOrderFlowAfterProduct(b.dataset.stageOffer);
       renderInlineProductSelections();
       renderReservations(reservations);
+      // Load the existing shop QR as soon as inline payment choices are opened.
+      api('/api/customer/payment-settings').then(settings=>{
+        customerPaymentQr=settings?.qrData||'';
+        if(paymentStepOpen&&pendingOfferCart.some(item=>item.productId===b.dataset.stageOffer)){
+          renderReservations(reservations);
+        }
+      }).catch(error=>console.warn('Customer payment QR refresh failed:',error.message));
     });
     renderReservations(reservations);
     renderBuyAgain();
