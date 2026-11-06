@@ -393,6 +393,41 @@ body>header{display:none}
 #promotionSettingsMsg{display:block;margin-top:12px;padding:10px 12px;border-radius:10px;background:#fff3d9;color:#654515;font-weight:700}
 #savePromotionPhotos:disabled{opacity:.65}
 </style>
+<style id="tanmayi-compact-product-rows-v2">
+/* Compact customer catalogue rows: preserve existing product name and photo dimensions. */
+#customerProducts .product-card,
+#publicProducts .product-card{gap:3px!important;padding:7px!important}
+#customerProducts .customer-product-topline,
+#publicProducts .customer-product-topline{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:18px}
+#customerProducts .product-photo-hint,
+#publicProducts .product-photo-hint{font-size:9px!important;line-height:1.1;padding:3px 6px!important;gap:3px!important;margin:0!important;white-space:nowrap}
+#customerProducts .product-photo-hint .photo-arrow,
+#publicProducts .product-photo-hint .photo-arrow{font-size:11px!important}
+#customerProducts .customer-product-meta-row,
+#customerProducts .customer-product-actions-row,
+#publicProducts .customer-product-meta-row,
+#publicProducts .customer-product-actions-row{display:contents}
+#customerProducts .customer-product-prices,
+#publicProducts .customer-product-prices{grid-column:1;grid-row:4;min-width:0;margin:0!important;display:flex;align-items:baseline;justify-content:flex-start;gap:6px;flex-wrap:nowrap}
+#customerProducts .customer-product-prices .price-old,
+#publicProducts .customer-product-prices .price-old{font-size:12px;white-space:nowrap}
+#customerProducts .customer-product-prices .price-offer,
+#publicProducts .customer-product-prices .price-offer{font-size:15px!important;white-space:nowrap}
+#customerProducts .customer-product-meta-row .stock-line,
+#publicProducts .customer-product-meta-row .stock-line{grid-column:1;grid-row:5;margin:0!important;font-size:11px!important;line-height:1.2}
+#customerProducts .customer-product-description,
+#publicProducts .customer-product-description{grid-column:2;grid-row:5;justify-self:start;align-self:center;margin:0!important;min-width:0}
+#customerProducts .customer-product-description summary,
+#publicProducts .customer-product-description summary{font-size:10px!important;padding:4px 8px!important;white-space:nowrap}
+#customerProducts .customer-product-description p,
+#publicProducts .customer-product-description p{font-size:11px!important;line-height:1.3;margin:4px 0 0!important;padding:6px!important}
+#customerProducts .customer-product-actions-row>button.secondary,
+#publicProducts .customer-product-actions-row>.stock-line{grid-column:1;grid-row:6;justify-self:stretch;align-self:center;width:100%;min-width:0;margin:0!important;padding:6px 7px!important;font-size:10px!important;line-height:1.15;border-radius:6px;text-align:center}
+#customerProducts .customer-product-actions-row>[data-stage-offer],
+#publicProducts .customer-product-actions-row>[data-guest-add]{grid-column:2;grid-row:6;justify-self:stretch;align-self:center;width:100%!important;min-width:0;margin:0!important;padding:6px 7px!important;font-size:10px!important;line-height:1.15;border-radius:6px}
+#customerProducts .inline-product-selection,
+#publicProducts .public-inline-selection{grid-column:1/-1;grid-row:7;margin:2px 0 0!important;padding:6px!important}
+</style>
 </head><body>
 <header><h1>🎁 TANMAYI STORE AND GIFTS</h1><p>Digital Loyalty System</p></header>
 <main class="wrap">
@@ -687,15 +722,13 @@ async function loadPublicProducts(){
       const available=Math.max(0,Number(p.availableStock??0));
       const inCart=guestOrderCart.find(x=>x.productId===p.id);
       return `<div class="customer-product-card product-card" data-public-product-card="${esc(p.id)}">
-        ${p.isNew?'<span class="product-new-badge">NEW ARRIVAL</span>':''}
+        <div class="customer-product-topline">${p.isNew?'<span class="product-new-badge">NEW ARRIVAL</span>':''}${photos.length>1?'<span class="product-photo-hint">📸 2 PHOTOS · SWIPE LEFT / RIGHT <span class="photo-arrow">↔</span></span>':''}</div>
         <b>${esc(p.name)}</b>
-        ${photos.length>1?'<span class="product-photo-hint">📸 2 PHOTOS · SWIPE LEFT / RIGHT <span class="photo-arrow">↔</span></span>':''}
         <div class="product-photos">${photos.map((u,i)=>`<img src="${esc(u)}" alt="${esc(p.name)} photo ${i+1}" loading="lazy" decoding="async">`).join('')}</div>
-        <p><span class="price-old">${moneyPrice(p.originalPrice)}</span> <b class="price-offer">${moneyPrice(p.offerPrice)}</b></p>
-        ${p.size?`<p class="stock-line"><b>Size:</b> ${esc(p.size)}</p>`:''}
-        ${p.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(p.description)}</p></details>`:''}
-        <p class="stock-line">${available>0?'Available to order':'Currently out of stock'}</p>
-        <button type="button" data-guest-add="${esc(p.id)}" ${available<=0?'disabled':''}>${inCart?'Add One More':'Add to Order'}</button>
+        <div class="customer-product-meta-row"><p class="customer-product-prices"><span class="price-old">${moneyPrice(p.originalPrice)}</span> <b class="price-offer">${moneyPrice(p.offerPrice)}</b></p>${p.size?`<p class="stock-line"><b>Size:</b> ${esc(p.size)}</p>`:''}</div>
+        <div class="customer-product-actions-row">${p.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(p.description)}</p></details>`:''}
+        <p class="stock-line">${available>0?'Stock: '+available:'NO STOCK'}</p>
+        <button type="button" data-guest-add="${esc(p.id)}" ${available<=0?'disabled':''}>${inCart?'Add One More':'Select & Add'}</button></div>
         <div class="public-inline-selection" data-public-selected hidden></div>
       </div>`;
     }).join('')||'<p class="muted">New products and offers will be displayed here soon.</p>';
