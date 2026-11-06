@@ -730,7 +730,7 @@ async function loadAdminOfferOrders(scope='active'){
   }catch(e){
     console.error('loadAdminOfferOrders failed:',e);
     const message=esc(e.message||'Could not load customer orders.');
-    const targets=scope==='history'?[$('adminCompletedOrders'),$('adminCancelledOrdersAll')]:[$('adminRunningOrdersList'),$('adminOnlineOrders'),$('adminCodOrders')];
+    const targets=scope==='completed'?[$('adminCompletedOrders')]:scope==='history'?[$('adminCancelledOrdersAll')]:[$('adminRunningOrdersList'),$('adminOnlineOrders'),$('adminCodOrders')];
     targets.filter(Boolean).forEach(el=>{el.innerHTML='<div class="order-empty">Could not load orders: '+message+'</div>';});
     const notice=$('offerOrderMsg');
     if(notice){notice.textContent='Could not load orders: '+(e.message||'Please refresh and try again.');notice.classList.remove('hidden');}
