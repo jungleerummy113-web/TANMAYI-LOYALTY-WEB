@@ -552,7 +552,7 @@ function placeOrderFlowAfterProduct(productId){
 }
 async function loadCustomerProducts(){
   try{
-    const [r,m,pay]=await Promise.all([api('/api/customer/offers'),api('/api/customer/my-offers'),api('/api/customer/payment-settings').catch(()=>({qrData:""}))]);
+    const [r,m,pay]=await Promise.all([api('/api/customer/offers'),api('/api/customer/my-offers').catch(error=>({reservations:[],loadError:error.message})),api('/api/customer/payment-settings').catch(()=>({qrData:""}))]);
     customerPaymentQr=pay.qrData||"";
     customerProductsCache=r.products||[];pendingOfferCart=pendingOfferCart.map(item=>{const latest=customerProductsCache.find(p=>p.id===item.productId);return latest?{...item,productName:latest.name,offerPrice:Number(latest.offerPrice),photoUrls:Array.isArray(latest.photoUrls)?latest.photoUrls.slice(0,2):item.photoUrls}:item});savePendingOfferCart();
     $('customerProducts').innerHTML=r.products.map(x=>{
@@ -580,7 +580,7 @@ async function loadCustomerProducts(){
       renderReservations(m.reservations);
     });
     renderReservations(m.reservations);renderBuyAgain();
-  }catch(e){$('customerProducts').textContent='Could not load offers. Please refresh.'}
+  }catch(e){console.error('Customer product offers failed:',e);$('customerProducts').textContent='Could not load products: '+(e.message||'Please check your internet and try again.')}
 }
 function renderReservations(items){
   const el=$('customerReservations');if(!el)return;
