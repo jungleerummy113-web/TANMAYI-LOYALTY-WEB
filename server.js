@@ -343,10 +343,12 @@ async function requireUser(req, res, next) {
 }
 const customerRef = (uid) => db.collection("customers").doc(uid);
 const moneyNumber = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
-const asMillis = (v) => v && typeof v.toMillis === "function" ? v.toMillis() : 0;function orderProductsForDisplay(products) {
+const asMillis = (v) => v && typeof v.toMillis === "function" ? v.toMillis() : 0;
+function orderProductsForDisplay(products) {
   const latestUpload = Math.max(0, ...products.map(p => Number(p.createdAtMillis) || 0));
+  const newArrivalWindow = latestUpload - 24 * 60 * 60 * 1000;
   return products
-    .map(p => ({ ...p, isNew: latestUpload > 0 && Number(p.createdAtMillis) === latestUpload }))
+    .map(p => ({ ...p, isNew: latestUpload > 0 && Number(p.createdAtMillis) >= newArrivalWindow }))
     .sort((a, b) =>
       Number(b.isNew) - Number(a.isNew) ||
       (a.isNew ? Number(b.createdAtMillis) - Number(a.createdAtMillis) :
