@@ -876,7 +876,9 @@ async function loadCustomerProducts(){
 
     document.querySelectorAll('[data-stage-offer]').forEach(b=>b.onclick=e=>{
       e.preventDefault();e.stopPropagation();
-      if(!pendingOfferCart.length){paymentStepOpen=false;selectedOrderPaymentMethod="CASH_ON_DELIVERY";}
+      // Selecting a product opens its inline checkout immediately below that product.
+      paymentStepOpen=true;
+      selectedOrderPaymentMethod=selectedOrderPaymentMethod||"CASH_ON_DELIVERY";
       const selectedProduct=customerProductsCache.find(p=>p.id===b.dataset.stageOffer)||{};
       const existingSelection=pendingOfferCart.find(p=>p.productId===b.dataset.stageOffer);
       if(existingSelection){existingSelection.quantity=Math.max(1,Number(existingSelection.quantity)||1)+1;}
