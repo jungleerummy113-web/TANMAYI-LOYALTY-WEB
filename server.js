@@ -10,13 +10,13 @@ app.use(express.json({ limit: "12mb" }));
 
 // Public SEO endpoints for Google Search Console. Keep these before application routes.
 app.get("/robots.txt", (_req, res) => {
-  res.type("text/plain").send("User-agent: *\\nAllow: /\\nDisallow: /api/\\n\\nSitemap: https://tanmayistore.com/sitemap.xml\\n");
+  res.type("text/plain").send("User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: https://tanmayistore.com/sitemap.xml\n");
 });
 app.get("/sitemap.xml", (_req, res) => {
-  res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?>\\n' +
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\\n' +
-    '  <url><loc>https://tanmayistore.com/</loc></url>\\n' +
-    '</urlset>\\n');
+  res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    '  <url><loc>https://tanmayistore.com/</loc></url>\n' +
+    '</urlset>\n');
 });
 
 const projectId = process.env.FIREBASE_PROJECT_ID || "tanmayi-store-and-gifts";
