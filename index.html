@@ -900,7 +900,7 @@ onAuthStateChanged(auth,async u=>{
     const a=await getDoc(doc(db,'admins',u.uid));
     if(a.exists()&&a.data().role==='admin'&&a.data().active===true){
       show('adminApp');$('adminEmail').textContent=u.email||'';
-      await loadCustomers();await loadAdminProducts();await loadAdminPaymentSettings();await loadAdminOfferOrders();await loadRewardEligible();
+      await Promise.all([loadCustomers(),loadAdminProducts(),loadAdminPaymentSettings(),loadAdminOfferOrders(),loadRewardEligible()]);
     }else{
       await signOut(auth);show('adminLogin');
       msg('adminMsg','Email and password were accepted, but this Firebase account is NOT enabled as an active shop admin. The Firestore admins/'+u.uid+' document must exist with role: "admin" and active: true.');
@@ -929,7 +929,7 @@ async function loadRewardEligible(){
   }catch(e){$('rewardEligibleList').textContent=e.message||'Could not load reward-eligible customers.'}
 }
 $('refreshRewardEligible').onclick=loadRewardEligible;
-async function loadCustomers(){const r=await api('/api/admin/customers');customers=r.customers;render();const x=await api('/api/admin/summary');$('customerCount').textContent=x.customerCount;$('stampCount').textContent=x.stampCount;$('giftCount').textContent=x.giftCount}
+async function loadCustomers(){const [r,x]=await Promise.all([api('/api/admin/customers'),api('/api/admin/summary')]);customers=r.customers;render();$('customerCount').textContent=x.customerCount;$('stampCount').textContent=x.stampCount;$('giftCount').textContent=x.giftCount}
 function render(){const t=$('search').value.trim().toLowerCase(),list=customers.filter(c=>(c.name||'').toLowerCase().includes(t)||(c.mobile||'').includes(t));$('rows').innerHTML=list.map(c=>`<tr><td>${esc(c.name)}<br><small>${esc(c.id)}</small></td><td>${esc(c.mobile)}</td><td>${esc(c.village)}</td><td>${date(c.createdAt)}</td><td>${Number(c.stamps||0)} / 10</td><td><button data-id="${esc(c.id)}">Open</button></td></tr>`).join('')||'<tr><td colspan="6">No customers found</td></tr>';document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>openCustomer(b.dataset.id))}
 $('search').oninput=render;
 async function openCustomer(id){selected=customers.find(c=>c.id===id);if(!selected)return;$('detail').classList.remove('hidden');$('detailName').textContent=selected.name||'Customer';$('detailInfo').textContent=`ID: ${id} · ${selected.mobile||''} · ${selected.village||''}`;await refresh()}
