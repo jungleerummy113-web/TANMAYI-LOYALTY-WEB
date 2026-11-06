@@ -319,6 +319,24 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #customerProducts .order-flow-backdrop.inline-order-flow #customerReservations .card h3{font-size:11px!important;margin:0 0 4px!important}
 #customerProducts .order-flow-backdrop.inline-order-flow #customerReservations .card p{font-size:10px!important;line-height:1.2!important;margin:3px 0!important}
 
+
+/* One-line product metadata/actions reduce card height and scrolling. */
+#customerProducts .customer-product-topline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:0}
+#customerProducts .customer-product-topline .product-new-badge{font-size:10px!important;padding:3px 7px!important;margin:0!important}
+#customerProducts .customer-product-topline .product-photo-hint{font-size:8px!important;padding:2px 5px!important;gap:3px!important;line-height:1.1!important}
+#customerProducts .customer-product-topline .photo-arrow{font-size:10px!important}
+#customerProducts .customer-product-meta-row{display:flex;align-items:center;justify-content:flex-start;gap:12px;flex-wrap:wrap;margin:0}
+#customerProducts .customer-product-meta-row p{margin:0!important}
+#customerProducts .customer-product-meta-row .price-offer{font-size:17px!important}
+#customerProducts .customer-product-meta-row .stock-line{font-size:11px!important}
+#customerProducts .customer-product-actions-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0}
+#customerProducts .customer-product-actions-row .customer-product-description{margin:0!important}
+#customerProducts .customer-product-actions-row .customer-product-description summary,
+#customerProducts .customer-product-actions-row>button{font-size:10px!important;padding:5px 8px!important;margin:0!important;line-height:1.15!important;white-space:nowrap}
+#customerProducts .customer-product-actions-row .customer-product-description p{flex-basis:100%;font-size:10px!important;padding:5px!important;margin:3px 0 0!important}
+#customerProducts .product-card{gap:4px!important;padding:8px!important}
+#customerProducts .product-photos img{height:205px!important;max-height:205px!important}
+
 </style>
 <style id="tanmayi-app-redesign">
 :root{--app-bg:#f5f3ed;--app-card:#fff;--app-ink:#201b14;--app-gold:#d9ad55;--app-red:#8d1d24}
@@ -1059,15 +1077,13 @@ async function loadCustomerProducts(){
       const available=Math.max(0,Number(x.availableStock??x.stock??0));const canAddMore=available>pendingCount;
       const photos=Array.isArray(x.photoUrls)?x.photoUrls.slice(0,2):[];
       return `<div class="product-card" data-product-card-id="${esc(x.id)}">
-        ${x.isNew?'<span class="product-new-badge">NEW ARRIVAL</span>':''}
+        <div class="customer-product-topline">${x.isNew?'<span class="product-new-badge">NEW ARRIVAL</span>':''}${photos.length>1?'<span class="product-photo-hint">📸 2 PHOTOS · SWIPE LEFT / RIGHT <span class="photo-arrow">↔</span></span>':''}</div>
         <strong>${esc(x.name)}</strong>
-        ${photos.length>1?'<span class="product-photo-hint">📸 2 PHOTOS · SWIPE LEFT / RIGHT <span class="photo-arrow">↔</span></span>':''}
         <div class="product-photos">${photos.map((u,i)=>`<img src="${esc(u)}" alt="${esc(x.name)} photo ${i+1}" data-zoom-product-image="${esc(u)}" loading="lazy" decoding="async">`).join('')}</div>
-        <p class="customer-product-prices"><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>
-        ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
-        ${x.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(x.description)}</p></details>`:''}
-        <button type="button" class="secondary" disabled>${available<=0?'NO STOCK AVAILABLE':`Available Stock: ${available} pieces`}</button>
-        <button type="button" data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${!canAddMore?'disabled':''}>${available<=0?'No stock available':!canAddMore?'Added to cart':'Select &amp; Add'}</button>
+        <div class="customer-product-meta-row"><p class="customer-product-prices"><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}</div>
+        <div class="customer-product-actions-row">${x.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(x.description)}</p></details>`:''}
+        <button type="button" class="secondary" disabled>${available<=0?'NO STOCK':`Stock: ${available}`}</button>
+        <button type="button" data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${!canAddMore?'disabled':''}>${available<=0?'No stock':!canAddMore?'Added':'Select &amp; Add'}</button></div>
         <div class="inline-product-selection" data-inline-selection="${esc(x.id)}" ${pendingCount?'':'hidden'}>
           ${pendingCount?'<span class="inline-selected-badge">✓ ADDED TO YOUR ORDER</span><div class="inline-selected-summary">'+(photos[0]?'<img src="'+esc(photos[0])+'" alt="'+esc(x.name)+' selected product">':'<span class="inline-selected-no-photo">Product</span>')+'<span><b>'+pendingCount+' selected</b><small>'+moneyPrice(Number(x.offerPrice)*pendingCount)+'</small></span></div>':''}
         </div>
