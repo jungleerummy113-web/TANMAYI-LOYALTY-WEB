@@ -135,6 +135,28 @@ async function sendOrderNotification(order) {
 }
 
 
+async function sendCodCancellationNotification(order, reason) {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, ORDER_NOTIFICATION_EMAIL, MAIL_FROM } = process.env;
+  const missing=[];
+  if(!SMTP_HOST)missing.push("SMTP_HOST");
+  if(!SMTP_PORT)missing.push("SMTP_PORT");
+  if(!SMTP_USER)missing.push("SMTP_USER");
+  if(!SMTP_PASS)missing.push("SMTP_PASS");
+  if(missing.length)throw new Error(`Missing SMTP environment variables: ${missing.join(", ")}`);
+  const port=Number(SMTP_PORT);
+  if(!Number.isInteger(port)||port<=0)throw new Error("SMTP_PORT must be a valid port number.");
+  const transporter=nodemailer.createTransport({host:SMTP_HOST,port,secure:String(SMTP_SECURE||(port===465?"true":"false")).toLowerCase()==="true",auth:{user:SMTP_USER,pass:SMTP_PASS},connectionTimeout:15000,greetingTimeout:15000,socketTimeout:20000});
+  const items=(order.items||[]).map(x=>`${x.productName||"Product"} | Qty ${Number(x.quantity||0)} | ₹${Number(x.lineTotal||0)}`).join("\n");
+  const when=new Date().toLocaleString("en-IN",{timeZone:"Asia/Kolkata"});
+  const text=["COD ORDER CANCELLED – TANMAYI STORE AND GIFTS",`Order: #${order.orderNumber}`,`Customer: ${order.customerName||"Customer"}`,`Mobile: ${order.mobile||""}`,`Reason: ${reason}`,`Cancellation time: ${when}`,"","PRODUCTS:",items||"Product details unavailable.",`Order total: ₹${Number(order.total||0).toLocaleString("en-IN")}`].join("\n");
+  try {
+    await transporter.verify();
+    const info=await transporter.sendMail({from:MAIL_FROM||`TANMAYI STORE AND GIFTS <${SMTP_USER}>`,to:ORDER_NOTIFICATION_EMAIL||SMTP_USER,subject:`COD ORDER CANCELLED – #${order.orderNumber} – TANMAYI STORE AND GIFTS`,text,html:`<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><h2 style="background:#171717;color:#d9b45b;padding:20px">TANMAYI STORE AND GIFTS</h2><h3>COD ORDER CANCELLED</h3><p><b>Order:</b> #${emailEscape(order.orderNumber)}<br><b>Customer:</b> ${emailEscape(order.customerName||"Customer")}<br><b>Mobile:</b> ${emailEscape(order.mobile||"")}<br><b>Reason:</b> ${emailEscape(reason)}<br><b>Cancellation time:</b> ${emailEscape(when)}<br><b>Total:</b> ₹${Number(order.total||0).toLocaleString("en-IN")}</p><pre>${emailEscape(items||"Product details unavailable.")}</pre></div>`});
+    return {sent:true,messageId:info.messageId||""};
+  } finally { transporter.close(); }
+}
+
+
 function requireFields(body, fields) {
   for (const field of fields) {
     if (typeof body[field] !== "string" || !body[field].trim()) {
@@ -853,6 +875,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 // Customer order history, including the completed order and stamp confirmation.
 app.get("/api/customer/my-orders", requireUser, async (req, res) => {
   try {
+    await cancelExpiredCodOrders();
     const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).get();
     const [paymentDocs, refundDocs] = await Promise.all([
       Promise.all(snap.docs.map(d=>db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(d.id).get())),
@@ -882,6 +905,7 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
     const orderRef=db.collection(ORDERS_COLLECTION).doc(orderId);
     let refundRequested=false;
     let refundEmailPayload=null;
+    let codCancellationPayload=null;
     await db.runTransaction(async tx => {
       const orderSnap=await tx.get(orderRef);
       if (!orderSnap.exists || orderSnap.data().customerUid !== req.user.uid) throw new Error("You cannot cancel this order.");
@@ -889,6 +913,7 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
       if (order.orderStatus === "cancelled") return;
       if (order.orderStatus === "completed" || order.collectionStatus === "collected") throw new Error("This order can no longer be cancelled online. Please contact the shop.");
       const online=order.paymentMethod === "ONLINE_PAYMENT";
+      if(!online && order.paymentMethod === "CASH_ON_DELIVERY") codCancellationPayload={...order, id:orderId};
       let holderName="",upiId="";
       if(online){
         holderName=String(req.body?.holderName||"").trim().slice(0,100);
@@ -911,6 +936,17 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
       reservations.docs.filter(d=>d.data().status === "active").forEach(d=>tx.update(d.ref,{status:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp()}));
       tx.update(orderRef,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),customerCancelled:true,...(online?{refundStatus:"requested"}:{})});
     });
+    let codCancellationEmailSent=false;
+    if(codCancellationPayload){
+      try{
+        const mail=await sendCodCancellationNotification(codCancellationPayload,"Customer cancelled the COD order.");
+        codCancellationEmailSent=mail.sent;
+        await orderRef.update({cancellationEmailStatus:"sent",cancellationEmailMessageId:mail.messageId||"",cancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
+      }catch(mailError){
+        console.error("COD cancellation email failed:",mailError);
+        await orderRef.update({cancellationEmailStatus:"failed",cancellationEmailError:String(mailError.message||"Email failed").slice(0,250),cancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+      }
+    }
     let refundEmailSent=false;
     if(refundRequested && refundEmailPayload){
       const refundRef=db.collection(ORDER_REFUNDS_COLLECTION).doc(orderId);
@@ -923,7 +959,7 @@ app.post("/api/customer/cancel-order", requireUser, async (req, res) => {
         await refundRef.update({emailStatus:"failed",emailError:String(mailError.message||"Email failed").slice(0,250),emailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
       }
     }
-    res.json({ok:true,refundRequested,message:refundRequested?"Order cancelled. Your refund request has been submitted to the shop.":"Order cancelled successfully."});
+    res.json({ok:true,refundRequested,codCancellationEmailSent,message:refundRequested?"Order cancelled. Your refund request has been submitted to the shop.":"Order cancelled successfully."});
   } catch(e) { res.status(400).json({error:e.message || "Could not cancel this order."}); }
 });
 
@@ -956,9 +992,40 @@ app.post("/api/admin/orders/:id/refund", requireAdmin, async (req,res)=>{
   }catch(e){res.status(400).json({error:e.message||"Could not update refund details."});}
 });
 
+
+app.post("/api/admin/orders/:id/cancel-cod", requireAdmin, async (req,res)=>{
+  try{
+    const orderRef=db.collection(ORDERS_COLLECTION).doc(req.params.id);
+    let cancelledOrder=null;
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(orderRef);
+      if(!snap.exists)throw new Error("Order not found.");
+      const order=snap.data();
+      if(order.paymentMethod!=="CASH_ON_DELIVERY")throw new Error("Admin cancellation here is only for Cash on Delivery orders.");
+      if(["completed","cancelled","expired"].includes(order.orderStatus)||order.collectionStatus==="collected")throw new Error("This COD order can no longer be cancelled.");
+      const reservations=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",req.params.id));
+      reservations.docs.filter(d=>d.data().status==="active").forEach(d=>tx.update(d.ref,{status:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),cancelReason:"admin_cancelled"}));
+      tx.update(orderRef,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),customerCancelled:false,cancelledByAdmin:true,cancelReason:"admin_cancelled",cancellationEmailStatus:"pending"});
+      cancelledOrder={...order,id:req.params.id};
+    });
+    if(!cancelledOrder)return res.json({ok:true,message:"Order was already cancelled."});
+    let emailSent=false;
+    try{
+      const mail=await sendCodCancellationNotification(cancelledOrder,"Cancelled by shop admin.");
+      emailSent=mail.sent;
+      await orderRef.update({cancellationEmailStatus:"sent",cancellationEmailMessageId:mail.messageId||"",cancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    }catch(mailError){
+      console.error("Admin COD cancellation email failed:",mailError);
+      await orderRef.update({cancellationEmailStatus:"failed",cancellationEmailError:String(mailError.message||"Email failed").slice(0,250),cancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+    }
+    res.json({ok:true,emailSent,message:emailSent?"COD order cancelled and notification email sent.":"COD order cancelled. Email could not be sent; check Render SMTP settings."});
+  }catch(e){res.status(400).json({error:e.message||"Could not cancel COD order."});}
+});
+
 // Admin dashboard order API. Response fields match the Admin HTML dashboard.
 app.get("/api/admin/offer-orders", requireAdmin, async (_req, res) => {
   try {
+    await cancelExpiredCodOrders();
     const [snap, paymentSnap, refundSnap] = await Promise.all([
       db.collection(ORDERS_COLLECTION).get(),
       db.collection(PAYMENT_SUBMISSIONS_COLLECTION).get(),
@@ -1258,5 +1325,50 @@ app.get("/api/customer/my-offers", requireUser, async (req, res) => {
   } catch (e) { console.error("customer offers history", e); res.status(500).json({ error:"Could not load your selected offers." }); }
 });
 
+
+const COD_COLLECTION_DEADLINE_MS=2*60*60*1000;
+let codExpiryCheckRunning=false;
+async function cancelExpiredCodOrders(){
+  if(codExpiryCheckRunning)return;
+  codExpiryCheckRunning=true;
+  try{
+    const snap=await db.collection(ORDERS_COLLECTION).where("paymentMethod","==","CASH_ON_DELIVERY").get();
+    const now=Date.now();
+    for(const doc of snap.docs){
+      const order=doc.data();
+      if(order.orderStatus!=="ready"||order.collectionStatus==="collected")continue;
+      const confirmedAt=asMillis(order.confirmedAt||order.createdAt);
+      if(!confirmedAt||now-confirmedAt<COD_COLLECTION_DEADLINE_MS)continue;
+      let cancelledOrder=null;
+      try{
+        await db.runTransaction(async tx=>{
+          const current=await tx.get(doc.ref);
+          if(!current.exists)return;
+          const x=current.data();
+          if(x.paymentMethod!=="CASH_ON_DELIVERY"||x.orderStatus!=="ready"||x.collectionStatus==="collected")return;
+          const currentConfirmedAt=asMillis(x.confirmedAt||x.createdAt);
+          if(!currentConfirmedAt||Date.now()-currentConfirmedAt<COD_COLLECTION_DEADLINE_MS)return;
+          const reservations=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",doc.id));
+          reservations.docs.filter(d=>d.data().status==="active").forEach(d=>tx.update(d.ref,{status:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),cancelReason:"cod_collection_timeout"}));
+          tx.update(doc.ref,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),customerCancelled:false,autoCancelled:true,cancelReason:"cod_collection_timeout",cancellationEmailStatus:"pending"});
+          cancelledOrder={...x,id:doc.id};
+        });
+        if(cancelledOrder){
+          try{
+            const mail=await sendCodCancellationNotification(cancelledOrder,"Automatically cancelled: the customer did not collect the COD order within 2 hours.");
+            await doc.ref.update({cancellationEmailStatus:"sent",cancellationEmailMessageId:mail.messageId||"",cancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
+          }catch(mailError){
+            console.error("Automatic COD cancellation email failed:",{orderNumber:cancelledOrder.orderNumber,message:mailError.message});
+            await doc.ref.update({cancellationEmailStatus:"failed",cancellationEmailError:String(mailError.message||"Email failed").slice(0,250),cancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+          }
+        }
+      }catch(orderError){console.error("COD expiry cancellation failed:",doc.id,orderError.message);}
+    }
+  }catch(error){console.error("COD expiry scan failed:",error.message);}
+  finally{codExpiryCheckRunning=false;}
+}
+
 const port = process.env.PORT || 10000;
 app.listen(port, "0.0.0.0", () => console.log(`TANMAYI LOYALTY WEB listening on ${port}`));
+setTimeout(()=>cancelExpiredCodOrders(),10000);
+setInterval(()=>cancelExpiredCodOrders(),60000).unref?.();
