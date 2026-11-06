@@ -128,6 +128,13 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #publicProducts .public-selected-info span{display:flex;flex-direction:column;gap:3px;font-size:13px}
 #publicProducts .public-selected-info small{font-weight:800;color:#8d1d24}
 #publicProducts .public-inline-checkout{display:block;width:100%;margin-top:10px;padding:12px 10px;font-size:14px;font-weight:900;border-radius:10px;background:#a87922;color:#fff}
+.public-store-welcome{display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;padding:8px 4px 14px}
+.public-store-welcome img{width:64px;height:64px;object-fit:contain;border-radius:12px}
+.public-store-welcome h2{margin:0;font-size:19px;line-height:1.3}
+.public-loading-message{text-align:center;padding:12px 4px;font-size:14px}
+.public-selected-actions{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.public-selected-actions button{width:100%;margin:0}
+.public-selected-actions .public-cancel-selection{background:#39332f;color:#fff}
 #publicCartPanel{position:static;z-index:auto;width:100%;max-width:none;max-height:none;overflow:visible;margin:14px 0;box-shadow:0 3px 12px #00000012;padding:12px}
 #publicCartPanel h3{font-size:15px;margin:0 0 6px}
 .public-cart-line{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid #eadfc9}
@@ -228,8 +235,11 @@ body>header{display:none}
 <label>Password</label><input id="password" type="password" placeholder="Password"><button id="loginBtn">Admin Login</button><div id="adminMsg" class="msg hidden"></div></section>
 <section id="authBootMessage" class="card hidden" role="status">Checking your saved login…</section>
 <section id="publicStorefront" class="card">
-  <div class="row"><div><h2>🛍️ Shop Products &amp; Offers</h2><p class="muted" style="margin:4px 0 10px">Browse our products, photos and latest prices. Add your favourites to place an order.</p></div></div>
-  <div id="publicProducts" class="customer-product-grid"><p class="muted">Loading shop products…</p></div>
+  <div class="public-store-welcome">
+    <img src="/icon-192.png" alt="TANMAYI STORE AND GIFTS" width="64" height="64">
+    <h2>WELCOME TO TANMAYI STORE AND GIFTS</h2>
+  </div>
+  <div id="publicProducts" class="customer-product-grid"><p class="muted public-loading-message">Loading products…</p></div>
   <div id="publicCartPanel" class="card hidden" style="background:#fffaf0;border:1px solid #d6ad55">
     <h3>🛒 Your Selected Products</h3>
     <div id="publicCartItems"></div>
@@ -423,12 +433,16 @@ function renderPublicCart(){
     const selected=guestOrderCart.find(p=>p.productId===button.dataset.guestAdd);
     const area=card?.querySelector('[data-public-selected]');
     if(!area)return;
-    if(!selected){area.hidden=true;area.innerHTML='';button.textContent='Add to Order';return;}
+    const anotherSelectionExists=guestOrderCart.some(p=>p.productId!==button.dataset.guestAdd);
+    button.disabled=anotherSelectionExists||Number((publicProductsCache.find(p=>p.id===button.dataset.guestAdd)||{}).availableStock??0)<=0;
+    if(anotherSelectionExists){button.textContent='Cancel previous selection first';}
+    else if(!selected){area.hidden=true;area.innerHTML='';button.textContent='Add to Order';return;}
+    if(!selected)return;
     const qty=Math.max(1,Number(selected.quantity)||1);
     const photo=(selected.photoUrls||[])[0]||'';
     area.hidden=false;
-    area.innerHTML='<span class="public-selected-badge">✓ ADDED TO YOUR ORDER</span><div class="public-selected-info">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(selected.productName)+' selected">':'')+'<span><b>Selected quantity: '+qty+'</b><small>'+moneyPrice(Number(selected.offerPrice)*qty)+'</small></span></div><button type="button" class="gold public-inline-checkout" data-public-checkout>Continue to Order · Login / Register</button>';
-    button.textContent='Add One More';
+    area.innerHTML='<span class="public-selected-badge">✓ ADDED TO YOUR ORDER</span><div class="public-selected-info">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(selected.productName)+' selected">':'')+'<span><b>Selected quantity: '+qty+'</b><small>'+moneyPrice(Number(selected.offerPrice)*qty)+'</small></span></div><div class="public-selected-actions"><button type="button" class="secondary public-cancel-selection" data-guest-cancel="'+esc(selected.productId)+'">Cancel selection</button><button type="button" class="gold public-inline-checkout" data-public-checkout>Continue to Order · Login / Register</button></div>';
+    if(!anotherSelectionExists)button.textContent='Add One More';
   });
 }
 async function loadPublicProducts(){
@@ -465,6 +479,12 @@ async function loadPublicProducts(){
   }catch(e){console.error('Public shop catalogue failed:',e);mount.innerHTML='<p class="muted">Products could not load right now. Please tap Refresh to try again.</p><button type="button" class="secondary" id="retryPublicProducts">Refresh Products</button>'}
 }
 $('publicProducts')?.addEventListener('click',event=>{
+  const cancel=event.target.closest('[data-guest-cancel]');
+  if(cancel){
+    guestOrderCart=guestOrderCart.filter(p=>p.productId!==cancel.dataset.guestCancel);
+    saveGuestOrderCart();
+    return;
+  }
   const checkout=event.target.closest('[data-public-checkout]');
   if(checkout){
     if(!guestOrderCart.length)return;
@@ -478,6 +498,10 @@ $('publicProducts')?.addEventListener('click',event=>{
   const product=publicProductsCache.find(p=>p.id===button.dataset.guestAdd);if(!product)return;
   const available=Math.max(0,Number(product.availableStock??0));
   const existing=guestOrderCart.find(p=>p.productId===product.id);
+  if(guestOrderCart.length&&!existing){
+    alert('Please cancel your currently selected product first, then choose another product.');
+    return;
+  }
   if(existing){if(existing.quantity>=available){alert('Only '+available+' piece(s) are available.');return}existing.quantity++}
   else guestOrderCart.push({productId:product.id,productName:product.name,offerPrice:Number(product.offerPrice)||0,quantity:1,photoUrls:Array.isArray(product.photoUrls)?product.photoUrls.slice(0,2):[]});
   if(existing&&Array.isArray(product.photoUrls))existing.photoUrls=product.photoUrls.slice(0,2);
