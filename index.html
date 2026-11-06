@@ -278,10 +278,12 @@ body>header{display:none}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider,setPersistence,browserLocalPersistence}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import{getFirestore,doc,getDoc}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 const cfg={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-store-and-gifts.firebaseapp.com',projectId:'tanmayi-store-and-gifts',storageBucket:'tanmayi-store-and-gifts.firebasestorage.app',messagingSenderId:'1061146758363',appId:'1:1061146758363:web:3260ea51094ba5fbab10fe',measurementId:'G-3RWVE6G0W9'};
 const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https://tanmayi-pin-reset-api.onrender.com';
+// Keep authenticated customer sessions across refresh; explicit sign-out clears this session.
+await setPersistence(auth,browserLocalPersistence);
 window.tanmayiAuth=auth;window.tanmayiFirebaseAuth={EmailAuthProvider,reauthenticateWithCredential,updatePassword};
 const $=id=>document.getElementById(id),money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),date=v=>v?new Date(v).toLocaleString('en-IN'):'—',customerEmail=m=>`${m}@tanmayi-loyalty.app`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -713,9 +715,28 @@ $('loginBtn').onclick=async()=>{
     msg('adminMsg',messages[e.code]||('Admin login failed: '+(e.message||e.code||'Unknown error')));
   }finally{button.disabled=false;button.textContent='Admin Login';}
 };
-$('logout').onclick=$('customerLogout').onclick=()=>signOut(auth);
+window.customerLogoutNow=async()=>{try{await signOut(auth);$('customerPassword').value='';show(adminRoute?'adminLogin':'customerLogin');}catch(e){msg('phoneMsg','Could not logout. Please check your internet and try again.');}};
+$('logout').onclick=()=>signOut(auth);
+$('customerLogout').onclick=()=>window.customerLogoutNow();
 $('showRegister').onclick=()=>$('registerFields').classList.toggle('hidden');
-$('customerSignIn').onclick=async()=>{clear('phoneMsg');const m=$('phone').value.trim(),p=$('customerPassword').value;if(!/^\d{10}$/.test(m)||!/^\d{6}$/.test(p))return msg('phoneMsg','Enter valid 10-digit mobile and 6-digit PIN.');try{await signInWithEmailAndPassword(auth,customerEmail(m),p)}catch(e){msg('phoneMsg',e.code==='auth/invalid-credential'?'Mobile number or password is incorrect.':e.message)}};
+$('customerSignIn').onclick=async()=>{
+  clear('phoneMsg');
+  const m=$('phone').value.trim(),p=$('customerPassword').value;
+  if(!/^\d{10}$/.test(m)||!/^\d{6}$/.test(p))return msg('phoneMsg','Enter valid 10-digit mobile and 6-digit PIN.');
+  const button=$('customerSignIn');button.disabled=true;button.textContent='Checking PIN…';
+  try{
+    // Clear any previous persisted account before validating the newly entered PIN.
+    if(auth.currentUser)await signOut(auth);
+    await signInWithEmailAndPassword(auth,customerEmail(m),p);
+  }catch(e){
+    if(auth.currentUser)await signOut(auth).catch(()=>{});
+    const message=e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found'
+      ?'Mobile number or 6-digit PIN is incorrect. Please try again.'
+      :e.code==='auth/too-many-requests'?'Too many attempts. Please wait and try again.'
+      :e.message||'Customer login failed.';
+    show('customerLogin');msg('phoneMsg',message);
+  }finally{button.disabled=false;button.textContent='Customer Login';}
+};
 $('register').onclick=async()=>{clear('phoneMsg');const mobile=$('phone').value.trim(),password=$('customerPassword').value,name=$('name').value.trim(),village=$('village').value.trim();if(!/^\d{10}$/.test(mobile)||!/^\d{6}$/.test(password)||!name||!village)return msg('phoneMsg','Enter name, village, valid mobile and 6-digit PIN.');try{await createUserWithEmailAndPassword(auth,customerEmail(mobile),password);await api('/api/customer/register','POST',{name,mobile,village});await loadCustomer()}catch(e){msg('phoneMsg',e.code==='auth/email-already-in-use'?'This mobile number is already registered. Please login.':e.message)}};
 onAuthStateChanged(auth,async u=>{
   if(!u){pendingOfferCart=[];cartOwnerMobile='';cartRestoredForMobile='';renderFloatingCart();show(adminRoute?'adminLogin':'customerLogin');return;}
@@ -989,7 +1010,7 @@ window.addEventListener("unhandledrejection", function (event) {
     ];
     const nav=drawerConfig(root,'customer',items,[items[0],items[1],items[2],items[3],items[5]]);
       const customerWhatsApp=$('customerPage-whatsapp');if(customerWhatsApp){customerWhatsApp.innerHTML='<div class="app-page-title">🟢 WhatsApp Contact</div><div class="card"><p>Contact TANMAYI STORE AND GIFTS directly on WhatsApp.</p><a id="customerWhatsAppLink" class="gold" href="#" target="_blank" rel="noopener">Loading WhatsApp contact…</a></div>';}
-    const customerExit=node('button','drawer-link','↗ Logout');customerExit.type='button';customerExit.onclick=()=>{document.querySelector('.app-drawer')?.classList.remove('open');document.querySelector('.app-drawer-shade')?.classList.remove('open');$('customerLogout')?.click()};document.querySelector('.app-drawer[data-kind="customer"]')?.append(customerExit);
+    const customerExit=node('button','drawer-link','↗ Logout');customerExit.type='button';customerExit.onclick=()=>{document.querySelector('.app-drawer')?.classList.remove('open');document.querySelector('.app-drawer-shade')?.classList.remove('open');window.customerLogoutNow?.()};document.querySelector('.app-drawer[data-kind="customer"]')?.append(customerExit);
      const shareLink=node('button','drawer-link','↗ Share Website with Friends');shareLink.type='button';shareLink.onclick=async()=>{const url=location.origin+location.pathname;try{if(navigator.share)await navigator.share({title:'TANMAYI STORE AND GIFTS',text:'Visit TANMAYI STORE AND GIFTS',url});else if(navigator.clipboard){await navigator.clipboard.writeText(url);alert('Website link copied. Share it with your friends.')}}catch(e){if(e.name!=='AbortError')alert('Could not share website link.')}};document.querySelector('.app-drawer[data-kind="customer"]')?.append(shareLink);
     tiles.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>nav.go(b.dataset.go));
     root.querySelectorAll('.customer-panel').forEach(p=>p.classList.add('hidden'));
