@@ -223,6 +223,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #customerProducts .product-card>button{width:auto!important;justify-self:start!important;margin:2px 0 0!important;padding:5px 8px!important;font-size:10px!important;line-height:1.15!important;border-radius:6px!important}
 #floatingCartButton{padding:7px 10px!important;font-size:12px!important;gap:5px!important;right:10px!important;bottom:84px!important}
 #floatingCartBadge{min-width:19px!important;height:19px!important;font-size:10px!important}
+#customerProducts .product-card > .order-flow-inline-mount{grid-column:1 / -1!important;flex-basis:100%!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important}
 #customerProducts .order-flow-inline-mount{grid-column:auto!important;width:100%!important;max-width:100%!important;margin:6px 0 0!important;padding-top:6px;border-top:1px dashed #d6ad55}
 #customerProducts .order-flow-backdrop.inline-order-flow{margin:0!important;padding:0!important}
 #customerProducts .order-flow-backdrop.inline-order-flow .order-flow-card{border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
@@ -1029,7 +1030,7 @@ function placeOrderFlowAfterProduct(productId){
   if(flow.parentElement!==mount)mount.appendChild(flow);
   // Keep checkout beside the selected product where possible; otherwise use a safe visible fallback.
   if(selectedCard){
-    selectedCard.insertAdjacentElement('afterend',mount);
+    selectedCard.appendChild(mount);
   }else if(grid){
     if(mount.parentElement!==grid)grid.appendChild(mount);
   }else if(panel){
