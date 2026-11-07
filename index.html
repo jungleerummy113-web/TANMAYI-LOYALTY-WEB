@@ -421,6 +421,18 @@ body>header{display:none}
 #customerProducts .customer-product-info-row,#publicProducts .customer-product-info-row{order:4;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:6px;min-width:0}
 /* Keep the customer product description full-width below its size line. */
 #customerProducts .customer-product-info-row{grid-template-columns:minmax(0,1fr)!important;align-items:start!important}
+/* Match the compact layout marked in the customer's reference photo. */
+#customerProducts .customer-product-topline{flex-wrap:nowrap!important;align-items:center!important;gap:6px!important}
+#customerProducts .customer-product-topline .product-photo-hint{font-size:8px!important;padding:3px 5px!important;white-space:nowrap!important}
+#customerProducts .customer-product-price-row{justify-content:space-between!important;gap:8px!important}
+#customerProducts .customer-product-size{margin:0!important;font-size:12px!important;white-space:nowrap!important}
+#customerProducts .customer-product-info-row{display:grid!important;grid-template-columns:auto minmax(72px,.8fr) minmax(105px,1.2fr)!important;align-items:center!important;gap:6px!important}
+#customerProducts .customer-product-info-row .customer-product-description{grid-column:auto!important;min-width:0}
+#customerProducts .customer-product-info-row .customer-product-description[open]{grid-column:1/-1!important}
+#customerProducts .customer-product-info-row .customer-product-description summary{white-space:nowrap!important}
+#customerProducts .customer-product-info-row .customer-product-stock,
+#customerProducts .customer-product-info-row .customer-product-select{width:100%!important;min-width:0!important;margin:0!important;padding:7px 5px!important;font-size:11px!important;line-height:1.15!important;white-space:nowrap!important;box-sizing:border-box!important}
+
 #customerProducts .customer-product-description,#customerProducts .customer-product-description p{width:100%;box-sizing:border-box}
 #customerProducts .customer-product-info-row>.stock-line,#publicProducts .customer-product-info-row>.stock-line{margin:0!important;font-size:11px!important;line-height:1.2;min-width:0}
 #customerProducts .customer-product-description,#publicProducts .customer-product-description{margin:0!important;min-width:0}
@@ -1120,11 +1132,10 @@ async function loadCustomerProducts(){
         <strong>${esc(x.name)}</strong>
         <div class="customer-product-topline">${x.isNew?'<span class="product-new-badge">NEW ARRIVAL</span>':''}${photos.length>1?'<span class="product-photo-hint">📸 2 PHOTOS · SWIPE LEFT / RIGHT <span class="photo-arrow">↔</span></span>':''}</div>
         <div class="product-photos">${photos.map((u,i)=>`<img src="${esc(u)}" alt="${esc(x.name)} photo ${i+1}" data-zoom-product-image="${esc(u)}" loading="lazy" decoding="async">`).join('')}</div>
-        <div class="customer-product-price-row"><p class="customer-product-prices"><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p></div>
-        <div class="customer-product-info-row">${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`: '<span></span>'}${x.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(x.description)}</p></details>`:''}</div>
-        <div class="customer-product-actions-row">
-        <button type="button" class="secondary" disabled>${available<=0?'NO STOCK':`Stock: ${available}`}</button>
-        <button type="button" data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${!canAddMore?'disabled':''}>${available<=0?'No stock':!canAddMore?'Added':'Select &amp; Add'}</button></div>
+        <div class="customer-product-price-row"><p class="customer-product-prices"><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>${x.size?`<p class="customer-product-size stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}</div>
+        <div class="customer-product-info-row">${x.description?`<details class="customer-product-description"><summary>Description</summary><p>${esc(x.description)}</p></details>`:''}
+        <button type="button" class="secondary customer-product-stock" disabled>${available<=0?'NO STOCK':`Stock: ${available}`}</button>
+        <button type="button" class="customer-product-select" data-stage-offer="${esc(x.id)}" data-name="${esc(x.name)}" data-price="${Number(x.offerPrice)}" ${!canAddMore?'disabled':''}>${available<=0?'No stock':!canAddMore?'Added':'Select &amp; Add'}</button></div>
         <div class="inline-product-selection" data-inline-selection="${esc(x.id)}" ${pendingCount?'':'hidden'}>
           ${pendingCount?'<span class="inline-selected-badge">✓ ADDED TO YOUR ORDER</span><div class="inline-selected-summary">'+(photos[0]?'<img src="'+esc(photos[0])+'" alt="'+esc(x.name)+' selected product">':'<span class="inline-selected-no-photo">Product</span>')+'<span><b>'+pendingCount+' selected</b><small>'+moneyPrice(Number(x.offerPrice)*pendingCount)+'</small></span></div>':''}
         </div>
