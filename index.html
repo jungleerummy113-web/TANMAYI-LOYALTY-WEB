@@ -409,6 +409,15 @@ body>header{display:none}
 #customerProducts .customer-product-prices,#publicProducts .customer-product-prices{display:flex;align-items:baseline;gap:8px;flex-wrap:nowrap;margin:0!important;min-width:0}
 #customerProducts .customer-product-prices .price-old,#publicProducts .customer-product-prices .price-old{font-size:12px!important;white-space:nowrap}
 #customerProducts .customer-product-prices .price-offer,#publicProducts .customer-product-prices .price-offer{font-size:15px!important;white-space:nowrap}
+/* Customer catalogue: stronger price contrast and requested green action button. */
+#customerProducts .customer-product-prices .price-old{font-size:15px!important;font-weight:800!important;color:#c62828!important}
+#customerProducts .customer-product-prices .price-offer{font-size:20px!important;font-weight:900!important;color:#1769aa!important}
+#customerProducts .customer-product-actions-row>[data-stage-offer]{background:#218838!important;color:#fff!important;border-color:#218838!important}
+#customerProducts .customer-product-actions-row>button.secondary{background:#292929!important;color:#fff!important}
+/* Slightly neater photo frame only; image width, height and aspect ratio stay unchanged. */
+#customerProducts .product-photos{border:1px solid #d6c49e!important;border-radius:10px!important;padding:2px!important;box-sizing:border-box}
+#customerProducts .product-photos img{border-radius:7px!important}
+
 #customerProducts .customer-product-info-row,#publicProducts .customer-product-info-row{order:4;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:6px;min-width:0}
 /* Keep the customer product description full-width below its size line. */
 #customerProducts .customer-product-info-row{grid-template-columns:minmax(0,1fr)!important;align-items:start!important}
