@@ -1286,7 +1286,7 @@ $('loginBtn').onclick=async()=>{
     msg('adminMsg',messages[e.code]||('Admin login failed: '+(e.message||e.code||'Unknown error')));
   }finally{button.disabled=false;button.textContent='Admin Login';}
 };
-window.customerLogoutNow=async()=>{try{try{sessionStorage.removeItem('tanmayi_customer_active_page')}catch(_){}await signOut(auth);$('customerPassword').value='';show(adminRoute?'adminLogin':'customerLogin');}catch(e){msg('phoneMsg','Could not logout. Please check your internet and try again.')}};
+window.customerLogoutNow=async()=>{try{try{sessionStorage.removeItem('tanmayi_customer_active_page')}catch(_){}await signOut(auth);$('customerPassword').value='';window.location.replace(location.pathname+location.search);}catch(e){msg('phoneMsg','Could not logout. Please check your internet and try again.')}};
 $('logout').onclick=()=>signOut(auth);
 $('customerLogout').onclick=()=>window.customerLogoutNow();
 $('showRegister').onclick=()=>$('registerFields').classList.toggle('hidden');
