@@ -410,6 +410,9 @@ body>header{display:none}
 #customerProducts .customer-product-prices .price-old,#publicProducts .customer-product-prices .price-old{font-size:12px!important;white-space:nowrap}
 #customerProducts .customer-product-prices .price-offer,#publicProducts .customer-product-prices .price-offer{font-size:15px!important;white-space:nowrap}
 #customerProducts .customer-product-info-row,#publicProducts .customer-product-info-row{order:4;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:6px;min-width:0}
+/* Keep the customer product description full-width below its size line. */
+#customerProducts .customer-product-info-row{grid-template-columns:minmax(0,1fr)!important;align-items:start!important}
+#customerProducts .customer-product-description,#customerProducts .customer-product-description p{width:100%;box-sizing:border-box}
 #customerProducts .customer-product-info-row>.stock-line,#publicProducts .customer-product-info-row>.stock-line{margin:0!important;font-size:11px!important;line-height:1.2;min-width:0}
 #customerProducts .customer-product-description,#publicProducts .customer-product-description{margin:0!important;min-width:0}
 #customerProducts .customer-product-description summary,#publicProducts .customer-product-description summary{font-size:10px!important;padding:4px 8px!important;white-space:nowrap}
