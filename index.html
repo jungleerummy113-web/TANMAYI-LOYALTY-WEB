@@ -1002,7 +1002,7 @@ function renderProfileOrders(){const el=$('profileOrdersHistory');if(!el)return;
 function renderBuyAgain(){const el=$('customerBuyAgain');if(!el)return;const bought=new Map();customerOrdersCache.forEach(o=>(o.items||[]).forEach(i=>{if(i.productId)bought.set(i.productId,i.productName||'Product')}));const matches=customerProductsCache.filter(p=>bought.has(p.id)&&Number(p.availableStock??p.stock??0)>0);el.innerHTML=matches.map(p=>`<div class="customer-product-card"><b>${esc(p.name)}</b><div class="product-photos">${(p.photoUrls||[]).map(u=>`<img src="${esc(u)}" alt="${esc(p.name)}">`).join('')}</div><p><span class="price-old">${moneyPrice(p.originalPrice)}</span> <b class="price-offer">${moneyPrice(p.offerPrice)}</b></p><p class="stock-line">Available: ${Number(p.availableStock??p.stock??0)}</p><button data-buy-again="${esc(p.id)}" data-name="${esc(p.name)}" data-price="${Number(p.offerPrice)}">Buy Again</button></div>`).join('')||'<p class="muted">Your previous products are currently unavailable or out of stock.</p>';el.querySelectorAll('[data-buy-again]').forEach(b=>b.onclick=()=>{const selectedProduct=customerProductsCache.find(p=>p.id===b.dataset.buyAgain)||{};const existingSelection=pendingOfferCart.find(p=>p.productId===b.dataset.buyAgain);if(existingSelection){existingSelection.quantity=Math.max(1,Number(existingSelection.quantity)||1)+1;}else{pendingOfferCart.push({key:b.dataset.buyAgain,productId:b.dataset.buyAgain,productName:b.dataset.name,offerPrice:Number(b.dataset.price),quantity:1,photoUrls:Array.isArray(selectedProduct.photoUrls)?selectedProduct.photoUrls.slice(0,2):[]});}savePendingOfferCart();orderConfirmedData=null;openCustomerPanel('myList');placeOrderFlowAfterProduct(b.dataset.buyAgain);renderReservations([])});}
 $('refreshMyOrders').onclick=loadCustomerOrders;
 
-function placeOrderFlowAfterProduct(productId){
+function placeOrderFlowAfterProduct(productId,anchorElement){
   let flow=$('orderFlowBackdrop');
   // Recover the checkout shell if a stale/partial customer page is missing it.
   if(!flow){
@@ -1017,7 +1017,8 @@ function placeOrderFlowAfterProduct(productId){
   }
   activeOfferAnchorId=productId||activeOfferAnchorId;
   const selectedId=String(activeOfferAnchorId||'');
-  const selectedCard=Array.from(document.querySelectorAll('[data-product-card-id]')).find(card=>card.isConnected&&card.getAttribute('data-product-card-id')===selectedId);
+  const selectedCard=(anchorElement&&anchorElement.closest?anchorElement.closest('[data-product-card-id]'):null)
+    ||Array.from(document.querySelectorAll('[data-product-card-id]')).find(card=>card.isConnected&&card.getAttribute('data-product-card-id')===selectedId);
   let mount=$('orderFlowMount');
   if(!mount){
     mount=document.createElement('div');
@@ -1031,9 +1032,9 @@ function placeOrderFlowAfterProduct(productId){
   flow.classList.add('inline-order-flow');
   flow.setAttribute('aria-hidden','false');
   if(flow.parentElement!==mount)mount.appendChild(flow);
-  // Keep checkout beside the selected product where possible; otherwise use a safe visible fallback.
+  // Place checkout as the next catalogue row, immediately after the exact selected product card.
   if(selectedCard){
-    selectedCard.appendChild(mount);
+    selectedCard.insertAdjacentElement('afterend',mount);
   }else if(grid){
     if(mount.parentElement!==grid)grid.appendChild(mount);
   }else if(panel){
@@ -1129,7 +1130,7 @@ async function loadCustomerProducts(){
       if(existingSelection){existingSelection.quantity=Math.max(1,Number(existingSelection.quantity)||1)+1;}
       else{pendingOfferCart.push({key:b.dataset.stageOffer,productId:b.dataset.stageOffer,productName:b.dataset.name,offerPrice:Number(b.dataset.price),quantity:1,photoUrls:Array.isArray(selectedProduct.photoUrls)?selectedProduct.photoUrls.slice(0,2):[]});}
       savePendingOfferCart();orderConfirmedData=null;
-      placeOrderFlowAfterProduct(b.dataset.stageOffer);
+      placeOrderFlowAfterProduct(b.dataset.stageOffer,b);
       renderInlineProductSelections();
       renderReservations(reservations);
       // Load the existing shop QR as soon as inline payment choices are opened.
