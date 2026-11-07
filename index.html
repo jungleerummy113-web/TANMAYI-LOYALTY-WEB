@@ -421,7 +421,7 @@ body>header{display:none}
 <section id="adminLogin" class="card hidden"><h2>Admin Login</h2><label>Email</label><input id="email" type="email" placeholder="Admin email">
 <label>Password</label><input id="password" type="password" placeholder="Password"><button id="loginBtn">Admin Login</button><div id="adminMsg" class="msg hidden"></div></section>
 <section id="authBootMessage" class="card hidden" role="status">Checking your saved login…</section>
-<section id="publicStorefront" class="card">
+<section id="publicStorefront" class="card hidden">
   <div class="public-store-welcome">
     <img src="/icon-192.png" alt="TANMAYI STORE AND GIFTS" width="64" height="64">
     <h2>WELCOME TO TANMAYI STORE AND GIFTS</h2>
@@ -439,7 +439,7 @@ body>header{display:none}
   <span class="guest-login-caption">Already a customer?</span>
   <button type="button" id="guestCustomerLoginButton">👤 CUSTOMER LOGIN</button>
 </div>
-<section id="customerLogin" class="card portal hidden">
+<section id="customerLogin" class="card portal">
 <div class="portal-top"><div class="mark">🎁</div><h2>TANMAYI STORE AND GIFTS</h2><p>WELCOME TO OUR DIGITAL LOYALTY PROGRAM</p></div>
 <div class="portal-body"><h2>Customer Login / Register</h2><p class="muted">Login with your 10-digit mobile number and 6-digit PIN. No OTP required.</p>
 <label>10-digit mobile number</label><input id="phone" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="Enter mobile number">
@@ -643,11 +643,9 @@ function msg(id,t){$(id).textContent=t;$(id).classList.remove('hidden')}function
 function show(id){
   ['adminLogin','customerLogin','customerView','adminApp'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
   const publicStore=$('publicStorefront');
-  if(publicStore)publicStore.classList.toggle('hidden',id==='adminLogin'||id==='adminApp'||id==='customerView');
-  // During guest checkout, keep the public catalogue visible behind the login/register form.
-  if(id==='customerLogin'&&!adminRoute)publicStore?.classList.remove('hidden');
+  if(publicStore)publicStore.classList.toggle('hidden',id!=='publicStorefront');
   const guestLogin=$('guestCustomerLoginPrompt');
-  if(guestLogin)guestLogin.classList.toggle('hidden',id!=='publicStorefront'||!!auth.currentUser||adminRoute);
+  if(guestLogin)guestLogin.classList.add('hidden');
 }
 let apiAuthUser=null;
 async function api(path,method='GET',body=null){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);try{let user=auth.currentUser||apiAuthUser;if(!user){await auth.authStateReady();user=auth.currentUser||apiAuthUser;}if(!user)throw Error('Please login to continue.');const token=await Promise.race([user.getIdToken(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Secure connection is taking longer than expected. Please wait and retry.')),15000))]);if(!token)throw Error('Secure connection is not ready yet. Please wait and retry.');const r=await fetch(API+path,{method,signal:controller.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}catch(e){if(e.name==='AbortError')throw Error('Server response timeout. Please check your internet and try again.');throw e}finally{clearTimeout(timer)}}
@@ -1288,7 +1286,7 @@ $('loginBtn').onclick=async()=>{
     msg('adminMsg',messages[e.code]||('Admin login failed: '+(e.message||e.code||'Unknown error')));
   }finally{button.disabled=false;button.textContent='Admin Login';}
 };
-window.customerLogoutNow=async()=>{try{try{sessionStorage.removeItem('tanmayi_customer_active_page')}catch(_){}await signOut(auth);$('customerPassword').value='';show(adminRoute?'adminLogin':'publicStorefront');}catch(e){msg('phoneMsg','Could not logout. Please check your internet and try again.')}};
+window.customerLogoutNow=async()=>{try{try{sessionStorage.removeItem('tanmayi_customer_active_page')}catch(_){}await signOut(auth);$('customerPassword').value='';show(adminRoute?'adminLogin':'customerLogin');}catch(e){msg('phoneMsg','Could not logout. Please check your internet and try again.')}};
 $('logout').onclick=()=>signOut(auth);
 $('customerLogout').onclick=()=>window.customerLogoutNow();
 $('showRegister').onclick=()=>$('registerFields').classList.toggle('hidden');
@@ -1311,12 +1309,12 @@ $('customerSignIn').onclick=async()=>{
   }finally{button.disabled=false;button.textContent='Customer Login';}
 };
 $('register').onclick=async()=>{clear('phoneMsg');const mobile=$('phone').value.trim(),password=$('customerPassword').value,name=$('name').value.trim(),village=$('village').value.trim();if(!/^\d{10}$/.test(mobile)||!/^\d{6}$/.test(password)||!name||!village)return msg('phoneMsg','Enter name, village, valid mobile and 6-digit PIN.');try{await createUserWithEmailAndPassword(auth,customerEmail(mobile),password);await api('/api/customer/register','POST',{name,mobile,village});await loadCustomer();loadCustomerProducts()}catch(e){msg('phoneMsg',e.code==='auth/email-already-in-use'?'This mobile number is already registered. Please login.':e.message)}};
-if(!adminRoute)loadPublicProducts();
+// Public products are loaded only after a customer has authenticated.
 onAuthStateChanged(auth,async u=>{
   apiAuthUser=u||null;
   $('authBootMessage')?.classList.add('hidden');
   document.documentElement.classList.add('tanmayi-auth-ready');
-  if(!u){pendingOfferCart=[];cartOwnerMobile='';cartRestoredForMobile='';renderFloatingCart();show(adminRoute?'adminLogin':'publicStorefront');return;}
+  if(!u){pendingOfferCart=[];cartOwnerMobile='';cartRestoredForMobile='';renderFloatingCart();show(adminRoute?'adminLogin':'customerLogin');return;}
   if(!adminRoute){
     // Customer login must not depend on read access to the admins collection.
     // Authenticate the customer directly through their own customer API.
