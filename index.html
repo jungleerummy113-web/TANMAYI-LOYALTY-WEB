@@ -242,6 +242,9 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #customerProducts .order-flow-backdrop.inline-order-flow .order-flow-actions{gap:5px!important;margin-top:5px!important}
 #customerProducts .order-flow-backdrop.inline-order-flow .order-flow-actions button{min-width:0!important;padding:7px!important;font-size:10px!important}
 #customerProducts .online-payment-fields img.customer-payment-qr{width:3in!important;height:3in!important;max-width:78vw!important;max-height:78vw!important;aspect-ratio:1/1!important;object-fit:contain!important;padding:5px!important;margin:5px auto!important}
+/* Keep the payment QR centered and fully inside the checkout panel on narrow screens. */
+#customerProducts .order-flow-backdrop.inline-order-flow .online-payment-fields{width:100%!important;max-width:100%!important;box-sizing:border-box!important;overflow:hidden!important}
+#customerProducts .order-flow-backdrop.inline-order-flow .online-payment-fields img.customer-payment-qr{display:block!important;float:none!important;position:static!important;left:auto!important;right:auto!important;transform:none!important;width:min(240px,100%)!important;height:auto!important;max-width:100%!important;max-height:none!important;aspect-ratio:1/1!important;object-fit:contain!important;box-sizing:border-box!important;margin:8px auto!important;padding:5px!important}
 
 
 /* Refined product-card proportions and compact checkout bill panels. */
