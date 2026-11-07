@@ -680,6 +680,18 @@ function show(id){
 }
 let apiAuthUser=null;
 async function api(path,method='GET',body=null){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);try{let user=auth.currentUser||apiAuthUser;if(!user){await auth.authStateReady();user=auth.currentUser||apiAuthUser;}if(!user)throw Error('Please login to continue.');const token=await Promise.race([user.getIdToken(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Secure connection is taking longer than expected. Please wait and retry.')),15000))]);if(!token)throw Error('Secure connection is not ready yet. Please wait and retry.');const r=await fetch(API+path,{method,signal:controller.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}catch(e){if(e.name==='AbortError')throw Error('Server response timeout. Please check your internet and try again.');throw e}finally{clearTimeout(timer)}}
+// Short-lived in-memory cache for customer read-only screens; never cache writes or admin data.
+const customerReadCache=new Map(),customerReadPending=new Map();
+async function customerGet(path,ttl=20000,force=false){
+  const key=(auth.currentUser?.uid||'customer')+':'+path,now=Date.now(),cached=customerReadCache.get(key);
+  if(!force&&cached&&now-cached.time<ttl)return cached.data;
+  if(!force&&customerReadPending.has(key))return customerReadPending.get(key);
+  const request=api(path).then(data=>{customerReadCache.set(key,{time:Date.now(),data});return data}).finally(()=>customerReadPending.delete(key));
+  customerReadPending.set(key,request);return request;
+}
+function invalidateCustomerReads(...prefixes){
+  for(const key of customerReadCache.keys())if(prefixes.some(prefix=>key.includes(':'+prefix)))customerReadCache.delete(key);
+}
 async function pinApi(path,body,token=''){const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify(body)});const d=await r.json().catch(()=>({error:'Unexpected response'}));if(!r.ok)throw Error(d.error||'PIN reset failed');return d}
 
 let publicProductsCache=[],guestOrderCart=[],guestCheckoutStarted=false;
@@ -998,7 +1010,7 @@ $('refreshCompletedHistory')?.addEventListener('click',()=>{completedHistoryOffs
 
 async function loadCustomerOrders(){
   try{
-    const r=await api('/api/customer/my-orders');
+    const r=await customerGet('/api/customer/my-orders',10000);
     customerOrdersCache=r.orders||[];
     const cancelledForDisplay = r.orders.filter(x=>x.orderStatus==='cancelled')
       .sort((a,b)=>new Date(b.cancelledAt || b.confirmedAt || 0)-new Date(a.cancelledAt || a.confirmedAt || 0));
@@ -1118,7 +1130,7 @@ async function loadCustomerProducts(){
   try{
     // Show the product catalogue as soon as its essential request completes.
     // Reservations and payment QR are secondary and must not delay product cards.
-    const r=await api('/api/customer/offers');
+    const r=await customerGet('/api/customer/offers',10000);
     customerProductsCache=r.products||[];
     pendingOfferCart=pendingOfferCart.map(item=>{
       const latest=customerProductsCache.find(p=>p.id===item.productId);
@@ -1381,7 +1393,7 @@ onAuthStateChanged(auth,async u=>{
     msg('adminMsg','Admin verification failed: '+(e.message||'Could not read the admin permission record. Check Firestore access and network.'));
   }
 });
-async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');restorePendingOfferCart(h.profile.mobile);customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings();if(window.showTanmayiInstallPopup)window.showTanmayiInstallPopup(customerProfile.mobile)}
+async function loadCustomer(){const h=await customerGet('/api/customer/home',20000);show('customerView');restorePendingOfferCart(h.profile.mobile);customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await customerGet('/api/customer/history',30000);$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings();if(window.showTanmayiInstallPopup)window.showTanmayiInstallPopup(customerProfile.mobile)}
 $('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
 document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventListener('change',()=>{$('approvedPointsInfo').classList.toggle('hidden',el.value!=='points'||!el.checked)}));
 $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemMsg');$('customerTaken').disabled=true;try{const choice=document.querySelector('input[name="rewardChoice"]:checked')?.value||'gift';await api('/api/customer/redeem-taken','POST',{redemptionId:pendingId,choice});msg('customerRedeemMsg','Redemption completed. Stamps and current cycle reset successfully.');await loadCustomer()}catch(e){msg('customerRedeemMsg',e.message)}finally{$('customerTaken').disabled=false}};
