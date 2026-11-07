@@ -1149,7 +1149,6 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
 // Customer order history, including the completed order and stamp confirmation.
 app.get("/api/customer/my-orders", requireUser, async (req, res) => {
   try {
-    await cancelExpiredCodOrders();
     const snap = await db.collection(ORDERS_COLLECTION).where("customerUid", "==", req.user.uid).get();
     const [paymentDocs, refundDocs] = await Promise.all([
       Promise.all(snap.docs.map(d=>db.collection(PAYMENT_SUBMISSIONS_COLLECTION).doc(d.id).get())),
@@ -1887,49 +1886,5 @@ app.get("/api/customer/my-offers", requireUser, async (req, res) => {
 });
 
 
-const COD_COLLECTION_DEADLINE_MS=2*60*60*1000;
-let codExpiryCheckRunning=false;
-async function cancelExpiredCodOrders(){
-  if(codExpiryCheckRunning)return;
-  codExpiryCheckRunning=true;
-  try{
-    const snap=await db.collection(ORDERS_COLLECTION).where("orderStatus","==","ready").get();
-    const now=Date.now();
-    for(const doc of snap.docs){
-      const order=doc.data();
-      if(order.orderStatus!=="ready"||order.collectionStatus==="collected")continue;
-      const confirmedAt=asMillis(order.confirmedAt||order.createdAt);
-      if(!confirmedAt||now-confirmedAt<COD_COLLECTION_DEADLINE_MS)continue;
-      let cancelledOrder=null;
-      try{
-        await db.runTransaction(async tx=>{
-          const current=await tx.get(doc.ref);
-          if(!current.exists)return;
-          const x=current.data();
-          if(x.paymentMethod!=="CASH_ON_DELIVERY"||x.orderStatus!=="ready"||x.collectionStatus==="collected")return;
-          const currentConfirmedAt=asMillis(x.confirmedAt||x.createdAt);
-          if(!currentConfirmedAt||Date.now()-currentConfirmedAt<COD_COLLECTION_DEADLINE_MS)return;
-          const reservations=await tx.get(db.collection(RESERVATIONS_COLLECTION).where("orderId","==",doc.id));
-          reservations.docs.filter(d=>d.data().status==="active").forEach(d=>tx.update(d.ref,{status:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),cancelReason:"cod_collection_timeout"}));
-          tx.update(doc.ref,{orderStatus:"cancelled",cancelledAt:admin.firestore.FieldValue.serverTimestamp(),customerCancelled:false,autoCancelled:true,cancelReason:"cod_collection_timeout",cancellationEmailStatus:"pending"});
-          cancelledOrder={...x,id:doc.id};
-        });
-        if(cancelledOrder){
-          try{
-            const mail=await sendCodCancellationNotification(cancelledOrder,"Automatically cancelled: the customer did not collect the COD order within 2 hours.");
-            await doc.ref.update({cancellationEmailStatus:"sent",cancellationEmailMessageId:mail.messageId||"",cancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()});
-          }catch(mailError){
-            console.error("Automatic COD cancellation email failed:",{orderNumber:cancelledOrder.orderNumber,message:mailError.message});
-            await doc.ref.update({cancellationEmailStatus:"failed",cancellationEmailError:String(mailError.message||"Email failed").slice(0,250),cancellationEmailUpdatedAt:admin.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
-          }
-        }
-      }catch(orderError){console.error("COD expiry cancellation failed:",doc.id,orderError.message);}
-    }
-  }catch(error){console.error("COD expiry scan failed:",error.message);}
-  finally{codExpiryCheckRunning=false;}
-}
-
 const port = process.env.PORT || 10000;
 app.listen(port, "0.0.0.0", () => console.log(`TANMAYI LOYALTY WEB listening on ${port}`));
-setTimeout(()=>cancelExpiredCodOrders(),10000);
-setInterval(()=>cancelExpiredCodOrders(),60000).unref?.();
