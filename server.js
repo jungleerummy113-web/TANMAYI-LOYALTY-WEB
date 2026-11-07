@@ -915,7 +915,7 @@ app.get("/api/public/products", async (_req, res) => {
       const held = heldByProduct.get(d.id) || 0;
       return { id:d.id, name:String(x.name||""), size:String(x.size||""), description:String(x.description||""), originalPrice:moneyNumber(x.originalPrice), offerPrice:moneyNumber(x.offerPrice), availableStock:Math.max(0,stock-held), photoUrls:Array.isArray(x.photoData)?x.photoData.slice(0,2):(Array.isArray(x.photoUrls)?x.photoUrls.slice(0,2):[]), createdAtMillis:asMillis(x.createdAt) };
     }));
-    res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
+    res.set("Cache-Control", "public, max-age=20, stale-while-revalidate=40");
     res.json({ products });
   } catch (e) {
     console.error("public product catalogue", e);
@@ -925,6 +925,8 @@ app.get("/api/public/products", async (_req, res) => {
 
 app.get("/api/customer/offers", requireUser, async (_req, res) => {
   try {
+    // Brief private caching avoids repeat photo downloads while keeping stock fresh.
+    res.set("Cache-Control", "private, max-age=10, stale-while-revalidate=20");
     const [snap, reservationSnap] = await Promise.all([
       db.collection(PRODUCTS_COLLECTION).where("active", "==", true).get(),
       db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
