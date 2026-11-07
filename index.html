@@ -695,7 +695,7 @@ async function loadPublicProducts(){
   const mount=$('publicProducts');if(!mount)return;
   readGuestOrderCart();renderPublicCart();
   try{
-    const response=await fetch(API+'/api/public/products',{method:'GET',headers:{Accept:'application/json'},cache:'no-store'});
+    const response=await fetch(API+'/api/public/products',{method:'GET',headers:{Accept:'application/json'},cache:'default'});
     const data=await response.json().catch(()=>({error:'Shop products could not be loaded.'}));
     if(!response.ok)throw Error(data.error||'Shop products could not be loaded.');
     publicProductsCache=Array.isArray(data.products)?data.products:[];
