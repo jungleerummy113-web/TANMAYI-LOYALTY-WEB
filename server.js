@@ -540,10 +540,15 @@ app.get("/api/customer/home", requireUser, async (req,res)=>{
     // Historical bills remain stored and visible in Bill History.
     const latestBillData=latestBillDoc?latestBillDoc.data():null;
     const latestBillIsCurrent=!!latestBillData && (!d.lastRedeemedAt || asMillis(latestBillData.date)>asMillis(d.lastRedeemedAt));
-    const pending=await customerRef(req.user.uid).collection("redemptions").where("status","==","pending").limit(1).get();
-    const allRed=await customerRef(req.user.uid).collection("redemptions").where("status","==","taken").get();
-    res.json({profile:{name:d.name||"",mobile:d.mobile||"",village:d.village||""},stamps:moneyNumber(d.stamps),latestBill:latestBillIsCurrent?safeDate(latestBillData.date):null,latestBillAmount:latestBillIsCurrent?moneyNumber(latestBillData.billTotal):0,giftsRedeemed:allRed.size,pendingRedemption:pending.empty?null:(()=>{const x=pending.docs[0];const a=x.data();return{id:x.id,type:a.type,approvedPoints:moneyNumber(a.approvedPoints),status:a.status,createdAt:safeDate(a.date)}})()});
-  }catch(e){console.error("customer home",e);res.status(500).json({error:"Could not load customer account."});}
+    // Read redemption records once and filter in memory. This avoids a Firestore
+    // status-field query/index failure from blocking every customer's login.
+    const redemptionSnap=await customerRef(req.user.uid).collection("redemptions").get();
+    const redemptionDocs=redemptionSnap.docs;
+    const pendingDoc=redemptionDocs.find(x=>x.data().status==="pending")||null;
+    const takenCount=redemptionDocs.filter(x=>x.data().status==="taken").length;
+    const pendingRedemption=pendingDoc?(()=>{const a=pendingDoc.data();return{id:pendingDoc.id,type:a.type,approvedPoints:moneyNumber(a.approvedPoints),status:a.status,createdAt:safeDate(a.date)}})():null;
+    res.json({profile:{name:d.name||"",mobile:d.mobile||"",village:d.village||""},stamps:moneyNumber(d.stamps),latestBill:latestBillIsCurrent?safeDate(latestBillData.date):null,latestBillAmount:latestBillIsCurrent?moneyNumber(latestBillData.billTotal):0,giftsRedeemed:takenCount,pendingRedemption});
+  }catch(e){console.error("customer home failed:",e.message,e.stack);res.status(500).json({error:"Could not load customer account."});}
 });
 app.get("/api/customer/history", requireUser, async (req,res)=>{
   try {
