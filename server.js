@@ -1029,11 +1029,18 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
           const previousOrderSnap = await tx.get(db.collection(ORDERS_COLLECTION).doc(previousOrderId));
           if (!previousOrderSnap.exists) throw new Error("This UTR number has already been submitted. Please contact the shop.");
           const previousOrder = previousOrderSnap.data();
-          const wasAdminRejected = previousOrder.orderStatus === "cancelled"
+          // A successfully refunded order must permanently keep its original payment UTR blocked.
+          const previousRefundSnap = await tx.get(db.collection(ORDER_REFUNDS_COLLECTION).doc(previousOrderId));
+          const wasRefunded = previousOrder.refundStatus === "success"
+            || (previousRefundSnap.exists && previousRefundSnap.data().status === "success");
+          const wasAdminRejected = !wasRefunded
+            && previousOrder.orderStatus === "cancelled"
             && previousOrder.cancelledByAdmin === true
             && ["submitted", "rejected"].includes(previousOrder.paymentStatus)
             && String(previousOrder.paymentUtr || "") === paymentUtr;
-          if (!wasAdminRejected) throw new Error("This UTR number is already linked to another running or completed order. Duplicate UTR is not allowed.");
+          if (!wasAdminRejected) throw new Error(wasRefunded
+            ? "This UTR belongs to an order that has already been refunded. Duplicate UTR is not allowed."
+            : "This UTR number is already linked to another running or completed order. Duplicate UTR is not allowed.");
           reusableRejectedUtr = true;
           previousUtrOrderId = previousOrderId;
         }
