@@ -679,9 +679,17 @@ function show(id){
   if(guestLogin)guestLogin.classList.add('hidden');
 }
 let apiAuthUser=null;
-async function api(path,method='GET',body=null){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);try{let user=auth.currentUser||apiAuthUser;if(!user){await auth.authStateReady();user=auth.currentUser||apiAuthUser;}if(!user)throw Error('Please login to continue.');const token=await Promise.race([user.getIdToken(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Secure connection is taking longer than expected. Please wait and retry.')),15000))]);if(!token)throw Error('Secure connection is not ready yet. Please wait and retry.');const r=await fetch(API+path,{method,signal:controller.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');if(method!=='GET'&&typeof customerReadCache!=='undefined')customerReadCache.clear();return d}catch(e){if(e.name==='AbortError')throw Error('Server response timeout. Please check your internet and try again.');throw e}finally{clearTimeout(timer)}}
-// Short-lived in-memory cache for customer read-only screens; never cache writes or admin data.
+async function api(path,method='GET',body=null){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);try{let user=auth.currentUser||apiAuthUser;if(!user){await auth.authStateReady();user=auth.currentUser||apiAuthUser;}if(!user)throw Error('Please login to continue.');const token=await Promise.race([user.getIdToken(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Secure connection is taking longer than expected. Please wait and retry.')),15000))]);if(!token)throw Error('Secure connection is not ready yet. Please wait and retry.');const r=await fetch(API+path,{method,signal:controller.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({error:'Unexpected server response'}));if(!r.ok)throw Error(d.error||'Request failed');if(method!=='GET'){if(typeof customerReadCache!=='undefined')customerReadCache.clear();if(typeof adminReadCache!=='undefined'){adminReadCache.clear();adminReadPending.clear();}}return d}catch(e){if(e.name==='AbortError')throw Error('Server response timeout. Please check your internet and try again.');throw e}finally{clearTimeout(timer)}}
+// Short-lived in-memory caches for read-only screens; writes always invalidate cached data.
 const customerReadCache=new Map(),customerReadPending=new Map();
+const adminReadCache=new Map(),adminReadPending=new Map();
+async function adminGet(path,ttl=15000){
+  const key=(auth.currentUser?.uid||'admin')+':'+path,now=Date.now(),cached=adminReadCache.get(key);
+  if(cached&&now-cached.time<ttl)return cached.data;
+  if(adminReadPending.has(key))return adminReadPending.get(key);
+  const request=api(path).then(data=>{adminReadCache.set(key,{time:Date.now(),data});return data}).finally(()=>adminReadPending.delete(key));
+  adminReadPending.set(key,request);return request;
+}
 async function customerGet(path,ttl=20000,force=false){
   const key=(auth.currentUser?.uid||'customer')+':'+path,now=Date.now(),cached=customerReadCache.get(key);
   if(!force&&cached&&now-cached.time<ttl)return cached.data;
@@ -821,7 +829,7 @@ async function imageData(file){if(!file)return '';if(!file.type.startsWith('imag
 function moneyPrice(v){return '₹'+Number(v||0).toLocaleString('en-IN')}
 async function loadAdminProducts(){
   try{
-    const r=await api('/api/admin/products');
+    const r=await adminGet('/api/admin/products',15000);
     $('adminProducts').innerHTML=r.products.map(x=>`<div class="product-card">
       <strong>${esc(x.name)}</strong>
       <div class="product-photos">${x.photoUrls.map(u=>`<img src="${esc(u)}" alt="${esc(x.name)}" data-zoom-product-image="${esc(u)}" loading="lazy">`).join('')}</div>
@@ -877,7 +885,7 @@ async function loadAdminProducts(){
 }
 async function loadAdminPaymentSettings(){
   try{
-    const r=await api('/api/admin/payment-settings');
+    const r=await adminGet('/api/admin/payment-settings',60000);
     const el=$('adminPaymentQrPreview');
     if(r.qrData){el.innerHTML=`<strong>Current Customer Payment QR Code</strong><img src="${esc(r.qrData)}" alt="Shop UPI QR code" style="max-width:220px;max-height:220px;object-fit:contain;background:#fff;padding:8px;border-radius:8px">`;el.classList.remove('hidden')}
     else{el.innerHTML='<span class="muted">No payment QR uploaded yet.</span>';el.classList.remove('hidden')}
@@ -903,7 +911,7 @@ async function loadAdminOfferOrders(scope='active',append=false){
   try{
     if(scope==='completed'&&!append)completedHistoryOffset=0;
     const query='/api/admin/offer-orders?scope='+encodeURIComponent(scope)+(scope==='completed'?'&offset='+completedHistoryOffset:'');
-    const r=await api(query);
+    const r=await adminGet(query,3000);
     const adminOrders=r.orders||[];
     const runningAdminOrders=adminOrders.filter(x=>!['completed','cancelled','expired'].includes(x.orderStatus));
     const completedAdminOrders=adminOrders.filter(x=>x.orderStatus==='completed').sort((a,b)=>new Date(b.completedAt||b.updatedAt||b.confirmedAt||0)-new Date(a.completedAt||a.updatedAt||a.confirmedAt||0));
@@ -1399,7 +1407,7 @@ document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventL
 $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemMsg');$('customerTaken').disabled=true;try{const choice=document.querySelector('input[name="rewardChoice"]:checked')?.value||'gift';await api('/api/customer/redeem-taken','POST',{redemptionId:pendingId,choice});msg('customerRedeemMsg','Redemption completed. Stamps and current cycle reset successfully.');await loadCustomer()}catch(e){msg('customerRedeemMsg',e.message)}finally{$('customerTaken').disabled=false}};
 async function loadRewardEligible(){
   try{
-    const r=await api('/api/admin/reward-eligible');
+    const r=await adminGet('/api/admin/reward-eligible',15000);
     $('rewardEligibleList').innerHTML=r.customers.map(c=>`<div class="product-card">
       <strong>${esc(c.name)}</strong>
       <p>Mobile: ${esc(c.mobile)}</p>
@@ -1412,7 +1420,7 @@ async function loadRewardEligible(){
   }catch(e){$('rewardEligibleList').textContent=e.message||'Could not load reward-eligible customers.'}
 }
 $('refreshRewardEligible').onclick=loadRewardEligible;
-async function loadCustomers(){const [r,x]=await Promise.all([api('/api/admin/customers'),api('/api/admin/summary')]);customers=r.customers;render();$('customerCount').textContent=x.customerCount;$('stampCount').textContent=x.stampCount;$('giftCount').textContent=x.giftCount}
+async function loadCustomers(){const [r,x]=await Promise.all([adminGet('/api/admin/customers',15000),adminGet('/api/admin/summary',30000)]);customers=r.customers;render();$('customerCount').textContent=x.customerCount;$('stampCount').textContent=x.stampCount;$('giftCount').textContent=x.giftCount}
 function render(){const t=$('search').value.trim().toLowerCase(),list=customers.filter(c=>(c.name||'').toLowerCase().includes(t)||(c.mobile||'').includes(t));$('rows').innerHTML=list.map(c=>`<tr><td>${esc(c.name)}<br><small>${esc(c.id)}</small></td><td>${esc(c.mobile)}</td><td>${esc(c.village)}</td><td>${date(c.createdAt)}</td><td>${Number(c.stamps||0)} / 10</td><td><button data-id="${esc(c.id)}">Open</button></td></tr>`).join('')||'<tr><td colspan="6">No customers found</td></tr>';document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>openCustomer(b.dataset.id))}
 $('search').oninput=render;
 async function openCustomer(id){selected=customers.find(c=>c.id===id);if(!selected)return;$('detail').classList.remove('hidden');$('detailName').textContent=selected.name||'Customer';$('detailInfo').textContent=`ID: ${id} · ${selected.mobile||''} · ${selected.village||''}`;await refresh()}
