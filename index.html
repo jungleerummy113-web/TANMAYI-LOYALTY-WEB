@@ -522,47 +522,13 @@ body>header{display:none}
  </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
-/* Public catalogue safety fallback: keep product browsing available if Firebase module startup stalls. */
-(function(){
-  var mount=document.getElementById('publicProducts');
-  if(!mount)return;
-  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-  function price(v){return '₹'+Number(v||0).toLocaleString('en-IN')}
-  function render(products){
-    mount.innerHTML=products.map(function(p){
-      var photos=Array.isArray(p.photoUrls)?p.photoUrls.slice(0,2):[];
-      var stock=Math.max(0,Number(p.availableStock==null?0:p.availableStock));
-      return '<div class="customer-product-card product-card" data-public-product-card="'+esc(p.id)+'"><b>'+esc(p.name)+'</b>'+
-        '<div class="customer-product-topline">'+(p.isNew?'<span class="product-new-badge">NEW ARRIVAL</span>':'')+(photos.length>1?'<span class="product-photo-hint">📸 2 PHOTOS · SWIPE LEFT / RIGHT <span class="photo-arrow">↔</span></span>':'')+'</div>'+
-        '<div class="product-photos">'+photos.map(function(u,i){return '<img src="'+esc(u)+'" alt="'+esc(p.name)+' photo '+(i+1)+'" loading="lazy" decoding="async">'}).join('')+'</div>'+
-        '<div class="customer-product-price-row"><p class="customer-product-prices"><span class="price-old">'+price(p.originalPrice)+'</span> <b class="price-offer">'+price(p.offerPrice)+'</b></p></div>'+
-        '<div class="customer-product-info-row">'+(p.size?'<p class="stock-line"><b>Size:</b> '+esc(p.size)+'</p>':'<span></span>')+(p.description?'<details class="customer-product-description"><summary>Description</summary><p>'+esc(p.description)+'</p></details>':'')+'</div>'+
-        '<div class="customer-product-actions-row"><p class="stock-line">'+(stock>0?'Stock: '+stock:'NO STOCK')+'</p><button type="button" data-guest-add="'+esc(p.id)+'" '+(stock<=0||!window.tanmayiModuleReady?'disabled':'')+'>'+(window.tanmayiModuleReady?'Select &amp; Add':'Catalogue available · refresh to order')+'</button></div><div class="public-inline-selection" data-public-selected hidden></div></div>';
-    }).join('')||'<p class="muted">New products and offers will be displayed here soon.</p>';
-  }
-  window.setTimeout(async function(){
-    if(!mount.textContent.includes('Loading products'))return;
-    mount.innerHTML='<p class="muted">Connecting to the shop…</p>';
-    var controller=new AbortController(),timer=window.setTimeout(function(){controller.abort()},30000);
-    try{
-      var response=await fetch('https://tanmayi-pin-reset-api.onrender.com/api/public/products',{method:'GET',headers:{Accept:'application/json'},cache:'no-store',signal:controller.signal});
-      var data=await response.json();
-      if(!response.ok)throw new Error(data.error||'Shop products could not be loaded.');
-      var products=Array.isArray(data.products)?data.products:[];render(products);window.dispatchEvent(new CustomEvent('tanmayi-public-products-fallback',{detail:products}));
-    }catch(error){
-      mount.innerHTML='<p class="muted">Products are temporarily unavailable. Please refresh the page and try again.</p>';
-    }finally{window.clearTimeout(timer)}
-  },8000);
-})();
-</script>
+
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider,}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import{getFirestore,doc,getDoc}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 const cfg={apiKey:'AIzaSyBXnsV3rJ7VR74EIbyCjhQ1gfGxIxD21kU',authDomain:'tanmayi-store-and-gifts.firebaseapp.com',projectId:'tanmayi-store-and-gifts',storageBucket:'tanmayi-store-and-gifts.firebasestorage.app',messagingSenderId:'1061146758363',appId:'1:1061146758363:web:3260ea51094ba5fbab10fe',measurementId:'G-3RWVE6G0W9'};
 const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https://tanmayi-pin-reset-api.onrender.com';
-window.tanmayiModuleReady=true;
 // Firebase Auth's default browser persistence restores the saved session asynchronously.
 // Do not block module startup; onAuthStateChanged below selects the page after restoration.
 window.tanmayiAuth=auth;window.tanmayiFirebaseAuth={EmailAuthProvider,reauthenticateWithCredential,updatePassword};
@@ -688,7 +654,6 @@ async function api(path,method='GET',body=null){const controller=new AbortContro
 async function pinApi(path,body,token=''){const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify(body)});const d=await r.json().catch(()=>({error:'Unexpected response'}));if(!r.ok)throw Error(d.error||'PIN reset failed');return d}
 
 let publicProductsCache=[],guestOrderCart=[],guestCheckoutStarted=false;
-window.addEventListener('tanmayi-public-products-fallback',event=>{publicProductsCache=Array.isArray(event.detail)?event.detail:[];});
 function readGuestOrderCart(){
   // A guest cart is valid only during the current page visit.
   // Clear any tab-restored/stale cart when the storefront is freshly initialized.
