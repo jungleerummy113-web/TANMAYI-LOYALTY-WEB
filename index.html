@@ -1360,7 +1360,6 @@ onAuthStateChanged(auth,async u=>{
       await loadCustomer();
       show('customerView');
       // Start store settings in the background so they do not delay the product catalogue.
-      if(window.refreshTanmayiStoreSettings) window.refreshTanmayiStoreSettings().catch(error=>console.warn('Store settings loaded later:',error));
       loadCustomerProducts();
     }catch(e){
       show('customerLogin');
@@ -1383,7 +1382,7 @@ onAuthStateChanged(auth,async u=>{
   }
 });
 async function loadCustomer(){const h=await api('/api/customer/home');show('customerView');restorePendingOfferCart(h.profile.mobile);customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await api('/api/customer/history');$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings();if(window.showTanmayiInstallPopup)window.showTanmayiInstallPopup(customerProfile.mobile)}
-$('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
+$('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
 document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventListener('change',()=>{$('approvedPointsInfo').classList.toggle('hidden',el.value!=='points'||!el.checked)}));
 $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemMsg');$('customerTaken').disabled=true;try{const choice=document.querySelector('input[name="rewardChoice"]:checked')?.value||'gift';await api('/api/customer/redeem-taken','POST',{redemptionId:pendingId,choice});msg('customerRedeemMsg','Redemption completed. Stamps and current cycle reset successfully.');await loadCustomer()}catch(e){msg('customerRedeemMsg',e.message)}finally{$('customerTaken').disabled=false}};
 async function loadRewardEligible(){
@@ -1909,8 +1908,12 @@ window.addEventListener("unhandledrejection", function (event) {
     }catch(e){status('whatsappSettingsMsg','Save failed: '+e.message)}
     finally{button.disabled=false;button.textContent='Save WhatsApp Number'}
   }
-  async function refreshCustomerSettings(){
-    const response=await fetch(API+'/api/customer/store-settings?_fresh='+Date.now(),{method:'GET',cache:'no-store',headers:{'Accept':'application/json'}});
+  let customerSettingsCache=null,customerSettingsCacheAt=0,customerSettingsPending=null;
+  async function refreshCustomerSettings(force=false){
+    if(!force&&customerSettingsCache&&Date.now()-customerSettingsCacheAt<60000)return customerSettingsCache;
+    if(!force&&customerSettingsPending)return customerSettingsPending;
+    customerSettingsPending=(async()=>{
+    const response=await fetch(API+'/api/customer/store-settings',{method:'GET',cache:'default',headers:{'Accept':'application/json'}});
     const data=await response.json().catch(()=>({error:'Invalid store settings response.'}));
     if(!response.ok)throw Error(data.error||('Store settings request failed ('+response.status+').'));
     const banner=$('customerPromoBanner');
@@ -1934,11 +1937,14 @@ window.addEventListener("unhandledrejection", function (event) {
     });
     const contact=$('customerWhatsAppLink');
     if(contact){contact.href=href;contact.textContent='Chat on WhatsApp · '+number}
+    customerSettingsCache=data;customerSettingsCacheAt=Date.now();
     return data;
+    })().finally(()=>{customerSettingsPending=null});
+    return customerSettingsPending;
   }
-  window.refreshTanmayiStoreSettings=async function(){
+  window.refreshTanmayiStoreSettings=async function(force=false){
     try{
-      const data=await refreshCustomerSettings();
+      const data=await refreshCustomerSettings(force);
       const banner=$('customerPromoBanner');
       const number=String(data.whatsappNumber||'7899066113').replaceAll(/[^0-9]/g,'').slice(-10);
       console.info('[TANMAYI] Customer settings refreshed; WhatsApp:',number,'promotion photos:',(data.promotionPhotos||[]).length);
@@ -1957,11 +1963,7 @@ window.addEventListener("unhandledrejection", function (event) {
   },true);
   document.addEventListener('DOMContentLoaded',function(){
     if(!location.search.includes('admin=1')){
-      const refresh=()=>window.refreshTanmayiStoreSettings?.();
-      setTimeout(refresh,1000);
-      setTimeout(refresh,3000);
-      $('refreshCustomerAccount')?.addEventListener('click',()=>setTimeout(refresh,300));
-      document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+      // Customer settings are loaded with the account; avoid timer/visibility duplicate reads.
     }
   });
 })();
