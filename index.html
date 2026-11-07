@@ -522,6 +522,40 @@ body>header{display:none}
  </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+/* Public catalogue safety fallback: keep product browsing available if Firebase module startup stalls. */
+(function(){
+  var mount=document.getElementById('publicProducts');
+  if(!mount)return;
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function price(v){return '₹'+Number(v||0).toLocaleString('en-IN')}
+  function render(products){
+    mount.innerHTML=products.map(function(p){
+      var photos=Array.isArray(p.photoUrls)?p.photoUrls.slice(0,2):[];
+      var stock=Math.max(0,Number(p.availableStock==null?0:p.availableStock));
+      return '<div class="customer-product-card product-card" data-public-product-card="'+esc(p.id)+'"><b>'+esc(p.name)+'</b>'+
+        '<div class="customer-product-topline">'+(p.isNew?'<span class="product-new-badge">NEW ARRIVAL</span>':'')+(photos.length>1?'<span class="product-photo-hint">📸 2 PHOTOS · SWIPE LEFT / RIGHT <span class="photo-arrow">↔</span></span>':'')+'</div>'+
+        '<div class="product-photos">'+photos.map(function(u,i){return '<img src="'+esc(u)+'" alt="'+esc(p.name)+' photo '+(i+1)+'" loading="lazy" decoding="async">'}).join('')+'</div>'+
+        '<div class="customer-product-price-row"><p class="customer-product-prices"><span class="price-old">'+price(p.originalPrice)+'</span> <b class="price-offer">'+price(p.offerPrice)+'</b></p></div>'+
+        '<div class="customer-product-info-row">'+(p.size?'<p class="stock-line"><b>Size:</b> '+esc(p.size)+'</p>':'<span></span>')+(p.description?'<details class="customer-product-description"><summary>Description</summary><p>'+esc(p.description)+'</p></details>':'')+'</div>'+
+        '<div class="customer-product-actions-row"><p class="stock-line">'+(stock>0?'Stock: '+stock:'NO STOCK')+'</p><button type="button" disabled>SELECT &amp; ADD — PLEASE REFRESH</button></div></div>';
+    }).join('')||'<p class="muted">New products and offers will be displayed here soon.</p>';
+  }
+  window.setTimeout(async function(){
+    if(!mount.textContent.includes('Loading products'))return;
+    mount.innerHTML='<p class="muted">Connecting to the shop…</p>';
+    var controller=new AbortController(),timer=window.setTimeout(function(){controller.abort()},30000);
+    try{
+      var response=await fetch('https://tanmayi-pin-reset-api.onrender.com/api/public/products',{method:'GET',headers:{Accept:'application/json'},cache:'no-store',signal:controller.signal});
+      var data=await response.json();
+      if(!response.ok)throw new Error(data.error||'Shop products could not be loaded.');
+      render(Array.isArray(data.products)?data.products:[]);
+    }catch(error){
+      mount.innerHTML='<p class="muted">Products are temporarily unavailable. Please refresh the page and try again.</p>';
+    }finally{window.clearTimeout(timer)}
+  },8000);
+})();
+</script>
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider,}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
