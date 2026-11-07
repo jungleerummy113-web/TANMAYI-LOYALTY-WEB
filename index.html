@@ -1557,7 +1557,24 @@ window.addEventListener("unhandledrejection", function (event) {
     menu.onclick=()=>{drawer.classList.add('open');shade.classList.add('open')};shade.onclick=close;
     drawer.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
     nav.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
-    if(kind==='customer'&&$('appRefreshBtn'))$('appRefreshBtn').onclick=()=>$('refreshCustomerAccount')?.click();
+    if(kind==='customer'&&$('appRefreshBtn')){
+      const refreshButton=$('appRefreshBtn');
+      refreshButton.type='button';
+      refreshButton.onclick=async()=>{
+        const activePage=root.dataset.activePage||'home';
+        refreshButton.disabled=true;
+        try{
+          if(activePage==='myList')await loadCustomerProducts();
+          else if(activePage==='orders')await loadCustomerOrders();
+          else if(activePage==='buyAgain'){await loadCustomerOrders();renderBuyAgain();}
+          else await loadCustomer();
+        }catch(error){
+          const message=$('customerRedeemMsg');
+          if(message){message.textContent='Refresh failed: '+(error.message||'Please try again.');message.classList.remove('hidden');}
+          else console.warn('Customer page refresh failed:',error);
+        }finally{refreshButton.disabled=false;}
+      };
+    }
     
     return {go};
   }
