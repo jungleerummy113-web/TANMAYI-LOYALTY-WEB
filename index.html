@@ -1408,22 +1408,41 @@ $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemM
 async function loadRewardEligible(){
   try{
     const r=await adminGet('/api/admin/reward-eligible',15000);
-    $('rewardEligibleList').innerHTML=r.customers.map(c=>`<div class="product-card">
+    $('rewardEligibleList').innerHTML=r.customers.map(c=>`<div class="product-card" style="margin-bottom:14px">
       <strong>${esc(c.name)}</strong>
       <p>Mobile: ${esc(c.mobile)}</p>
       <p>Village: ${esc(c.village)}</p>
       <p class="price-offer">${Number(c.stamps)} / 10 Stamps</p>
       <p>${c.pendingRedemption?'<span class="tag">Reward options already prepared</span>':'<span class="tag">Eligible for reward</span>'}</p>
-      <button class="gold" data-manage-reward="${esc(c.id)}">Manage Reward</button>
+      <button type="button" class="gold" data-reward-open="${esc(c.id)}">${c.pendingRedemption?'View Reward Status':'Manage Reward'}</button>
+      <div id="reward-manager-${esc(c.id)}" class="card hidden" style="margin-top:12px;background:#fffaf0">
+        <p><strong>Approve reward for ${esc(c.name)}</strong></p>
+        <p class="muted">Choose one approval action. Customer will see the approved option in My Stamps & Rewards.</p>
+        <button type="button" class="gold" data-reward-gift="${esc(c.id)}" ${c.pendingRedemption?'disabled':''}>Approve Free Gift</button>
+        <label style="display:block;margin-top:12px">Redeem Points (1 point = ₹1)</label>
+        <input id="reward-points-${esc(c.id)}" type="number" min="1" max="1000000" step="1" placeholder="Enter points amount" ${c.pendingRedemption?'disabled':''}>
+        <button type="button" class="gold" data-reward-points="${esc(c.id)}" ${c.pendingRedemption?'disabled':''}>Approve Gift / Points</button>
+        <div id="reward-manager-msg-${esc(c.id)}" class="msg hidden"></div>
+      </div>
     </div>`).join('')||'<p class="muted">No customers have reached 10 stamps yet.</p>';
-    document.querySelectorAll('[data-manage-reward]').forEach(b=>b.onclick=()=>openCustomer(b.dataset.manageReward));
+    document.querySelectorAll('[data-reward-open]').forEach(b=>b.onclick=()=>{const p=$('reward-manager-'+b.dataset.rewardOpen);p.classList.toggle('hidden');});
+    document.querySelectorAll('[data-reward-gift]').forEach(b=>b.onclick=()=>approveRewardFromRewardsPage(b.dataset.rewardGift,0,b));
+    document.querySelectorAll('[data-reward-points]').forEach(b=>b.onclick=()=>{const id=b.dataset.rewardPoints,points=Number($('reward-points-'+id).value);if(!Number.isInteger(points)||points<1||points>1000000){msg('reward-manager-msg-'+id,'Enter a valid points amount (1 to 1,000,000).');return}approveRewardFromRewardsPage(id,points,b)});
   }catch(e){$('rewardEligibleList').textContent=e.message||'Could not load reward-eligible customers.'}
+}
+async function approveRewardFromRewardsPage(customerUid,approvedPoints,button){
+  const id='reward-manager-msg-'+customerUid;clear(id);button.disabled=true;
+  try{
+    const r=await api('/api/admin/create-redemption','POST',{customerUid,approvedPoints});
+    msg(id,approvedPoints>0?'Reward and '+approvedPoints+' points approved. Customer can now see the reward in their account.':'Free gift approved. Customer can now see the reward in their account.');
+    await loadRewardEligible();
+  }catch(e){msg(id,e.message||'Could not approve this reward.');button.disabled=false}
 }
 $('refreshRewardEligible').onclick=loadRewardEligible;
 async function loadCustomers(){const [r,x]=await Promise.all([adminGet('/api/admin/customers',15000),adminGet('/api/admin/summary',30000)]);customers=r.customers;render();$('customerCount').textContent=x.customerCount;$('stampCount').textContent=x.stampCount;$('giftCount').textContent=x.giftCount}
 function render(){const t=$('search').value.trim().toLowerCase(),list=customers.filter(c=>(c.name||'').toLowerCase().includes(t)||(c.mobile||'').includes(t));$('rows').innerHTML=list.map(c=>`<tr><td>${esc(c.name)}<br><small>${esc(c.id)}</small></td><td>${esc(c.mobile)}</td><td>${esc(c.village)}</td><td>${date(c.createdAt)}</td><td>${Number(c.stamps||0)} / 10</td><td><button data-id="${esc(c.id)}">Open</button></td></tr>`).join('')||'<tr><td colspan="6">No customers found</td></tr>';document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>openCustomer(b.dataset.id))}
 $('search').oninput=render;
-async function openCustomer(id){selected=customers.find(c=>c.id===id);if(!selected){msg('adminMsg','Customer details are still loading. Please tap Manage Reward again.');return}$('detail').classList.remove('hidden');$('detailName').textContent=selected.name||'Customer';$('detailInfo').textContent=`ID: ${id} · ${selected.mobile||''} · ${selected.village||''}`;$('detail').scrollIntoView({behavior:'smooth',block:'start'});clear('redeemMsg');try{await refresh();$('redeem').scrollIntoView({behavior:'smooth',block:'center'});$('approvedPoints').focus({preventScroll:true})}catch(e){msg('redeemMsg',e.message||'Could not load this customer reward details.')}}
+async function openCustomer(id){selected=customers.find(c=>c.id===id);if(!selected)return;$('detail').classList.remove('hidden');$('detailName').textContent=selected.name||'Customer';$('detailInfo').textContent=`ID: ${id} · ${selected.mobile||''} · ${selected.village||''}`;await refresh()}
 $('close').onclick=()=>{$('detail').classList.add('hidden');selected=null};
 async function refresh(){if(!selected)return;const d=await api('/api/admin/customer/'+encodeURIComponent(selected.id));$('detailStamps').textContent=d.stamps;$('detailCycleTotal').textContent=money(d.cycleBillTotal);$('detailLifetimeTotal').textContent=money(d.lifetimeBillTotal);$('detailGiftCount').textContent=d.redemptions.filter(x=>x.status==='taken').length;$('billRows').innerHTML=d.bills.map(b=>`<tr><td>${date(b.date)}</td><td>${money(b.amount)}</td><td>+${b.stampsAdded}</td><td>${esc(b.source==='shop-offer'?'Shop offer · '+(b.productName||'Product'):'Admin bill')}</td></tr>`).join('')||'<tr><td colspan="4">No bills yet</td></tr>';$('redRows').innerHTML=d.redemptions.map(r=>`<tr><td>${date(r.date)}</td><td>${esc(r.type)} · ${esc(r.status)}</td><td>${Number(r.approvedPoints||0)}</td></tr>`).join('')||'<tr><td colspan="3">No redemptions yet</td></tr>';customers=customers.map(c=>c.id===selected.id?{...c,stamps:d.stamps}:c);render()}
 $('saveBill').onclick=async()=>{clear('billMsg');const amount=Number($('billAmount').value);if(!selected||!Number.isFinite(amount)||amount<=0)return msg('billMsg','Enter a valid bill amount.');try{const r=await api('/api/admin/add-bill','POST',{customerUid:selected.id,amount});$('billAmount').value='';msg('billMsg',`${r.stampsAdded} stamp(s) added.`);await refresh();await loadCustomers();await loadRewardEligible()}catch(e){msg('billMsg',e.message)}};
