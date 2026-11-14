@@ -596,7 +596,11 @@ app.get("/api/admin/reward-eligible", requireAdmin, async (_req,res)=>{
       const x=d.data(), stamps=moneyNumber(x.stamps);
       if(stamps>=10){
         const pending=await d.ref.collection("redemptions").where("status","==","pending").limit(1).get();
-        eligible.push({id:d.id,name:x.name||"",mobile:x.mobile||"",village:x.village||"",stamps,pendingRedemption:!pending.empty});
+        // Keep approved-but-not-yet-collected rewards on the customer page only.
+        // Hide them from the Admin Rewards queue until the customer takes the reward.
+        if(pending.empty){
+          eligible.push({id:d.id,name:x.name||"",mobile:x.mobile||"",village:x.village||"",stamps,pendingRedemption:false});
+        }
       }
     }
     eligible.sort((a,b)=>b.stamps-a.stamps);
