@@ -1642,15 +1642,26 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
 
     let completedTotal = null, completedHasMore = false, completedNextOffset = 0;
     if (scope === "completed") {
-      // Fetch only the 10 most recently completed orders. This keeps the
-      // Admin Completed History page fast and avoids scanning the full history.
+      // Avoid a composite Firestore index dependency: fetch completed orders,
+      // sort by completion time in memory, and return only the latest 10.
       const snap = await orderCollection
         .where("orderStatus", "==", "completed")
-        .orderBy("completedAt", "desc")
-        .limit(10)
         .get();
-      rawOrders = snap.docs.map(d => ({ id:d.id, data:d.data() }));
-      completedTotal = rawOrders.length;
+      const completedMillis = value => {
+        if (!value) return 0;
+        if (typeof value.toMillis === "function") return value.toMillis();
+        if (typeof value.toDate === "function") return value.toDate().getTime();
+        const parsed = new Date(value).getTime();
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+      const allCompleted = snap.docs.map(d => ({ id:d.id, data:d.data() }));
+      completedTotal = allCompleted.length;
+      rawOrders = allCompleted
+        .sort((a,b) =>
+          completedMillis(b.data.completedAt || b.data.confirmedAt || b.data.createdAt) -
+          completedMillis(a.data.completedAt || a.data.confirmedAt || a.data.createdAt)
+        )
+        .slice(0,10);
       completedHasMore = false;
       completedNextOffset = 0;
     } else if (scope === "history") {
@@ -1741,7 +1752,7 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
       const payment = paymentByOrder.get(id) || {};
       const refund = refundByOrder.get(id) || null;
       return {
-        id, ...x, confirmedAt, expiresAt:asMillis(x.expiresAt),
+        id, ...x, confirmedAt, completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt),
         orderStatus:x.orderStatus || "ready", total:moneyNumber(x.total), items,
         paymentUtr:x.paymentUtr || payment.utr || "",
         paymentScreenshotData:(x.orderStatus === "cancelled" || payment.status === "submitted" || refund) ? (payment.screenshotData || "") : "",
@@ -1751,7 +1762,9 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
         refund,
         customerName:x.customerName || "Customer", mobile:x.mobile || ""
       };
-    }).sort((a,b) => new Date(b.confirmedAt || 0) - new Date(a.confirmedAt || 0));
+    }).sort((a,b) => scope === "completed"
+      ? new Date(b.completedAt || b.confirmedAt || 0) - new Date(a.completedAt || a.confirmedAt || 0)
+      : new Date(b.confirmedAt || 0) - new Date(a.confirmedAt || 0));
 
     const runningOrders = orders.filter(x => !["completed", "cancelled", "expired"].includes(x.orderStatus));
     const completedOrdersList = orders.filter(x => x.orderStatus === "completed");
