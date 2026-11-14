@@ -517,7 +517,7 @@ body>header{display:none}
 <div id="qrWrap" class="qr-area hidden"><div id="qrCode"></div><small id="qrUrl" class="muted"></small>
 <div class="portal-actions"><button id="downloadQR" class="secondary">Download QR PNG</button></div></div>
 <div id="qrMsg" class="msg hidden"></div></section>
-<section class="card" id="rewardEligibleSection"><div class="row"><h2>🎁 Reward Eligible Customers (10+ Stamps)</h2><button type="button" class="secondary" id="refreshRewardEligible">Refresh</button></div><p class="muted">10 లేదా అంతకంటే ఎక్కువ stamps ఉన్న customers మాత్రమే ఇక్కడ automaticగా కనిపిస్తారు. Customerపై Manage Reward నొక్కి gift / points approval చేయవచ్చు.</p><div id="rewardEligibleList" class="product-grid">Loading eligible customers…</div></section>
+<section class="card" id="rewardEligibleSection"><div class="row"><h2>🎁 Reward Eligible Customers (10+ Stamps)</h2><button type="button" class="secondary" id="refreshRewardEligible">Refresh</button></div><p class="muted">10 లేదా అంతకంటే ఎక్కువ stamps ఉన్న customers మాత్రమే ఇక్కడ automaticగా కనిపిస్తారు. Reward approval pending ఉన్న customers, customer తీసుకునే వరకు ఈ Admin list లో కనిపించరు.</p><div id="rewardApprovalNotice" class="msg hidden"></div><div id="rewardEligibleList" class="product-grid">Loading eligible customers…</div></section>
 <section class="card"><h2>Registered Customers</h2><label>Search name or mobile</label><input id="search" placeholder="Search">
 <div class="scroll"><table><thead><tr><th>Name / ID</th><th>Mobile</th><th>Village</th><th>Registered</th><th>Stamps</th><th>Action</th></tr></thead><tbody id="rows"></tbody></table></div></section>
 <section id="detail" class="card hidden"><div class="row"><h2 id="detailName">Customer</h2><button class="secondary" id="close">Close</button></div><p id="detailInfo" class="muted"></p>
@@ -1431,13 +1431,12 @@ async function loadRewardEligible(){
   }catch(e){$('rewardEligibleList').textContent=e.message||'Could not load reward-eligible customers.'}
 }
 async function approveRewardFromRewardsPage(customerUid,approvedPoints,button){
-  const id='reward-manager-msg-'+customerUid;clear(id);button.disabled=true;
+  clear('rewardApprovalNotice');button.disabled=true;
   try{
     await api('/api/admin/create-redemption','POST',{customerUid,approvedPoints});
     await loadRewardEligible();
-    const panel=$('reward-manager-'+customerUid);if(panel)panel.classList.remove('hidden');
-    msg(id,approvedPoints>0?'Reward and '+approvedPoints+' points approved. Customer can now see the reward in their account.':'Free gift approved. Customer can now see the reward in their account.');
-  }catch(e){msg(id,e.message||'Could not approve this reward.');button.disabled=false}
+    msg('rewardApprovalNotice',approvedPoints>0?'Reward and '+approvedPoints+' points approved. This customer is now hidden from the Admin Rewards list until they collect it.':'Free gift approved. This customer is now hidden from the Admin Rewards list until they collect it.');
+  }catch(e){msg('rewardApprovalNotice',e.message||'Could not approve this reward.');button.disabled=false}
 }
 $('refreshRewardEligible').onclick=loadRewardEligible;
 async function loadCustomers(){const [r,x]=await Promise.all([adminGet('/api/admin/customers',15000),adminGet('/api/admin/summary',30000)]);customers=r.customers;render();$('customerCount').textContent=x.customerCount;$('stampCount').textContent=x.stampCount;$('giftCount').textContent=x.giftCount}
