@@ -1433,9 +1433,10 @@ async function loadRewardEligible(){
 async function approveRewardFromRewardsPage(customerUid,approvedPoints,button){
   const id='reward-manager-msg-'+customerUid;clear(id);button.disabled=true;
   try{
-    const r=await api('/api/admin/create-redemption','POST',{customerUid,approvedPoints});
-    msg(id,approvedPoints>0?'Reward and '+approvedPoints+' points approved. Customer can now see the reward in their account.':'Free gift approved. Customer can now see the reward in their account.');
+    await api('/api/admin/create-redemption','POST',{customerUid,approvedPoints});
     await loadRewardEligible();
+    const panel=$('reward-manager-'+customerUid);if(panel)panel.classList.remove('hidden');
+    msg(id,approvedPoints>0?'Reward and '+approvedPoints+' points approved. Customer can now see the reward in their account.':'Free gift approved. Customer can now see the reward in their account.');
   }catch(e){msg(id,e.message||'Could not approve this reward.');button.disabled=false}
 }
 $('refreshRewardEligible').onclick=loadRewardEligible;
