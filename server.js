@@ -1664,7 +1664,7 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
     } else {
       // Dashboard refresh reads only orders that still need attention, plus refunds in progress.
       const [activeSnap, refundOrdersSnap, todaySnap, readyCountSnap, oldCountSnap, completedCountSnap] = await Promise.all([
-        orderCollection.where("orderStatus", "in", ["ready", "collected"]).get(),
+        orderCollection.where("orderStatus", "in", ["ready", "collected", "processing"]).get(),
         orderCollection.where("refundStatus", "in", ["requested", "success"]).get(),
         (() => {
           const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
