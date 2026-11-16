@@ -889,8 +889,11 @@ async function loadAdminProducts(force=false){
 }
 $('refreshAdminProducts')?.addEventListener('click',()=>loadAdminProducts(true));
 async function loadAdminPaymentSettings(){
+  const preview=$('adminPaymentQrPreview');
+  if(preview){preview.innerHTML='<span class="muted">Loading saved payment settings…</span>';preview.classList.remove('hidden')}
   try{
-    const r=await adminGet('/api/admin/payment-settings',60000);
+    // Fetch directly on page open so a stale cached/empty settings response is never shown.
+    const r=await api('/api/admin/payment-settings');
     $('paymentHolderName').value=r.holderName||'';
     $('paymentUpiId').value=r.upiId||'';
     $('specialDiscountPercent').value=Number(r.discountPercent||0);
@@ -898,7 +901,10 @@ async function loadAdminPaymentSettings(){
     const el=$('adminPaymentQrPreview');
     if(r.qrData){el.innerHTML=`<strong>Saved backup QR image</strong><img src="${esc(r.qrData)}" alt="Shop UPI QR code" style="max-width:220px;max-height:220px;object-fit:contain;background:#fff;padding:8px;border-radius:8px">`;el.classList.remove('hidden')}
     else{el.innerHTML='<span class="muted">Dynamic UPI QR is generated per order. No backup QR image saved.</span>';el.classList.remove('hidden')}
-  }catch(e){msg('adminPaymentQrMsg',e.message||'Could not load payment settings.')}
+  }catch(e){
+    if(preview){preview.innerHTML='<span class="msg">Could not load saved payment settings: '+esc(e.message||'Server error')+'</span>';preview.classList.remove('hidden')}
+    msg('adminPaymentQrMsg',e.message||'Could not load payment settings.')
+  }
 }
 $('saveAdminPaymentQr').onclick=async()=>{
   clear('adminPaymentQrMsg');$('saveAdminPaymentQr').disabled=true;
@@ -1824,7 +1830,7 @@ window.addEventListener("unhandledrejection", function (event) {
       {id:'products',label:'Products & Offers',icon:'🛍️',content:[products],onOpen:()=>{if(!root.classList.contains('hidden'))loadAdminProducts()}},
       {id:'customers',label:'Customers',icon:'👥',content:[customers,detail],onOpen:()=>{if(!root.classList.contains('hidden'))loadCustomers()}},
       {id:'rewards',label:'Rewards',icon:'🎁',content:[rewards],onOpen:()=>{if(!root.classList.contains('hidden'))loadRewardEligible()}},
-      {id:'payments',label:'Payment QR',icon:'💳',content:[payments],onOpen:()=>{if(!root.classList.contains('hidden'))loadAdminPaymentSettings()}},
+      {id:'payments',label:'Payment QR',icon:'💳',content:[payments],onOpen:()=>loadAdminPaymentSettings()},
       {id:'qr',label:'Customer QR',icon:'▦',content:[qr]}
     ];
     const onlineBox=$('adminOnlineOrders'),codBox=$('adminCodOrders');
