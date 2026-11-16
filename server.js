@@ -678,17 +678,26 @@ function decodeImage(dataUrl) {
 app.get("/api/admin/payment-settings", requireAdmin, async (_req, res) => {
   try {
     const snap = await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
-    res.json({ qrData: snap.exists ? String(snap.data().qrData || "") : "", updatedAt: snap.exists ? safeDate(snap.data().updatedAt) : null });
+    const d = snap.exists ? snap.data() : {};
+    res.json({ qrData:String(d.qrData||""), upiId:String(d.upiId||"paytm.s3paakj@pty"), holderName:String(d.holderName||""), specialOfferEnabled:d.specialOfferEnabled===true, discountPercent:moneyNumber(d.discountPercent), updatedAt:snap.exists?safeDate(d.updatedAt):null });
   } catch (e) { res.status(500).json({ error:"Could not load payment QR settings." }); }
 });
 app.put("/api/admin/payment-settings", requireAdmin, async (req, res) => {
   try {
-    const qrData = decodePaymentImage(req.body?.qrData, "Payment QR");
-    await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").set({
-      qrData, updatedAt:admin.firestore.FieldValue.serverTimestamp(), updatedBy:req.adminUid
-    }, { merge:true });
-    res.json({ ok:true, message:"Online payment QR code updated successfully." });
-  } catch (e) { res.status(400).json({ error:e.message || "Could not update payment QR." }); }
+    const body=req.body||{};
+    const current=await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
+    const patch={updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedBy:req.adminUid};
+    if(body.qrData!==undefined) patch.qrData=decodePaymentImage(body.qrData,"Payment QR");
+    const holderName=String(body.holderName??(current.exists?current.data().holderName:"")).trim().slice(0,100);
+    const discountPercent=Number(body.discountPercent??(current.exists?current.data().discountPercent:0));
+    if(!Number.isFinite(discountPercent)||discountPercent<0||discountPercent>90) throw new Error("Special offer discount must be between 0 and 90 percent.");
+    patch.holderName=holderName;
+    patch.discountPercent=discountPercent;
+    patch.specialOfferEnabled=body.specialOfferEnabled===undefined?(current.exists&&current.data().specialOfferEnabled===true):body.specialOfferEnabled===true;
+    patch.upiId="paytm.s3paakj@pty";
+    await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").set(patch,{merge:true});
+    res.json({ok:true,message:"Payment and Special Days Offer settings saved."});
+  } catch(e) { res.status(400).json({error:e.message||"Could not update payment settings."}); }
 });
 
 // Signed Cloudinary uploads keep large image binaries out of Firestore.
@@ -811,9 +820,10 @@ app.put("/api/admin/store-settings", requireAdmin, async (req, res) => {
 
 app.get("/api/customer/payment-settings", requireUser, async (_req, res) => {
   try {
-    const snap = await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
-    res.json({ qrData: snap.exists ? String(snap.data().qrData || "") : "" });
-  } catch (e) { res.status(500).json({ error:"Could not load shop payment QR." }); }
+    const snap=await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
+    const d=snap.exists?snap.data():{};
+    res.json({qrData:String(d.qrData||""),upiId:"paytm.s3paakj@pty",holderName:String(d.holderName||""),specialOfferEnabled:d.specialOfferEnabled===true,discountPercent:moneyNumber(d.discountPercent)});
+  } catch(e) { res.status(500).json({error:"Could not load shop payment settings."}); }
 });
 
 app.get("/api/admin/products", requireAdmin, async (_req, res) => {
@@ -982,6 +992,10 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     const paymentMethod = String(req.body?.paymentMethod || "CASH_ON_DELIVERY");
     const paymentUtr = String(req.body?.paymentUtr || "").replace(/[^0-9]/g, "");
     const paymentScreenshot = req.body?.paymentScreenshot;
+    const paymentSettingsSnap=await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
+    const paymentSettings=paymentSettingsSnap.exists?paymentSettingsSnap.data():{};
+    const specialOfferEnabled=paymentSettings.specialOfferEnabled===true;
+    const specialDiscountPercent=Math.max(0,Math.min(90,moneyNumber(paymentSettings.discountPercent)));
     const fulfilmentMode = String(req.body?.fulfilmentMode || "SHOP_COLLECTION");
     const deliveryAddress = req.body?.deliveryAddress || {};
     const customerLatitude = Number(req.body?.customerLatitude), customerLongitude = Number(req.body?.customerLongitude);
@@ -997,6 +1011,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     }
     if (!["CASH_ON_DELIVERY", "ONLINE_PAYMENT"].includes(paymentMethod)) return res.status(400).json({ error:"Choose a valid payment method." });
     if (fulfilmentMode === "HOME_DELIVERY" && paymentMethod !== "ONLINE_PAYMENT") return res.status(400).json({error:"Home delivery is available with Online Payment only. Cash on Delivery is available only for Visit Shop & Collect."});
+    if(specialOfferEnabled && paymentMethod!=="ONLINE_PAYMENT") return res.status(400).json({error:"Special Days Offer is available with Online Payment only."});
     if (paymentMethod === "ONLINE_PAYMENT") {
       if (paymentUtr.length !== 12) return res.status(400).json({ error:`UTR must contain exactly 12 digits. Server received ${paymentUtr.length} digit(s).` });
       decodePaymentImage(paymentScreenshot, "Payment screenshot");
@@ -1081,8 +1096,10 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
       const customer = customerSnap.data();
       const items = [...quantities.entries()].map(([id, quantity]) => {
         const product = productSnaps.get(id).data();
-        const offerPrice = moneyNumber(product.offerPrice);
-        return { productId:id, productName:product.name || "Product", size:String(product.size||""), description:String(product.description||""), quantity, offerPrice, lineTotal:offerPrice * quantity,
+        const baseOfferPrice=moneyNumber(product.offerPrice);
+        const specialDiscount=specialOfferEnabled?Math.round(baseOfferPrice*specialDiscountPercent)/100:0;
+        const offerPrice=Math.max(0,Math.round((baseOfferPrice-specialDiscount)*100)/100);
+        return { productId:id, productName:product.name || "Product", size:String(product.size||""), description:String(product.description||""), quantity, originalOfferPrice:baseOfferPrice, specialDiscountPercent:specialOfferEnabled?specialDiscountPercent:0, offerPrice, lineTotal:offerPrice * quantity,
           photoUrls:Array.isArray(product.photoData) ? product.photoData : (Array.isArray(product.photoUrls) ? product.photoUrls : []) };
       });
       const productTotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
@@ -1094,6 +1111,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         orderNumber, customerUid:req.user.uid,
         customerName:String(customer.name || "Customer"), mobile:String(customer.mobile || ""), village:String(customer.village || ""),
         items, productTotal, deliveryCharge, total, paymentMethod,
+        specialOfferApplied:specialOfferEnabled, specialDiscountPercent:specialOfferEnabled?specialDiscountPercent:0,
         fulfilmentMode,
         deliveryAddress:fulfilmentMode === "HOME_DELIVERY" ? {name:String(deliveryAddress.name).trim(),mobile:String(deliveryAddress.mobile),address:String(deliveryAddress.address).trim(),landmark:String(deliveryAddress.landmark).trim(),pincode:"517408",latitude:customerLatitude,longitude:customerLongitude} : null,
         paymentUtr: paymentMethod === "ONLINE_PAYMENT" ? paymentUtr : "",
