@@ -1497,7 +1497,7 @@ onAuthStateChanged(auth,async u=>{
     const a=await getDoc(doc(db,'admins',u.uid));
     if(a.exists()&&a.data().role==='admin'&&a.data().active===true){
       show('adminApp');$('adminEmail').textContent=u.email||'';
-      await Promise.all([loadCustomers(),loadAdminProducts(),loadAdminPaymentSettings(),loadAdminOfferOrders(),loadRewardEligible()]);
+      loadAdminOfferOrders();loadAdminSummary();
     }else{
       await signOut(auth);show('adminLogin');
       msg('adminMsg','Email and password were accepted, but this Firebase account is NOT enabled as an active shop admin. The Firestore admins/'+u.uid+' document must exist with role: "admin" and active: true.');
@@ -1545,7 +1545,8 @@ async function approveRewardFromRewardsPage(customerUid,approvedPoints,button){
   }catch(e){msg('rewardApprovalNotice',e.message||'Could not approve this reward.');button.disabled=false}
 }
 $('refreshRewardEligible').onclick=loadRewardEligible;
-async function loadCustomers(){const [r,x]=await Promise.all([adminGet('/api/admin/customers',15000),adminGet('/api/admin/summary',30000)]);customers=r.customers;render();$('customerCount').textContent=x.customerCount;$('stampCount').textContent=x.stampCount;$('giftCount').textContent=x.giftCount}
+async function loadAdminSummary(){try{const x=await adminGet('/api/admin/summary',30000);$('customerCount').textContent=x.customerCount;$('stampCount').textContent=x.stampCount;$('giftCount').textContent=x.giftCount}catch(e){console.warn('Admin summary unavailable:',e.message)}}
+async function loadCustomers(){const r=await adminGet('/api/admin/customers',15000);customers=Array.isArray(r?.customers)?r.customers:[];render()}
 function render(){const t=$('search').value.trim().toLowerCase(),list=customers.filter(c=>(c.name||'').toLowerCase().includes(t)||(c.mobile||'').includes(t));$('rows').innerHTML=list.map(c=>`<tr><td>${esc(c.name)}<br><small>${esc(c.id)}</small></td><td>${esc(c.mobile)}</td><td>${esc(c.village)}</td><td>${date(c.createdAt)}</td><td>${Number(c.stamps||0)} / 10</td><td><button data-id="${esc(c.id)}">Open</button></td></tr>`).join('')||'<tr><td colspan="6">No customers found</td></tr>';document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>openCustomer(b.dataset.id))}
 $('search').oninput=render;
 async function openCustomer(id){selected=customers.find(c=>c.id===id);if(!selected)return;$('detail').classList.remove('hidden');$('detailName').textContent=selected.name||'Customer';$('detailInfo').textContent=`ID: ${id} · ${selected.mobile||''} · ${selected.village||''}`;await refresh()}
@@ -1812,18 +1813,18 @@ window.addEventListener("unhandledrejection", function (event) {
     const cancelledHistoryPage=node('section','card');
     cancelledHistoryPage.innerHTML='<h2>❌ Cancelled Orders History</h2><p class="muted">Online Payment and Cash on Delivery orders cancelled by Admin or Customer. Latest cancellations appear first.</p><h3>All Orders</h3><div id="adminCancelledOrdersAll" class="compact-orders">Loading cancelled orders…</div>';
     const items=[
-      {id:'dashboard',label:'Dashboard',icon:'📊',content:[head,stats,dashboard]},
-      {id:'orders',label:'Pending / Running Orders',icon:'📦',content:[orders]},
-      {id:'online',label:'Online Payment Orders',icon:'💳',content:[]},
-      {id:'cod',label:'Cash on Delivery Orders',icon:'💵',content:[]},
+      {id:'dashboard',label:'Dashboard',icon:'📊',content:[head,stats,dashboard],onOpen:()=>{if(!root.classList.contains('hidden')){loadAdminOfferOrders();loadAdminSummary()}}},
+      {id:'orders',label:'Pending / Running Orders',icon:'📦',content:[orders],onOpen:()=>{if(!root.classList.contains('hidden'))loadAdminOfferOrders()}},
+      {id:'online',label:'Online Payment Orders',icon:'💳',content:[],onOpen:()=>{if(!root.classList.contains('hidden'))loadAdminOfferOrders()}},
+      {id:'cod',label:'Cash on Delivery Orders',icon:'💵',content:[],onOpen:()=>{if(!root.classList.contains('hidden'))loadAdminOfferOrders()}},
       {id:'history',label:'Completed Orders History',icon:'✅',content:[$('adminCompletedHistorySection')],onOpen:()=>{const el=$('adminCompletedOrders');if(el)el.innerHTML='<div class="order-empty">Loading completed orders…</div>';loadAdminOfferOrders('completed')}},
       {id:'cancelled',label:'Cancel Orders',icon:'❌',content:[cancelledHistoryPage],onOpen:()=>loadAdminOfferOrders('history')},
       {id:'whatsapp',label:'WhatsApp',icon:'🟢',content:[]},
       {id:'promotions',label:'Promotions',icon:'🖼️',content:[]},
-      {id:'products',label:'Products & Offers',icon:'🛍️',content:[products]},
-      {id:'customers',label:'Customers',icon:'👥',content:[customers,detail]},
-      {id:'rewards',label:'Rewards',icon:'🎁',content:[rewards]},
-      {id:'payments',label:'Payment QR',icon:'💳',content:[payments]},
+      {id:'products',label:'Products & Offers',icon:'🛍️',content:[products],onOpen:()=>{if(!root.classList.contains('hidden'))loadAdminProducts()}},
+      {id:'customers',label:'Customers',icon:'👥',content:[customers,detail],onOpen:()=>{if(!root.classList.contains('hidden'))loadCustomers()}},
+      {id:'rewards',label:'Rewards',icon:'🎁',content:[rewards],onOpen:()=>{if(!root.classList.contains('hidden'))loadRewardEligible()}},
+      {id:'payments',label:'Payment QR',icon:'💳',content:[payments],onOpen:()=>{if(!root.classList.contains('hidden'))loadAdminPaymentSettings()}},
       {id:'qr',label:'Customer QR',icon:'▦',content:[qr]}
     ];
     const onlineBox=$('adminOnlineOrders'),codBox=$('adminCodOrders');
