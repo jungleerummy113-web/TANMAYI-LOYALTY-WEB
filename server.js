@@ -997,6 +997,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     const paymentSettingsSnap=await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
     const paymentSettings=paymentSettingsSnap.exists?paymentSettingsSnap.data():{};
     const specialOfferEnabled=paymentSettings.specialOfferEnabled===true;
+    const specialOfferApplied=specialOfferEnabled&&paymentMethod==="ONLINE_PAYMENT";
     const specialDiscountPercent=Math.max(0,Math.min(90,moneyNumber(paymentSettings.discountPercent)));
     const fulfilmentMode = String(req.body?.fulfilmentMode || "SHOP_COLLECTION");
     const deliveryAddress = req.body?.deliveryAddress || {};
@@ -1013,7 +1014,6 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     }
     if (!["CASH_ON_DELIVERY", "ONLINE_PAYMENT"].includes(paymentMethod)) return res.status(400).json({ error:"Choose a valid payment method." });
     if (fulfilmentMode === "HOME_DELIVERY" && paymentMethod !== "ONLINE_PAYMENT") return res.status(400).json({error:"Home delivery is available with Online Payment only. Cash on Delivery is available only for Visit Shop & Collect."});
-    if(specialOfferEnabled && paymentMethod!=="ONLINE_PAYMENT") return res.status(400).json({error:"Special Days Offer is available with Online Payment only."});
     if (paymentMethod === "ONLINE_PAYMENT") {
       if (paymentUtr.length !== 12) return res.status(400).json({ error:`UTR must contain exactly 12 digits. Server received ${paymentUtr.length} digit(s).` });
       decodePaymentImage(paymentScreenshot, "Payment screenshot");
@@ -1099,9 +1099,9 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
       const items = [...quantities.entries()].map(([id, quantity]) => {
         const product = productSnaps.get(id).data();
         const baseOfferPrice=moneyNumber(product.offerPrice);
-        const specialDiscount=specialOfferEnabled?Math.round(baseOfferPrice*specialDiscountPercent)/100:0;
+        const specialDiscount=specialOfferApplied?Math.round(baseOfferPrice*specialDiscountPercent)/100:0;
         const offerPrice=Math.max(0,Math.round((baseOfferPrice-specialDiscount)*100)/100);
-        return { productId:id, productName:product.name || "Product", size:String(product.size||""), description:String(product.description||""), quantity, originalOfferPrice:baseOfferPrice, specialDiscountPercent:specialOfferEnabled?specialDiscountPercent:0, offerPrice, lineTotal:offerPrice * quantity,
+        return { productId:id, productName:product.name || "Product", size:String(product.size||""), description:String(product.description||""), quantity, originalOfferPrice:baseOfferPrice, specialDiscountPercent:specialOfferApplied?specialDiscountPercent:0, offerPrice, lineTotal:offerPrice * quantity,
           photoUrls:Array.isArray(product.photoData) ? product.photoData : (Array.isArray(product.photoUrls) ? product.photoUrls : []) };
       });
       const productTotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
@@ -1113,7 +1113,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         orderNumber, customerUid:req.user.uid,
         customerName:String(customer.name || "Customer"), mobile:String(customer.mobile || ""), village:String(customer.village || ""),
         items, productTotal, deliveryCharge, total, paymentMethod,
-        specialOfferApplied:specialOfferEnabled, specialDiscountPercent:specialOfferEnabled?specialDiscountPercent:0,
+        specialOfferApplied, specialDiscountPercent:specialOfferApplied?specialDiscountPercent:0,
         fulfilmentMode,
         deliveryAddress:fulfilmentMode === "HOME_DELIVERY" ? {name:String(deliveryAddress.name).trim(),mobile:String(deliveryAddress.mobile),address:String(deliveryAddress.address).trim(),landmark:String(deliveryAddress.landmark).trim(),pincode:"517408",latitude:customerLatitude,longitude:customerLongitude} : null,
         paymentUtr: paymentMethod === "ONLINE_PAYMENT" ? paymentUtr : "",
