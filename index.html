@@ -1283,12 +1283,15 @@ function renderReservations(items){
   if(selectedFulfilmentMode==='HOME_DELIVERY')evaluateDeliveryAvailability();document.querySelectorAll('input[name="orderPaymentMethod"]').forEach(r=>r.onchange=()=>{selectedOrderPaymentMethod=r.value;const online=r.value==='ONLINE_PAYMENT';$('onlinePaymentFields')?.classList.toggle('hidden',!online);const b=$('confirmOffersButton');if(b)b.textContent=online?'CONFIRM PAYMENT & ORDER':'CONFIRM ORDER';$('orderFlowBackdrop').querySelector('.payment-stage')?.classList.toggle('payment-stage',true)});
   if(selectedFulfilmentMode==='HOME_DELIVERY')selectedOrderPaymentMethod='ONLINE_PAYMENT';const onlineFields=$('onlinePaymentFields');if(onlineFields)onlineFields.classList.toggle('hidden',selectedOrderPaymentMethod!=='ONLINE_PAYMENT');
   const utrInput=$('onlinePaymentUtr');if(utrInput)utrInput.oninput=()=>{const digits=utrInput.value.replace(/[^0-9]/g,'').slice(0,12);if(utrInput.value!==digits)utrInput.value=digits;};
+  let paymentScreenshotAmountStatus='NOT_CHECKED';
+  let paymentScreenshotDetectedAmount=null;
   const screenshotInput=$('onlinePaymentScreenshot');
   if(screenshotInput)screenshotInput.onchange=async()=>{
     const file=screenshotInput.files?.[0],status=$('paymentOcrStatus'),amountEl=$('paymentOcrAmount');
     const expectedPayAmount=Math.max(0,Math.round((discountedProductsTotal+(selectedFulfilmentMode==='HOME_DELIVERY'?49:0))*100)/100);
     const formatOcrMoney=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
     if(!file)return;
+    paymentScreenshotAmountStatus='CHECKING';paymentScreenshotDetectedAmount=null;
     if(status)status.textContent='Reading payment screenshot… please wait.';
     if(amountEl)amountEl.textContent='Order amount: '+formatOcrMoney(expectedPayAmount)+' · Checking screenshot amount…';
     try{
@@ -1328,6 +1331,8 @@ function renderReservations(items){
         }catch(retryError){console.warn('Payment screenshot OCR retry failed:',retryError);}
       }
       if(utrMatches.length&&$('onlinePaymentUtr'))$('onlinePaymentUtr').value=utrMatches[0];
+      paymentScreenshotDetectedAmount=Number.isFinite(detectedAmount)?detectedAmount:null;
+      paymentScreenshotAmountStatus=Number.isFinite(detectedAmount)?(Math.abs(detectedAmount-expectedPayAmount)<0.01?'MATCH':'MISMATCH'):'UNREADABLE';
       if(amountEl){
         if(Number.isFinite(detectedAmount)){
           const matchesOrder=Math.abs(detectedAmount-expectedPayAmount)<0.01;
@@ -1341,6 +1346,7 @@ function renderReservations(items){
       }
       if(status)status.textContent=utrMatches.length?'12-digit UTR detected. Please verify it before submitting.':'UTR not detected clearly. Please enter it manually.';
     }catch(error){
+      paymentScreenshotAmountStatus='UNREADABLE';paymentScreenshotDetectedAmount=null;
       if(amountEl)amountEl.textContent='ORDER AMOUNT: '+formatOcrMoney(expectedPayAmount)+' · Screenshot amount could not be verified.';
       if(status)status.textContent=error.message||'OCR failed. Please enter the UTR manually.';
     }
@@ -1355,6 +1361,9 @@ function renderReservations(items){
       const payload={productIds:pendingOfferCart.flatMap(x=>Array(Math.max(1,Number(x.quantity)||1)).fill(x.productId)),clientRequestId:pendingOrderRequestId,paymentMethod};if(selectedFulfilmentMode==='HOME_DELIVERY'){if(!deliveryCoordinates)throw Error('Please tap USE CURRENT LOCATION and allow GPS permission.');payload.fulfilmentMode='HOME_DELIVERY';payload.deliveryAddress={name:$('deliveryName').value.trim(),mobile:$('deliveryMobile').value.replace(/\D/g,''),address:$('deliveryAddress').value.trim(),area:'',landmark:$('deliveryLandmark').value.trim(),pincode:$('deliveryPincode').value.trim()};payload.customerLatitude=deliveryCoordinates.latitude;payload.customerLongitude=deliveryCoordinates.longitude;}else payload.fulfilmentMode='SHOP_COLLECTION';
       if(paymentMethod==='ONLINE_PAYMENT'){
         if(!customerPaymentSettings.upiId)throw Error('Shop Paytm UPI ID is not configured yet. Please contact the shop.');
+        const expectedPayAmount=Math.max(0,Math.round((discountedProductsTotal+(selectedFulfilmentMode==='HOME_DELIVERY'?49:0))*100)/100);
+        if(paymentScreenshotAmountStatus==='MISMATCH')throw Error('PAYMENT AMOUNT MISMATCH! Your order total is ₹'+expectedPayAmount.toFixed(2)+', but the uploaded screenshot shows ₹'+Number(paymentScreenshotDetectedAmount).toFixed(2)+'. Please verify and upload the correct payment screenshot. This order has NOT been placed.');
+        if(paymentScreenshotAmountStatus!=='MATCH')throw Error('PAYMENT SCREENSHOT NOT VERIFIED! Please upload a clear screenshot showing the exact paid amount of ₹'+expectedPayAmount.toFixed(2)+'. Please verify and upload the correct payment screenshot. This order has NOT been placed.');
         const utr=String($('onlinePaymentUtr')?.value||'').replace(/[^0-9]/g,'');if($('onlinePaymentUtr'))$('onlinePaymentUtr').value=utr;
         const screenshotFile=$('onlinePaymentScreenshot')?.files?.[0];if(utr.length!==12)throw Error('UTR must contain exactly 12 digits. Website detected '+utr.length+' digit(s). Please check the UTR field.');if(!screenshotFile)throw Error('Please upload your payment screenshot.');payload.paymentUtr=utr;payload.paymentScreenshot=await imageData(screenshotFile);
       }
