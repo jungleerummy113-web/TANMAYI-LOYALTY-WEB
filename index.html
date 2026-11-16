@@ -1727,7 +1727,7 @@ window.addEventListener("unhandledrejection", function (event) {
     const sections=children.filter(x=>x.tagName==='SECTION'&&x!==dashboard);
     const findSection=(text)=>sections.find(x=>(x.querySelector('h2')?.textContent||'').toLowerCase().includes(text));
     const products=findSection('manage shop photos');
-    const payments=findSection('online payment qr');
+    const payments=findSection('online payment & special days offer');
     const orders=findSection('customer orders');
     const qr=findSection('customer login qr');
     const rewards=findSection('reward eligible');
