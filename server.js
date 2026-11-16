@@ -830,13 +830,22 @@ app.get("/api/customer/payment-settings", requireUser, async (_req, res) => {
 
 app.get("/api/admin/products", requireAdmin, async (_req, res) => {
   try {
-    const [snap, reservationSnap] = await Promise.all([
-      db.collection(PRODUCTS_COLLECTION).orderBy("createdAt", "desc").get(),
-      db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
-    ]);
-    const now = Date.now();
-    const heldByProduct = await countHeldReservations(reservationSnap.docs, now, id => db.collection(ORDERS_COLLECTION).doc(id).get());
-    res.json({ products: snap.docs.map(d => {
+    // Do not use Firestore orderBy here: legacy product documents without
+    // createdAt are excluded by orderBy and disappear from the Admin list.
+    const snap = await db.collection(PRODUCTS_COLLECTION).get();
+    let heldByProduct = new Map();
+    try {
+      const reservationSnap = await db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get();
+      heldByProduct = await countHeldReservations(reservationSnap.docs, Date.now(), id => db.collection(ORDERS_COLLECTION).doc(id).get());
+    } catch (reservationError) {
+      // Reservation statistics must never prevent existing products from displaying.
+      console.error("admin product reservation counts", reservationError);
+    }
+    const docs = [...snap.docs].sort((a,b) => {
+      const millis = value => value && typeof value.toMillis === "function" ? value.toMillis() : value instanceof Date ? value.getTime() : 0;
+      return millis(b.data().createdAt) - millis(a.data().createdAt);
+    });
+    res.json({ products: docs.map(d => {
       const x=d.data(), stock=Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const reservedCount=heldByProduct.get(d.id) || 0;
       return { id:d.id, ...x, size:String(x.size||""), description:String(x.description||""), stock, reservedCount, availableStock:Math.max(0, stock-reservedCount),
