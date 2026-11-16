@@ -1142,9 +1142,10 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
       tx.create(requestRef, { orderId:orderRef.id, customerUid:req.user.uid, createdAt:admin.firestore.FieldValue.serverTimestamp() });
       productIds.forEach((id, index) => {
         const product = productSnaps.get(id).data();
+        const orderedItem=items.find(item=>item.productId===id);
         tx.create(reservationRefs[index], {
           customerUid:req.user.uid, productId:id, productName:product.name || "Product",
-          offerPrice:moneyNumber(product.offerPrice), orderId:orderRef.id, orderNumber,
+          offerPrice:moneyNumber(orderedItem?.offerPrice??product.offerPrice), orderId:orderRef.id, orderNumber,
           status:"active", createdAt:confirmedAt, orderId:orderRef.id, orderNumber
         });
       });
