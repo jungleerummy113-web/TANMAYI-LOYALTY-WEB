@@ -1213,7 +1213,7 @@ app.get("/api/customer/my-orders", requireUser, async (req, res) => {
         orderStatus:(x.orderStatus || "ready"), collectionStatus:x.collectionStatus || "pending",
         stampsStatus:x.stampsStatus || "pending", stampsAdded:moneyNumber(x.stampsAdded), confirmedAt:safeDate(x.confirmedAt || x.createdAt),
         fulfilmentMode:x.fulfilmentMode || "SHOP_COLLECTION", deliveryCharge:moneyNumber(x.deliveryCharge), deliveryAddress:x.deliveryAddress || null, paymentVerifiedAt:safeDate(x.paymentVerifiedAt),
-        cancelledAt:safeDate(x.cancelledAt), readyAt:safeDate(x.readyAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
+        cancelledAt:safeDate(x.cancelledAt), readyAt:safeDate(x.readyAt), processingStartedAt:safeDate(x.processingStartedAt), completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt) };
     }).sort((a,b)=>new Date(b.confirmedAt || 0)-new Date(a.confirmedAt || 0));
     res.json({ orders });
   } catch (e) { console.error("customer orders", e); res.status(500).json({ error:"Could not load your orders." }); }
