@@ -1226,7 +1226,7 @@ function renderReservations(items){
   $('selectedOfferCount').textContent=`Selected items: ${total}`;
   const deliveryChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="order-flow-stage"><p class="order-flow-step-title">CHOOSE DELIVERY OPTION</p><div class="payment-choice"><label><input type="radio" name="fulfilmentMode" value="SHOP_COLLECTION" ${selectedFulfilmentMode==="SHOP_COLLECTION"?"checked":""}> Visit Shop & Collect – Free</label><label><input type="radio" name="fulfilmentMode" value="HOME_DELIVERY" ${selectedFulfilmentMode==="HOME_DELIVERY"?"checked":""}> Home Delivery – ₹49 extra</label></div><div id="homeDeliveryFields" class="online-payment-fields ${selectedFulfilmentMode==="HOME_DELIVERY"?"":"hidden"}"><b>Home Delivery Address</b><label>Name</label><input id="deliveryName" maxlength="80" autocomplete="name" placeholder="Enter your name"><label>Mobile Number</label><input id="deliveryMobile" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="Enter 10-digit mobile number"><div id="deliveryAddressFields" class="hidden"><label>Address</label><textarea id="deliveryAddress" rows="2" maxlength="250" placeholder="Enter full address"></textarea><label>Landmark</label><input id="deliveryLandmark" maxlength="100" placeholder="Nearby landmark"><label>PIN Code</label><input id="deliveryPincode" inputmode="numeric" maxlength="6" autocomplete="postal-code" placeholder="Enter 6-digit PIN code"><button type="button" class="secondary" id="getDeliveryLocation">📍 USE CURRENT LOCATION</button><p id="deliveryLocationStatus" class="muted">Home delivery is available only for PIN 517408 within 12 km of the shop.</p></div><p><b>Delivery charge: ₹49</b></p></div></div>`:"";
   const deliveryPaymentSummary=selectedFulfilmentMode==='HOME_DELIVERY'?'<div class="card" style="background:#eefaf0;border:1px solid #9ac9a1;margin:8px 0;padding:12px"><h3 style="margin:0 0 8px;color:#24733a">HOME DELIVERY PAYMENT BILL</h3><p style="margin:4px 0">Product total: <b>'+moneyPrice(discountedProductsTotal)+'</b></p><p style="margin:4px 0">Home delivery charge: <b>₹49</b></p><p style="margin:8px 0 0;font-size:18px">TOTAL PAY: <b>'+moneyPrice(discountedProductsTotal+49)+'</b></p></div>':'';
-  const paymentChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="order-flow-stage payment-stage"><p class="order-flow-step-title">STEP 2 · CHOOSE PAYMENT</p><strong>Payment method</strong><div class="payment-choice">${selectedFulfilmentMode==='HOME_DELIVERY'?'<label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" checked> Online Payment – Home Delivery</label>':customerPaymentSettings.specialOfferEnabled?'<label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" checked> Special Days Offer · Online Payment Only</label>':'<label><input type="radio" name="orderPaymentMethod" value="CASH_ON_DELIVERY" checked> Cash on Delivery – Visit Shop</label><label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT"> Online Payment – Visit Shop</label>'}<div id="onlinePaymentFields" class="online-payment-fields hidden">${deliveryPaymentSummary}<p style="font-size:12px;margin:4px 0"><b>Paytm UPI QR · Amount: ${moneyPrice(discountedProductsTotal+(selectedFulfilmentMode==='HOME_DELIVERY'?49:0))}</b></p><div id="dynamicPaymentQr" class="qr-area"></div><p class="muted" style="text-align:center">UPI ID: ${esc(customerPaymentSettings.upiId||'Not configured')} · ${esc(customerPaymentSettings.holderName||'')}</p><label>Upload Payment Screenshot</label><input type="file" id="onlinePaymentScreenshot" accept="image/*"><p id="paymentOcrStatus" class="muted">Screenshot OCR can suggest UTR and paid amount. Shop approval is still required.</p><p id="paymentOcrAmount" class="muted"></p><label>Enter 12-digit UTR Number (check OCR result)</label><input type="text" id="onlinePaymentUtr" inputmode="numeric" maxlength="12" placeholder="12-digit UTR number"></div></div></div>`:'';
+  const paymentChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="order-flow-stage payment-stage"><p class="order-flow-step-title">STEP 2 · CHOOSE PAYMENT</p><strong>Payment method</strong><div class="payment-choice">${selectedFulfilmentMode==='HOME_DELIVERY'?'<label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" checked> Online Payment – Home Delivery</label>':customerPaymentSettings.specialOfferEnabled?'<label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" checked> Special Days Offer · Online Payment Only</label>':'<label><input type="radio" name="orderPaymentMethod" value="CASH_ON_DELIVERY" checked> Cash on Delivery – Visit Shop</label><label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT"> Online Payment – Visit Shop</label>'}<div id="onlinePaymentFields" class="online-payment-fields hidden">${deliveryPaymentSummary}<p style="font-size:12px;margin:4px 0"><b>Paytm UPI QR · Amount: ${moneyPrice(discountedProductsTotal+(selectedFulfilmentMode==='HOME_DELIVERY'?49:0))}</b></p><div id="dynamicPaymentQr" class="qr-area"></div><p class="muted" style="text-align:center">UPI ID: ${esc(customerPaymentSettings.upiId||'Not configured')} · ${esc(customerPaymentSettings.holderName||'')}</p><label>Upload Payment Screenshot</label><input type="file" id="onlinePaymentScreenshot" accept="image/*"><p id="paymentOrderAmount" style="font-weight:800;color:#7e2028;margin:10px 0 4px">ORDER AMOUNT: ${moneyPrice(discountedProductsTotal+(selectedFulfilmentMode==='HOME_DELIVERY'?49:0))}</p><p id="paymentOcrStatus" class="muted">Screenshot OCR can suggest UTR and paid amount. Shop approval is still required.</p><p id="paymentOcrAmount" class="muted"></p><label>Enter 12-digit UTR Number (check OCR result)</label><input type="text" id="onlinePaymentUtr" inputmode="numeric" maxlength="12" placeholder="12-digit UTR number"></div></div></div>`:'';
 
   el.innerHTML=`<p class="order-flow-step-title">${paymentStepOpen?'STEP 2 · PAYMENT DETAILS':'STEP 1 · YOUR SELECTED PRODUCTS'}</p>${staged?`<div class="order-flow-stage"><div class="pending-cart-grid">${staged}</div><p style="font-size:12px;margin:8px 0 0"><b>${pendingOfferCart.reduce((n,x)=>n+Math.max(1,Number(x.quantity)||1),0)} piece(s)</b> · Total: ${moneyPrice(discountedProductsTotal)}</p></div>`:''}${deliveryChoice}${paymentChoice}${pendingOfferCart.length?`<div class="order-flow-actions">${paymentStepOpen?'<button type="button" class="back-btn" id="orderFlowBack">BACK</button>':'<button type="button" class="back-btn pending-addmore-btn" id="orderFlowAddMore">ADD MORE</button>'}<button type="button" class="continue-btn pending-payment-btn" id="confirmOffersButton">${paymentStepOpen?(selectedOrderPaymentMethod==='ONLINE_PAYMENT'?'CONFIRM PAYMENT & ORDER':'CONFIRM ORDER'):'CONTINUE TO PAYMENT'}</button></div>`:''}${!pendingOfferCart.length&&!confirmed?'<p class="muted">No products selected.</p>':''}`;
   const dynamicQrMount=$('dynamicPaymentQr');
@@ -1286,47 +1286,64 @@ function renderReservations(items){
   const screenshotInput=$('onlinePaymentScreenshot');
   if(screenshotInput)screenshotInput.onchange=async()=>{
     const file=screenshotInput.files?.[0],status=$('paymentOcrStatus'),amountEl=$('paymentOcrAmount');
+    const expectedPayAmount=Math.max(0,Math.round((discountedProductsTotal+(selectedFulfilmentMode==='HOME_DELIVERY'?49:0))*100)/100);
+    const formatOcrMoney=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
     if(!file)return;
     if(status)status.textContent='Reading payment screenshot… please wait.';
-    if(amountEl)amountEl.textContent='';
+    if(amountEl)amountEl.textContent='Order amount: '+formatOcrMoney(expectedPayAmount)+' · Checking screenshot amount…';
     try{
       if(!window.Tesseract)throw new Error('OCR service is not available. Enter the UTR manually.');
-      const readOcr=async input=>String((await Tesseract.recognize(input,'eng',{tessedit_pageseg_mode:6}))?.data?.text||'');
-      const parsePaymentText=raw=>{
-        const lines=String(raw||'').replace(/\r/g,'\n').split('\n').map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
-        const all=lines.join(' ').replace(/\s+/g,' ');
-        const amountPattern='([0-9][0-9,]*(?:\\.[0-9]{1,2})?)';
+      const readOcr=async(input,mode=6)=>String((await Tesseract.recognize(input,'eng',{tessedit_pageseg_mode:mode}))?.data?.text||'');
+      const extractAmounts=raw=>{
+        const all=String(raw||'').replace(/\s+/g,' ');
         const patterns=[
-          new RegExp('(?:₹|rs\\.?|inr)\\s*'+amountPattern,'i'),
-          new RegExp('(?:amount\\s*(?:paid|sent|transferred)?|paid\\s*amount|you\\s*paid|total\\s*paid|transaction\\s*amount)\\D{0,24}'+amountPattern,'i'),
-          new RegExp(amountPattern+'\\s*(?:rupees|rs\\.?|inr)\\b','i')
+          /(?:₹|rs\.?|inr)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/gi,
+          /(?:amount\s*(?:paid|sent|transferred)?|paid\s*amount|you\s*paid|total\s*paid|transaction\s*amount|debited\s*amount)\D{0,24}([0-9][0-9,]*(?:\.[0-9]{1,2})?)/gi,
+          /([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:rupees|rs\.?|inr)\b/gi
         ];
-        for(const re of patterns){const m=all.match(re);if(m){const n=Number(m[1].replace(/,/g,''));if(Number.isFinite(n)&&n>0&&n<=1000000)return n;}}
-        for(let i=0;i<lines.length;i++){
-          if(/paid|amount|successful|debited|sent|transferred|payment/i.test(lines[i])){
-            const nearby=lines.slice(Math.max(0,i-1),Math.min(lines.length,i+3)).join(' ');
-            const nums=[...nearby.matchAll(/\b([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b/g)].map(m=>Number(m[1].replace(/,/g,''))).filter(n=>Number.isFinite(n)&&n>0&&n<=1000000);
-            if(nums.length)return nums[0];
-          }
-        }
-        return NaN;
+        const values=[];
+        for(const re of patterns){let m;while((m=re.exec(all))!==null){const n=Number(m[1].replace(/,/g,''));if(Number.isFinite(n)&&n>0&&n<=1000000)values.push(n);}}
+        return [...new Set(values)];
       };
-      let ocrText=await readOcr(file);
+      let ocrText=await readOcr(file,6);
       let utrMatches=[...ocrText.matchAll(/\b\d{12}\b/g)].map(m=>m[0]);
-      let detectedAmount=parsePaymentText(ocrText);
-      if(!Number.isFinite(detectedAmount)&&typeof createImageBitmap==='function'){
+      let amountCandidates=extractAmounts(ocrText);
+      let detectedAmount=amountCandidates.find(n=>Math.abs(n-expectedPayAmount)<0.01)??amountCandidates[0]??NaN;
+      if(!Number.isFinite(detectedAmount)||Math.abs(detectedAmount-expectedPayAmount)>=0.01){
         try{
-          const bitmap=await createImageBitmap(file),scale=Math.min(2,Math.max(1,1800/Math.max(bitmap.width,bitmap.height)));
+          const bitmap=await createImageBitmap(file);
+          const scale=Math.min(2,Math.max(1,1800/Math.max(bitmap.width,bitmap.height)));
           const canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
           const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.filter='grayscale(1) contrast(1.35)';ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
           const processed=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
-          if(processed){const retryText=await readOcr(processed);ocrText+='\n'+retryText;utrMatches=[...new Set([...utrMatches,...[...retryText.matchAll(/\b\d{12}\b/g)].map(m=>m[0])])];detectedAmount=parsePaymentText(retryText)||parsePaymentText(ocrText);}
+          if(processed){
+            const retryTexts=[await readOcr(processed,6),await readOcr(processed,11)];
+            for(const retryText of retryTexts){
+              ocrText+='\n'+retryText;
+              utrMatches=[...new Set([...utrMatches,...[...retryText.matchAll(/\b\d{12}\b/g)].map(m=>m[0])])];
+            }
+            amountCandidates=[...new Set([...amountCandidates,...extractAmounts(ocrText)])];
+            detectedAmount=amountCandidates.find(n=>Math.abs(n-expectedPayAmount)<0.01)??amountCandidates[0]??NaN;
+          }
         }catch(retryError){console.warn('Payment screenshot OCR retry failed:',retryError);}
       }
       if(utrMatches.length&&$('onlinePaymentUtr'))$('onlinePaymentUtr').value=utrMatches[0];
-      if(amountEl)amountEl.textContent=Number.isFinite(detectedAmount)?'PAID AMOUNT DETECTED: ₹'+detectedAmount.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+' · Please compare it with your order total.':'Paid amount could not be read clearly. Please upload a clear payment screenshot or check it manually.';
+      if(amountEl){
+        if(Number.isFinite(detectedAmount)){
+          const matchesOrder=Math.abs(detectedAmount-expectedPayAmount)<0.01;
+          amountEl.textContent='ORDER AMOUNT: '+formatOcrMoney(expectedPayAmount)+' · SCREENSHOT AMOUNT (OCR): '+formatOcrMoney(detectedAmount)+(matchesOrder?' · MATCH':' · DOES NOT MATCH — please verify the payment screenshot before submitting.');
+          amountEl.style.color=matchesOrder?'#24733a':'#a32626';
+          amountEl.style.fontWeight='800';
+        }else{
+          amountEl.textContent='ORDER AMOUNT: '+formatOcrMoney(expectedPayAmount)+' · Screenshot paid amount could not be read clearly. Please check the screenshot manually.';
+          amountEl.style.color='#8a5a12';
+        }
+      }
       if(status)status.textContent=utrMatches.length?'12-digit UTR detected. Please verify it before submitting.':'UTR not detected clearly. Please enter it manually.';
-    }catch(error){if(status)status.textContent=error.message||'OCR failed. Please enter the UTR manually.';}
+    }catch(error){
+      if(amountEl)amountEl.textContent='ORDER AMOUNT: '+formatOcrMoney(expectedPayAmount)+' · Screenshot amount could not be verified.';
+      if(status)status.textContent=error.message||'OCR failed. Please enter the UTR manually.';
+    }
   };
   const confirmButton=$('confirmOffersButton');if(confirmButton)confirmButton.onclick=async()=>{
     if(!paymentStepOpen){paymentStepOpen=true;try{const latestPaymentSettings=await api('/api/customer/payment-settings');customerPaymentSettings=latestPaymentSettings||{};customerPaymentQr=latestPaymentSettings.qrData||'';if(customerPaymentSettings.specialOfferEnabled)selectedOrderPaymentMethod='ONLINE_PAYMENT';}catch(_){}renderReservations(items);return;}
