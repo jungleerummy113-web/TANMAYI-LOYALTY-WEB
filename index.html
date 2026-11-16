@@ -831,9 +831,10 @@ function moneyPrice(v){return '₹'+Number(v||0).toLocaleString('en-IN')}
 async function loadAdminProducts(){
   try{
     const r=await adminGet('/api/admin/products',15000);
-    $('adminProducts').innerHTML=r.products.map(x=>`<div class="product-card">
-      <strong>${esc(x.name)}</strong>
-      <div class="product-photos">${x.photoUrls.map(u=>`<img src="${esc(u)}" alt="${esc(x.name)}" data-zoom-product-image="${esc(u)}" loading="lazy">`).join('')}</div>
+    const products=Array.isArray(r?.products)?r.products:[];
+    $('adminProducts').innerHTML=products.map(x=>`<div class="product-card">
+      <strong>${esc(x.name||'Product')}</strong>
+      <div class="product-photos">${(Array.isArray(x.photoUrls)?x.photoUrls:Array.isArray(x.photoData)?x.photoData:[]).map(u=>`<img src="${esc(u)}" alt="${esc(x.name||'Product')}" data-zoom-product-image="${esc(u)}" loading="lazy">`).join('')}</div>
       <p><span class="price-old">${moneyPrice(x.originalPrice)}</span> <span class="price-offer">${moneyPrice(x.offerPrice)}</span></p>
       ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
       ${x.description?`<p style="white-space:pre-wrap"><b>Description:</b> ${esc(x.description)}</p>`:''}
