@@ -1138,7 +1138,7 @@ function renderInlineProductSelections(){
 function renderProductSpecialOfferMessages(){
   const pct=customerPaymentSettings.specialOfferEnabled?Math.max(0,Math.min(90,Number(customerPaymentSettings.discountPercent)||0)):0;
   document.querySelectorAll('[data-special-offer-message]').forEach(el=>{
-    el.innerHTML=pct>0?'<div style="margin:6px 0;padding:7px 9px;border-radius:8px;background:#fff4d8;border:1px solid #e5c36e;color:#81520c;font-size:12px;font-weight:800">🎉 SPECIAL DAYS OFFER: EXTRA '+pct+'% OFF ON ONLINE PAYMENT ONLY</div>':'';
+    el.innerHTML=pct>0?'<div style="margin:8px 0;padding:11px 12px;border-radius:10px;background:#dff2ff;border:2px solid #78c5f2;color:#e0ad00;text-shadow:0 1px 1px #31536b;font-size:13px;font-weight:900;letter-spacing:.25px;text-align:center;box-shadow:0 2px 7px rgba(34,115,165,.16)">🎉 SPECIAL DAYS OFFER<br>EXTRA '+pct+'% OFF ON ONLINE PAYMENT ONLY</div>':'';
   });
 }
 async function loadCustomerProducts(){
