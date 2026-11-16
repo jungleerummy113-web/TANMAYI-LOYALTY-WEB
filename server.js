@@ -679,7 +679,7 @@ app.get("/api/admin/payment-settings", requireAdmin, async (_req, res) => {
   try {
     const snap = await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
     const d = snap.exists ? snap.data() : {};
-    res.json({ qrData:String(d.qrData||""), upiId:String(d.upiId||"paytm.s3paakj@pty"), holderName:String(d.holderName||""), specialOfferEnabled:d.specialOfferEnabled===true, discountPercent:moneyNumber(d.discountPercent), updatedAt:snap.exists?safeDate(d.updatedAt):null });
+    res.json({ qrData:String(d.qrData||""), upiId:String(d.upiId||""), holderName:String(d.holderName||""), specialOfferEnabled:d.specialOfferEnabled===true, discountPercent:moneyNumber(d.discountPercent), updatedAt:snap.exists?safeDate(d.updatedAt):null });
   } catch (e) { res.status(500).json({ error:"Could not load payment QR settings." }); }
 });
 app.put("/api/admin/payment-settings", requireAdmin, async (req, res) => {
@@ -694,7 +694,9 @@ app.put("/api/admin/payment-settings", requireAdmin, async (req, res) => {
     patch.holderName=holderName;
     patch.discountPercent=discountPercent;
     patch.specialOfferEnabled=body.specialOfferEnabled===undefined?(current.exists&&current.data().specialOfferEnabled===true):body.specialOfferEnabled===true;
-    patch.upiId="paytm.s3paakj@pty";
+    const upiId=String(body.upiId??(current.exists?current.data().upiId:"")).trim().slice(0,120);
+    if(upiId&&!/^[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,40}$/.test(upiId)) throw new Error("Enter a valid Paytm Merchant UPI ID.");
+    patch.upiId=upiId;
     await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").set(patch,{merge:true});
     res.json({ok:true,message:"Payment and Special Days Offer settings saved."});
   } catch(e) { res.status(400).json({error:e.message||"Could not update payment settings."}); }
@@ -822,7 +824,7 @@ app.get("/api/customer/payment-settings", requireUser, async (_req, res) => {
   try {
     const snap=await db.collection(PAYMENT_SETTINGS_COLLECTION).doc("upi").get();
     const d=snap.exists?snap.data():{};
-    res.json({qrData:String(d.qrData||""),upiId:"paytm.s3paakj@pty",holderName:String(d.holderName||""),specialOfferEnabled:d.specialOfferEnabled===true,discountPercent:moneyNumber(d.discountPercent)});
+    res.json({qrData:String(d.qrData||""),upiId:String(d.upiId||""),holderName:String(d.holderName||""),specialOfferEnabled:d.specialOfferEnabled===true,discountPercent:moneyNumber(d.discountPercent)});
   } catch(e) { res.status(500).json({error:"Could not load shop payment settings."}); }
 });
 
