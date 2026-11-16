@@ -1287,18 +1287,47 @@ function renderReservations(items){
   if(screenshotInput)screenshotInput.onchange=async()=>{
     const file=screenshotInput.files?.[0],status=$('paymentOcrStatus'),amountEl=$('paymentOcrAmount');
     if(!file)return;
-    if(status)status.textContent='Reading screenshot… please wait.';
+    if(status)status.textContent='Reading payment screenshot… please wait.';
     if(amountEl)amountEl.textContent='';
     try{
       if(!window.Tesseract)throw new Error('OCR service is not available. Enter the UTR manually.');
-      const result=await Tesseract.recognize(file,'eng');
-      const text=String(result?.data?.text||'').replace(/\s+/g,' ');
-      const utrMatches=[...text.matchAll(/\b\d{12}\b/g)].map(m=>m[0]);
+      const readOcr=async input=>String((await Tesseract.recognize(input,'eng',{tessedit_pageseg_mode:6}))?.data?.text||'');
+      const parsePaymentText=raw=>{
+        const lines=String(raw||'').replace(/\r/g,'\n').split('\n').map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
+        const all=lines.join(' ').replace(/\s+/g,' ');
+        const amountPattern='([0-9][0-9,]*(?:\\.[0-9]{1,2})?)';
+        const patterns=[
+          new RegExp('(?:₹|rs\\.?|inr)\\s*'+amountPattern,'i'),
+          new RegExp('(?:amount\\s*(?:paid|sent|transferred)?|paid\\s*amount|you\\s*paid|total\\s*paid|transaction\\s*amount)\\D{0,24}'+amountPattern,'i'),
+          new RegExp(amountPattern+'\\s*(?:rupees|rs\\.?|inr)\\b','i')
+        ];
+        for(const re of patterns){const m=all.match(re);if(m){const n=Number(m[1].replace(/,/g,''));if(Number.isFinite(n)&&n>0&&n<=1000000)return n;}}
+        // Some UPI apps put the amount on the line immediately beside "Paid to" or "Payment successful".
+        for(let i=0;i<lines.length;i++){
+          if(/paid|amount|successful|debited|sent|transferred|payment/i.test(lines[i])){
+            const nearby=lines.slice(Math.max(0,i-1),Math.min(lines.length,i+3)).join(' ');
+            const nums=[...nearby.matchAll(/\b([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b/g)].map(m=>Number(m[1].replace(/,/g,''))).filter(n=>Number.isFinite(n)&&n>0&&n<=1000000);
+            if(nums.length)return nums[0];
+          }
+        }
+        return NaN;
+      };
+      let ocrText=await readOcr(file);
+      let utrMatches=[...ocrText.matchAll(/\b\d{12}\b/g)].map(m=>m[0]);
+      let detectedAmount=parsePaymentText(ocrText);
+      // Retry once with an enlarged, grayscale screenshot when the amount is not readable on the first pass.
+      if(!Number.isFinite(detectedAmount)&&typeof createImageBitmap==='function'){
+        try{
+          const bitmap=await createImageBitmap(file),scale=Math.min(2,Math.max(1,1800/Math.max(bitmap.width,bitmap.height)));
+          const canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
+          const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.filter='grayscale(1) contrast(1.35)';ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
+          const processed=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+          if(processed){const retryText=await readOcr(processed);ocrText+='\n'+retryText;utrMatches=[...new Set([...utrMatches,...[...retryText.matchAll(/\b\d{12}\b/g)].map(m=>m[0])])];detectedAmount=parsePaymentText(retryText)||parsePaymentText(ocrText);}
+        }catch(retryError){console.warn('Payment screenshot OCR retry failed:',retryError);}
+      }
       if(utrMatches.length&&$('onlinePaymentUtr'))$('onlinePaymentUtr').value=utrMatches[0];
-      const amountMatch=text.match(/(?:₹|INR\s?)([0-9,]+(?:\.[0-9]{1,2})?)/i)||text.match(/(?:paid|amount)\s*[:：]?\s*(?:₹|INR)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i);
-      const detectedAmount=amountMatch?Number(amountMatch[1].replace(/,/g,'')):NaN;
-      if(amountEl)amountEl.textContent=Number.isFinite(detectedAmount)?'OCR detected paid amount: ₹'+detectedAmount.toLocaleString('en-IN'):'Paid amount not clearly detected. Please check the screenshot.';
-      if(status)status.textContent=utrMatches.length?'OCR suggested a 12-digit UTR. Please verify it before submitting.':'UTR not detected clearly. Please enter it manually.';
+      if(amountEl)amountEl.textContent=Number.isFinite(detectedAmount)?'PAID AMOUNT DETECTED: ₹'+detectedAmount.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+' · Please compare it with your order total.':'Paid amount could not be read clearly. Please upload a clear payment screenshot or check it manually.';
+      if(status)status.textContent=utrMatches.length?'12-digit UTR detected. Please verify it before submitting.':'UTR not detected clearly. Please enter it manually.';
     }catch(error){if(status)status.textContent=error.message||'OCR failed. Please enter the UTR manually.';}
   };
   const confirmButton=$('confirmOffersButton');if(confirmButton)confirmButton.onclick=async()=>{
