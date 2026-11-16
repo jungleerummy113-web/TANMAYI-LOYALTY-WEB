@@ -1291,10 +1291,10 @@ function renderReservations(items){
     try{
       if(!window.Tesseract)throw new Error('OCR service is not available. Enter the UTR manually.');
       const result=await Tesseract.recognize(file,'eng');
-      const text=String(result?.data?.text||'').replace(/\\s+/g,' ');
-      const utrMatches=[...text.matchAll(/\\b\\d{12}\\b/g)].map(m=>m[0]);
+      const text=String(result?.data?.text||'').replace(/\s+/g,' ');
+      const utrMatches=[...text.matchAll(/\b\\d{12}\b/g)].map(m=>m[0]);
       if(utrMatches.length&&$('onlinePaymentUtr'))$('onlinePaymentUtr').value=utrMatches[0];
-      const amountMatch=text.match(/(?:₹|INR\\s?)([0-9,]+(?:\\.[0-9]{1,2})?)/i)||text.match(/(?:paid|amount)\\s*[:：]?\\s*(?:₹|INR)?\\s*([0-9,]+(?:\\.[0-9]{1,2})?)/i);
+      const amountMatch=text.match(/(?:₹|INR\s?)([0-9,]+(?:\.[0-9]{1,2})?)/i)||text.match(/(?:paid|amount)\s*[:：]?\s*(?:₹|INR)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i);
       const detectedAmount=amountMatch?Number(amountMatch[1].replace(/,/g,'')):NaN;
       if(amountEl)amountEl.textContent=Number.isFinite(detectedAmount)?'OCR detected paid amount: ₹'+detectedAmount.toLocaleString('en-IN'):'Paid amount not clearly detected. Please check the screenshot.';
       if(status)status.textContent=utrMatches.length?'OCR suggested a 12-digit UTR. Please verify it before submitting.':'UTR not detected clearly. Please enter it manually.';
