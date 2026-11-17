@@ -1827,7 +1827,7 @@ app.get("/api/admin/offer-orders", requireAdmin, async (req, res) => {
         id, ...x, confirmedAt, completedAt:safeDate(x.completedAt), expiresAt:asMillis(x.expiresAt),
         orderStatus:x.orderStatus || "ready", total:moneyNumber(x.total), items,
         paymentUtr:x.paymentUtr || payment.utr || "",
-        paymentScreenshotData:(x.orderStatus === "cancelled" || payment.status === "submitted" || refund) ? (payment.screenshotData || "") : "",
+        paymentScreenshotData:payment.screenshotData || x.paymentScreenshotData || "",
         adminCancellationMessage:x.adminCancellationMessage || "",
         cancelledByAdmin:Boolean(x.cancelledByAdmin),
         paymentSubmissionStatus:payment.status || "",
