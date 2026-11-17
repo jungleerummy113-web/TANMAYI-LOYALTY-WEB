@@ -1237,7 +1237,7 @@ function renderReservations(items){
   const confirmed=(items||[]).map(x=>`<div class="product-card" data-expiry="${Number(x.expiresAt)}"><strong>${esc(x.productName)}</strong> · ${moneyPrice(x.offerPrice)}<span class="countdown" data-countdown="${Number(x.expiresAt)}"></span><div class="collection-notice">Collect at TANMAYI STORE AND GIFTS before this offer expires.</div><button class="cancel-reservation" data-cancel-reservation="${esc(x.id)}">Cancel selection</button></div>`).join('');
   const total=pendingOfferCart.reduce((n,x)=>n+Math.max(1,Number(x.quantity)||1),0)+(items||[]).length;
   $('selectedOfferCount').textContent=`Selected items: ${total}`;
-  const deliveryChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="order-flow-stage"><p class="order-flow-step-title">CHOOSE DELIVERY OPTION</p><div class="payment-choice"><label><input type="radio" name="fulfilmentMode" value="SHOP_COLLECTION" ${selectedFulfilmentMode==="SHOP_COLLECTION"?"checked":""}> Visit Shop & Collect – Free</label><label><input type="radio" name="fulfilmentMode" value="HOME_DELIVERY" ${selectedFulfilmentMode==="HOME_DELIVERY"?"checked":""}> Home Delivery – ₹49 extra (08:00 AM–09:00 PM IST)</label></div><div id="homeDeliveryFields" class="online-payment-fields ${selectedFulfilmentMode==="HOME_DELIVERY"?"":"hidden"}"><b>Home Delivery Address</b><label>Name</label><input id="deliveryName" maxlength="80" autocomplete="name" placeholder="Enter your name"><label>Mobile Number</label><input id="deliveryMobile" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="Enter 10-digit mobile number"><div id="deliveryAddressFields" class="hidden"><label>Address</label><textarea id="deliveryAddress" rows="2" maxlength="250" placeholder="Enter full address"></textarea><label>Landmark</label><input id="deliveryLandmark" maxlength="100" placeholder="Nearby landmark"><label>PIN Code</label><input id="deliveryPincode" inputmode="numeric" maxlength="6" autocomplete="postal-code" placeholder="Enter 6-digit PIN code"><button type="button" class="secondary" id="getDeliveryLocation">📍 USE CURRENT LOCATION</button><p id="deliveryLocationStatus" class="muted">Home delivery is available for valid PIN codes within 15 km road distance of the shop.</p></div><p><b>Delivery charge: ₹49</b></p></div></div>`:"";
+  const deliveryChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="order-flow-stage"><p class="order-flow-step-title">CHOOSE DELIVERY OPTION</p><div class="payment-choice"><label><input type="radio" name="fulfilmentMode" value="SHOP_COLLECTION" ${selectedFulfilmentMode==="SHOP_COLLECTION"?"checked":""}> Visit Shop & Collect – Free</label><label><input type="radio" name="fulfilmentMode" value="HOME_DELIVERY" ${selectedFulfilmentMode==="HOME_DELIVERY"?"checked":""}> Home Delivery – ₹49 extra (08:00 AM–09:00 PM IST)</label></div><div id="homeDeliveryHoursNotice" class="muted ${selectedFulfilmentMode==="HOME_DELIVERY"?"":"hidden"}" style="margin:10px 0;padding:10px;border:1px solid #e2c98b;border-radius:10px;background:#fffaf0;color:#6f4c16"></div>${selectedFulfilmentMode==="HOME_DELIVERY"&&isHomeDeliveryHoursOpenClient()?`<div id="homeDeliveryFields" class="online-payment-fields"><b>Home Delivery Address</b><label>Name</label><input id="deliveryName" maxlength="80" autocomplete="name" placeholder="Enter your name"><label>Mobile Number</label><input id="deliveryMobile" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="Enter 10-digit mobile number"><div id="deliveryAddressFields" class="hidden"><label>Address</label><textarea id="deliveryAddress" rows="2" maxlength="250" placeholder="Enter full address"></textarea><label>Landmark</label><input id="deliveryLandmark" maxlength="100" placeholder="Nearby landmark"><label>PIN Code</label><input id="deliveryPincode" inputmode="numeric" maxlength="6" autocomplete="postal-code" placeholder="Enter 6-digit PIN code"><button type="button" class="secondary" id="getDeliveryLocation">📍 USE CURRENT LOCATION</button><p id="deliveryLocationStatus" class="muted">Home delivery is available for valid PIN codes within 15 km road distance of the shop.</p></div><p><b>Delivery charge: ₹49</b></p></div>`:""}</div>`:"";
   const deliveryPaymentSummary=selectedFulfilmentMode==='HOME_DELIVERY'?'<div class="card" style="background:#eefaf0;border:1px solid #9ac9a1;margin:8px 0;padding:12px"><h3 style="margin:0 0 8px;color:#24733a">HOME DELIVERY PAYMENT BILL</h3><p style="margin:4px 0">Product total: <b>'+moneyPrice(discountedProductsTotal)+'</b></p><p style="margin:4px 0">Home delivery charge: <b>₹49</b></p><p style="margin:8px 0 0;font-size:18px">TOTAL PAY: <b>'+moneyPrice(discountedProductsTotal+49)+'</b></p></div>':'';
   const paymentChoice=pendingOfferCart.length&&paymentStepOpen?`<div class="order-flow-stage payment-stage"><p class="order-flow-step-title">STEP 2 · CHOOSE PAYMENT</p><strong>Payment method</strong><div class="payment-choice">${selectedFulfilmentMode==='HOME_DELIVERY'?'<label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" checked> Online Payment – Home Delivery</label>':`<label><input type="radio" name="orderPaymentMethod" value="CASH_ON_DELIVERY" ${selectedOrderPaymentMethod==='CASH_ON_DELIVERY'?'checked':''}> Cash on Delivery – Visit Shop</label><label><input type="radio" name="orderPaymentMethod" value="ONLINE_PAYMENT" ${selectedOrderPaymentMethod==='ONLINE_PAYMENT'?'checked':''}> Online Payment – Visit Shop${customerPaymentSettings.specialOfferEnabled?' · Extra '+Math.max(0,Math.min(90,Number(customerPaymentSettings.discountPercent)||0))+'% OFF':''}</label>`}<div id="onlinePaymentFields" class="online-payment-fields hidden">${deliveryPaymentSummary}<p style="font-size:12px;margin:4px 0"><b>Paytm UPI QR · Amount: ${moneyPrice(discountedProductsTotal+(selectedFulfilmentMode==='HOME_DELIVERY'?49:0))}</b></p><div id="dynamicPaymentQr" class="qr-area"></div><p class="muted" style="text-align:center">UPI ID: ${esc(customerPaymentSettings.upiId||'Not configured')} · ${esc(customerPaymentSettings.holderName||'')}</p><label>Upload Payment Screenshot</label><input type="file" id="onlinePaymentScreenshot" accept="image/*"><p id="paymentOrderAmount" style="font-weight:800;color:#7e2028;margin:10px 0 4px">ORDER AMOUNT: ${moneyPrice(discountedProductsTotal+(selectedFulfilmentMode==='HOME_DELIVERY'?49:0))}</p><p id="paymentOcrStatus" class="muted">Screenshot OCR can suggest UTR and paid amount. Shop approval is still required.</p><p id="paymentOcrAmount" class="muted"></p><div id="paymentManualAmountWrap" class="hidden" style="margin:10px 0;padding:10px;border:1px solid #d6b66a;border-radius:10px"><label for="paymentManualAmount"><b>OCR could not read the paid amount. Enter the amount shown in your payment screenshot.</b></label><input type="number" id="paymentManualAmount" inputmode="decimal" min="0.01" step="0.01" placeholder="Enter paid amount (₹)"><small style="display:block;margin-top:5px;color:#805b20">Manual amount will still be checked by the shop against your uploaded screenshot.</small></div><label>Enter 12-digit UTR Number (check OCR result)</label><input type="text" id="onlinePaymentUtr" inputmode="numeric" maxlength="12" placeholder="12-digit UTR number"></div></div></div>`:'';
 
@@ -1262,11 +1262,46 @@ function renderReservations(items){
     const minutes=hour*60+minute;
     return minutes>=480&&minutes<1260;
   }
+  let homeDeliveryCountdownInterval=null;
+  function getHomeDeliveryOpeningCountdown(){
+    const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+    const value=type=>Number(parts.find(p=>p.type===type)?.value||0);
+    const nowWall=Date.UTC(value('year'),value('month')-1,value('day'),value('hour'),value('minute'),value('second'));
+    let openingWall=Date.UTC(value('year'),value('month')-1,value('day'),8,0,0);
+    if(value('hour')>=8)openingWall+=24*60*60*1000;
+    const remaining=Math.max(0,Math.floor((openingWall-nowWall)/1000));
+    const hours=String(Math.floor(remaining/3600)).padStart(2,'0');
+    const minutes=String(Math.floor((remaining%3600)/60)).padStart(2,'0');
+    const seconds=String(remaining%60).padStart(2,'0');
+    return hours+':'+minutes+':'+seconds;
+  }
+  function showHomeDeliveryHoursNotice(){
+    const notice=$('homeDeliveryHoursNotice');
+    if(!notice)return;
+    if(selectedFulfilmentMode!=='HOME_DELIVERY'){
+      notice.classList.add('hidden');
+      if(homeDeliveryCountdownInterval){clearInterval(homeDeliveryCountdownInterval);homeDeliveryCountdownInterval=null;}
+      return;
+    }
+    const update=()=>{
+      const open=isHomeDeliveryHoursOpenClient();
+      if(open){
+        notice.classList.add('hidden');
+        if(homeDeliveryCountdownInterval){clearInterval(homeDeliveryCountdownInterval);homeDeliveryCountdownInterval=null;}
+        return;
+      }
+      notice.classList.remove('hidden');
+      const countdown=getHomeDeliveryOpeningCountdown();
+      notice.innerHTML='<b>English:</b> Dear Customer, Home Delivery is available daily from 08:00 AM to 09:00 PM only. Please place your order during these hours. Thank you for understanding! ❤️<br><br><b>తెలుగు:</b> ప్రియమైన కస్టమర్, హోమ్ డెలివరీ సదుపాయం ప్రతిరోజూ ఉదయం 08:00 AM నుండి రాత్రి 09:00 PM వరకు మాత్రమే అందుబాటులో ఉంటుంది. దయచేసి ఈ సమయాల్లోనే ఆర్డర్ చేయండి. మీ సహకారానికి ధన్యవాదాలు! ❤️<br><br><b>Home Delivery opens again in / మళ్లీ హోమ్ డెలివరీ ప్రారంభమయ్యే సమయం:</b> <b>'+countdown+'</b>';
+    };
+    update();
+    if(!homeDeliveryCountdownInterval)homeDeliveryCountdownInterval=setInterval(update,1000);
+  }
   async function evaluateDeliveryAvailability(){
     if(selectedFulfilmentMode!=='HOME_DELIVERY')return true;
+    showHomeDeliveryHoursNotice();
     if(!isHomeDeliveryHoursOpenClient()){
-      const status=$('deliveryLocationStatus'),confirm=$('confirmOffersButton');
-      if(status){status.textContent='Home Delivery is available only from 08:00 AM to 09:00 PM IST. Please choose Visit Shop & Collect.';status.style.color='#b3262d';}
+      const confirm=$('confirmOffersButton');
       if(confirm&&paymentStepOpen)confirm.disabled=true;
       return false;
     }
