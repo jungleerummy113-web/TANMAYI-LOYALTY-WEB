@@ -1262,14 +1262,42 @@ function renderReservations(items){
     const minutes=hour*60+minute;
     return minutes>=480&&minutes<1260;
   }
+  let homeDeliveryCountdownInterval=null;
+  function getHomeDeliveryOpeningCountdown(){
+    const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+    const value=type=>Number(parts.find(p=>p.type===type)?.value||0);
+    const nowWall=Date.UTC(value('year'),value('month')-1,value('day'),value('hour'),value('minute'),value('second'));
+    let openingWall=Date.UTC(value('year'),value('month')-1,value('day'),8,0,0);
+    if(value('hour')>=8)openingWall+=24*60*60*1000;
+    const remaining=Math.max(0,Math.floor((openingWall-nowWall)/1000));
+    const hours=String(Math.floor(remaining/3600)).padStart(2,'0');
+    const minutes=String(Math.floor((remaining%3600)/60)).padStart(2,'0');
+    const seconds=String(remaining%60).padStart(2,'0');
+    return hours+':'+minutes+':'+seconds;
+  }
+  function showHomeDeliveryClosedMessage(){
+    const status=$('deliveryLocationStatus');
+    if(!status)return;
+    const update=()=>{
+      if(selectedFulfilmentMode!=='HOME_DELIVERY'){
+        if(homeDeliveryCountdownInterval){clearInterval(homeDeliveryCountdownInterval);homeDeliveryCountdownInterval=null;}
+        return;
+      }
+      status.innerHTML='<b>తెలుగు:</b> హోమ్ డెలివరీ ప్రతిరోజూ ఉదయం 08:00 AM నుండి రాత్రి 09:00 PM వరకు అందుబాటులో ఉంటుంది. మళ్లీ ప్రారంభమయ్యే సమయం: <b>'+getHomeDeliveryOpeningCountdown()+'</b><br><b>English:</b> Home Delivery is available daily from 08:00 AM to 09:00 PM IST. Opens again in: <b>'+getHomeDeliveryOpeningCountdown()+'</b><br>మీకు ఎప్పుడైనా షాప్‌కు వచ్చి వస్తువులు తీసుకెళ్లవచ్చు. | You are welcome to choose Visit Shop & Collect at any time. ధన్యవాదాలు! | Thank you!';
+      status.style.color='#b3262d';
+    };
+    update();
+    if(!homeDeliveryCountdownInterval)homeDeliveryCountdownInterval=setInterval(update,1000);
+  }
   async function evaluateDeliveryAvailability(){
     if(selectedFulfilmentMode!=='HOME_DELIVERY')return true;
     if(!isHomeDeliveryHoursOpenClient()){
-      const status=$('deliveryLocationStatus'),confirm=$('confirmOffersButton');
-      if(status){status.textContent='Thank you for choosing TANMAYI STORE AND GIFTS! Home Delivery is available daily from 08:00 AM to 09:00 PM IST. You are welcome to choose Visit Shop & Collect at any time. Thank you for your understanding.';status.style.color='#b3262d';}
+      const confirm=$('confirmOffersButton');
+      showHomeDeliveryClosedMessage();
       if(confirm&&paymentStepOpen)confirm.disabled=true;
       return false;
     }
+    if(homeDeliveryCountdownInterval){clearInterval(homeDeliveryCountdownInterval);homeDeliveryCountdownInterval=null;}
     const sequence=++deliveryCheckSequence;
     const status=$('deliveryLocationStatus'),pin=$('deliveryPincode')?.value.trim()||'';
     const confirm=$('confirmOffersButton');
