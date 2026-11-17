@@ -418,7 +418,7 @@ app.post("/api/customer/reset-pin", async (req, res) => {
     const code = req.body.code.trim();
     const newPin = req.body.newPin;
     if (!/^\d{10}$/.test(mobile)) return res.status(400).json({ error: "Enter a valid registered 10-digit mobile number." });
-    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Reset code must contain 6 digits." });
+    if (!/^[1-9]\d{5}$/.test(code)) return res.status(400).json({ error: "Reset code must contain 6 digits." });
     if (!/^\d{6}$/.test(newPin)) return res.status(400).json({ error: "New PIN must contain exactly 6 digits." });
 
     const matches = await db.collection("customers").where("mobile", "==", mobile).limit(2).get();
