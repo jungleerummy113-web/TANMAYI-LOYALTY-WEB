@@ -1262,7 +1262,7 @@ function renderReservations(items){
     const status=$('deliveryLocationStatus'),pin=$('deliveryPincode')?.value.trim()||'';
     const confirm=$('confirmOffersButton');
     let available=false,message='';
-    if(!/^\d{6}$/.test(pin))message='Please enter a valid 6-digit PIN code.';
+    if(!/^[1-9]\d{5}$/.test(pin))message='Please enter a valid 6-digit PIN code.';
     else if(!deliveryCoordinates)message='PIN entered. Tap USE CURRENT LOCATION and allow GPS to check the 15 km road-distance limit.';
     else{
       if(status){status.textContent='Checking road distance…';status.style.color='#665e53';}
