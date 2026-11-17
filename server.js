@@ -205,12 +205,22 @@ async function sendOrderNotification(order) {
     `<tr><td style="padding:8px;border-bottom:1px solid #eee">${emailEscape(item.productName)}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${Number(item.quantity || 0)}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">₹${Number(item.offerPrice || 0).toLocaleString('en-IN')}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">₹${Number(item.lineTotal || 0).toLocaleString('en-IN')}</td></tr>`
   ).join('');
   const textItems = (order.items || []).map(item => `${item.productName} | Qty ${item.quantity} | ₹${item.lineTotal}`).join('\n');
+  const deliveryCoordinatesValid = order.fulfilmentMode === "HOME_DELIVERY"
+    && Number.isFinite(Number(order.deliveryAddress?.latitude))
+    && Number.isFinite(Number(order.deliveryAddress?.longitude));
+  const deliveryMapsUrl = deliveryCoordinatesValid
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(Number(order.deliveryAddress.latitude) + "," + Number(order.deliveryAddress.longitude))}&travelmode=driving`
+    : "";
+  const deliveryMapsText = deliveryMapsUrl ? `\\nGoogle Maps directions: ${deliveryMapsUrl}` : "";
+  const deliveryMapsHtml = deliveryMapsUrl
+    ? `<br><b>Customer GPS location:</b> <a href="${emailEscape(deliveryMapsUrl)}" target="_blank" rel="noopener noreferrer">OPEN GOOGLE MAPS DIRECTIONS</a>`
+    : "";
   const message = {
     from: MAIL_FROM || `TANMAYI STORE AND GIFTS <${SMTP_USER}>`,
     to: ORDER_NOTIFICATION_EMAIL || SMTP_USER,
     subject: `New customer order #${order.orderNumber} – TANMAYI STORE AND GIFTS`,
-    text: `New order received\\nOrder: #${order.orderNumber}\\nCustomer: ${order.customerName}\\nMobile: ${order.mobile}\\nVillage: ${order.village}\\nFulfilment: ${order.fulfilmentMode === "HOME_DELIVERY" ? "HOME DELIVERY" : "VISIT SHOP & COLLECT"}\\nDelivery address: ${order.deliveryAddress ? [order.deliveryAddress.name,order.deliveryAddress.mobile,order.deliveryAddress.address,order.deliveryAddress.landmark,"PIN "+order.deliveryAddress.pincode].join(", ") : "Shop collection"}\\nDelivery charge: ₹${order.deliveryCharge || 0}\\nPayment: ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'ONLINE PAYMENT – UTR ' + (order.paymentUtr || 'submitted') : 'CASH ON DELIVERY'}\\nPayment status: ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'SUBMITTED – ADMIN VERIFICATION REQUIRED' : 'PENDING AT SHOP'}\\nOrder status: CONFIRMED / READY\\n\\n${textItems}\\n\\nTotal: ₹${order.total}\\nOrder time: ${order.confirmedAtText || 'Just now'}`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><div style="background:#171717;color:#d9b45b;padding:22px;border-radius:12px 12px 0 0;text-align:center"><h2 style="margin:0">TANMAYI STORE AND GIFTS</h2><p style="margin:8px 0 0;color:#fff">NEW CUSTOMER ORDER RECEIVED</p></div><div style="border:1px solid #e8dfc9;padding:20px;border-radius:0 0 12px 12px"><h2>Order #${emailEscape(order.orderNumber)}</h2><p><b>Customer:</b> ${emailEscape(order.customerName)}<br><b>Mobile:</b> ${emailEscape(order.mobile)}<br><b>Village:</b> ${emailEscape(order.village)}<br><b>Fulfilment:</b> ${order.fulfilmentMode === "HOME_DELIVERY" ? "HOME DELIVERY" : "VISIT SHOP & COLLECT"}<br>${order.deliveryAddress ? "<b>Delivery address:</b> " + emailEscape([order.deliveryAddress.name,order.deliveryAddress.mobile,order.deliveryAddress.address,order.deliveryAddress.landmark,"PIN "+order.deliveryAddress.pincode].join(", ")) + "<br>" : ""}<b>Delivery charge:</b> ₹${Number(order.deliveryCharge||0)}<br><b>Payment:</b> ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'ONLINE PAYMENT' : 'CASH ON DELIVERY'}<br><b>Payment status:</b> ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'SUBMITTED – ADMIN VERIFICATION REQUIRED' : 'PENDING AT SHOP'}<br>${order.paymentMethod === 'ONLINE_PAYMENT' ? '<b>UTR:</b> ' + emailEscape(order.paymentUtr || '') + '<br>' : ''}<b>Status:</b> CONFIRMED / READY</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px">Product</th><th>Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemRows}</tbody></table><h2 style="text-align:right">Total: ₹${Number(order.total || 0).toLocaleString('en-IN')}</h2><p style="color:#666">Order time: ${emailEscape(order.confirmedAtText || 'Just now')}</p></div></div>`
+    text: `New order received\\nOrder: #${order.orderNumber}\\nCustomer: ${order.customerName}\\nMobile: ${order.mobile}\\nVillage: ${order.village}\\nFulfilment: ${order.fulfilmentMode === "HOME_DELIVERY" ? "HOME DELIVERY" : "VISIT SHOP & COLLECT"}\\nDelivery address: ${order.deliveryAddress ? [order.deliveryAddress.name,order.deliveryAddress.mobile,order.deliveryAddress.address,order.deliveryAddress.landmark,"PIN "+order.deliveryAddress.pincode].join(", ") : "Shop collection"}${deliveryMapsText}\\nDelivery charge: ₹${order.deliveryCharge || 0}\\nPayment: ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'ONLINE PAYMENT – UTR ' + (order.paymentUtr || 'submitted') : 'CASH ON DELIVERY'}\\nPayment status: ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'SUBMITTED – ADMIN VERIFICATION REQUIRED' : 'PENDING AT SHOP'}\\nOrder status: CONFIRMED / READY\\n\\n${textItems}\\n\\nTotal: ₹${order.total}\\nOrder time: ${order.confirmedAtText || 'Just now'}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#222"><div style="background:#171717;color:#d9b45b;padding:22px;border-radius:12px 12px 0 0;text-align:center"><h2 style="margin:0">TANMAYI STORE AND GIFTS</h2><p style="margin:8px 0 0;color:#fff">NEW CUSTOMER ORDER RECEIVED</p></div><div style="border:1px solid #e8dfc9;padding:20px;border-radius:0 0 12px 12px"><h2>Order #${emailEscape(order.orderNumber)}</h2><p><b>Customer:</b> ${emailEscape(order.customerName)}<br><b>Mobile:</b> ${emailEscape(order.mobile)}<br><b>Village:</b> ${emailEscape(order.village)}<br><b>Fulfilment:</b> ${order.fulfilmentMode === "HOME_DELIVERY" ? "HOME DELIVERY" : "VISIT SHOP & COLLECT"}<br>${order.deliveryAddress ? "<b>Delivery address:</b> " + emailEscape([order.deliveryAddress.name,order.deliveryAddress.mobile,order.deliveryAddress.address,order.deliveryAddress.landmark,"PIN "+order.deliveryAddress.pincode].join(", ")) + "<br>" : ""}${deliveryMapsHtml}<br><b>Delivery charge:</b> ₹${Number(order.deliveryCharge||0)}<br><b>Payment:</b> ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'ONLINE PAYMENT' : 'CASH ON DELIVERY'}<br><b>Payment status:</b> ${order.paymentMethod === 'ONLINE_PAYMENT' ? 'SUBMITTED – ADMIN VERIFICATION REQUIRED' : 'PENDING AT SHOP'}<br>${order.paymentMethod === 'ONLINE_PAYMENT' ? '<b>UTR:</b> ' + emailEscape(order.paymentUtr || '') + '<br>' : ''}<b>Status:</b> CONFIRMED / READY</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px">Product</th><th>Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemRows}</tbody></table><h2 style="text-align:right">Total: ₹${Number(order.total || 0).toLocaleString('en-IN')}</h2><p style="color:#666">Order time: ${emailEscape(order.confirmedAtText || 'Just now')}</p></div></div>`
   };
 
   try {
@@ -418,7 +428,7 @@ app.post("/api/customer/reset-pin", async (req, res) => {
     const code = req.body.code.trim();
     const newPin = req.body.newPin;
     if (!/^\d{10}$/.test(mobile)) return res.status(400).json({ error: "Enter a valid registered 10-digit mobile number." });
-    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Reset code must contain 6 digits." });
+    if (!/^[1-9]\d{5}$/.test(code)) return res.status(400).json({ error: "Reset code must contain 6 digits." });
     if (!/^\d{6}$/.test(newPin)) return res.status(400).json({ error: "New PIN must contain exactly 6 digits." });
 
     const matches = await db.collection("customers").where("mobile", "==", mobile).limit(2).get();
@@ -994,6 +1004,35 @@ app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
 // Customer confirms the staged cart. Confirmed orders remain active until the shop
 // cancels or completes them; the one-hour expiry applies only to unconfirmed selections. Packing is done in-store
 // when the customer arrives; the website does not mark cash paid or award stamps here.
+async function getHomeDeliveryRoadDistanceMeters(latitude, longitude) {
+  const apiKey = process.env.OPENROUTESERVICE_API_KEY;
+  if (!apiKey) throw new Error("Road distance service is not configured.");
+  const response = await fetch("https://api.heigit.org/openrouteservice/v2/directions/driving-car", {
+    method: "POST",
+    headers: { "Authorization": apiKey, "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify({ coordinates: [[78.738013, 13.217485], [longitude, latitude]], instructions: false })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result?.error?.message || result?.message || "Road distance provider request failed.");
+  const meters = Number(result?.routes?.[0]?.summary?.distance);
+  if (!Number.isFinite(meters) || meters < 0) throw new Error("Road distance could not be calculated for this location.");
+  return meters;
+}
+
+app.post("/api/customer/check-delivery-distance", requireUser, async (req, res) => {
+  const latitude = Number(req.body?.latitude), longitude = Number(req.body?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: "Please share a valid current GPS location." });
+  }
+  try {
+    const distanceMeters = await getHomeDeliveryRoadDistanceMeters(latitude, longitude);
+    return res.json({ distanceKm: Number((distanceMeters / 1000).toFixed(2)), withinLimit: distanceMeters <= 15000, limitKm: 15 });
+  } catch (error) {
+    console.error("Home delivery road-distance check failed:", error.message);
+    return res.status(503).json({ error: "Could not verify road distance right now. Please retry in a moment." });
+  }
+});
+
 app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
   let createdOrder = null;
   let isDuplicateRequest = false;
@@ -1013,13 +1052,16 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     const customerLatitude = Number(req.body?.customerLatitude), customerLongitude = Number(req.body?.customerLongitude);
     if (!["SHOP_COLLECTION", "HOME_DELIVERY"].includes(fulfilmentMode)) return res.status(400).json({error:"Choose a valid delivery option."});
     if (fulfilmentMode === "HOME_DELIVERY") {
-      if (!/^\d{10}$/.test(String(deliveryAddress.mobile||"")) || !String(deliveryAddress.name||"").trim() || !String(deliveryAddress.address||"").trim() || !String(deliveryAddress.landmark||"").trim() || String(deliveryAddress.pincode||"") !== "517408") return res.status(400).json({error:"Home delivery not available at this location or pincode. Check all address fields and PIN 517408."});
+      if (!/^\d{10}$/.test(String(deliveryAddress.mobile||"")) || !String(deliveryAddress.name||"").trim() || !String(deliveryAddress.address||"").trim() || !String(deliveryAddress.landmark||"").trim() || !/^\d{6}$/.test(String(deliveryAddress.pincode||""))) return res.status(400).json({error:"Enter all delivery details and a valid 6-digit PIN code."});
       if (!Number.isFinite(customerLatitude) || !Number.isFinite(customerLongitude) || customerLatitude < -90 || customerLatitude > 90 || customerLongitude < -180 || customerLongitude > 180) return res.status(400).json({error:"Please share your current GPS location to check delivery availability."});
-      const rad = n => n * Math.PI / 180;
-      const dLat = rad(customerLatitude - 13.217485), dLon = rad(customerLongitude - 78.738013);
-      const h = Math.sin(dLat/2)**2 + Math.cos(rad(13.217485))*Math.cos(rad(customerLatitude))*Math.sin(dLon/2)**2;
-      const distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1-h));
-      if (distanceKm > 12) return res.status(400).json({error:"Home delivery not available at this location or pincode. Delivery is available only within 12 km of the shop."});
+      let roadDistanceMeters;
+      try {
+        roadDistanceMeters = await getHomeDeliveryRoadDistanceMeters(customerLatitude, customerLongitude);
+      } catch (error) {
+        console.error("Home delivery road-distance validation failed:", error.message);
+        return res.status(503).json({error:"Could not verify road distance right now. Please retry your order."});
+      }
+      if (roadDistanceMeters > 15000) return res.status(400).json({error:"Home delivery is available only within 15 km by road from the shop."});
     }
     if (!["CASH_ON_DELIVERY", "ONLINE_PAYMENT"].includes(paymentMethod)) return res.status(400).json({ error:"Choose a valid payment method." });
     if (fulfilmentMode === "HOME_DELIVERY" && paymentMethod !== "ONLINE_PAYMENT") return res.status(400).json({error:"Home delivery is available with Online Payment only. Cash on Delivery is available only for Visit Shop & Collect."});
@@ -1124,7 +1166,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         items, productTotal, deliveryCharge, total, paymentMethod,
         specialOfferApplied, specialDiscountPercent:specialOfferApplied?specialDiscountPercent:0,
         fulfilmentMode,
-        deliveryAddress:fulfilmentMode === "HOME_DELIVERY" ? {name:String(deliveryAddress.name).trim(),mobile:String(deliveryAddress.mobile),address:String(deliveryAddress.address).trim(),landmark:String(deliveryAddress.landmark).trim(),pincode:"517408",latitude:customerLatitude,longitude:customerLongitude} : null,
+        deliveryAddress:fulfilmentMode === "HOME_DELIVERY" ? {name:String(deliveryAddress.name).trim(),mobile:String(deliveryAddress.mobile),address:String(deliveryAddress.address).trim(),landmark:String(deliveryAddress.landmark).trim(),pincode:String(deliveryAddress.pincode),latitude:customerLatitude,longitude:customerLongitude} : null,
         paymentUtr: paymentMethod === "ONLINE_PAYMENT" ? paymentUtr : "",
         orderStatus:"ready", collectionStatus:"pending",
         paymentStatus: paymentMethod === "ONLINE_PAYMENT" ? "submitted" : "pending",
