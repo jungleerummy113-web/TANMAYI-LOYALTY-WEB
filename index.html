@@ -1266,7 +1266,7 @@ function renderReservations(items){
     if(selectedFulfilmentMode!=='HOME_DELIVERY')return true;
     if(!isHomeDeliveryHoursOpenClient()){
       const status=$('deliveryLocationStatus'),confirm=$('confirmOffersButton');
-      if(status){status.textContent='Home Delivery is available only from 08:00 AM to 09:00 PM IST. Please choose Visit Shop & Collect.';status.style.color='#b3262d';}
+      if(status){status.textContent='Thank you for choosing TANMAYI STORE AND GIFTS! Home Delivery is available daily from 08:00 AM to 09:00 PM IST. You are welcome to choose Visit Shop & Collect at any time. Thank you for your understanding.';status.style.color='#b3262d';}
       if(confirm&&paymentStepOpen)confirm.disabled=true;
       return false;
     }
