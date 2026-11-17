@@ -1283,11 +1283,16 @@ function renderReservations(items){
       if(homeDeliveryCountdownInterval){clearInterval(homeDeliveryCountdownInterval);homeDeliveryCountdownInterval=null;}
       return;
     }
-    notice.classList.remove('hidden');
     const update=()=>{
       const open=isHomeDeliveryHoursOpenClient();
+      if(open){
+        notice.classList.add('hidden');
+        if(homeDeliveryCountdownInterval){clearInterval(homeDeliveryCountdownInterval);homeDeliveryCountdownInterval=null;}
+        return;
+      }
+      notice.classList.remove('hidden');
       const countdown=getHomeDeliveryOpeningCountdown();
-      notice.innerHTML='<b>English:</b> Dear Customer, Home Delivery is available daily from 08:00 AM to 09:00 PM only. Please place your order during these hours. Thank you for understanding! ❤️<br><br><b>తెలుగు:</b> ప్రియమైన కస్టమర్, హోమ్ డెలివరీ సదుపాయం ప్రతిరోజూ ఉదయం 08:00 AM నుండి రాత్రి 09:00 PM వరకు మాత్రమే అందుబాటులో ఉంటుంది. దయచేసి ఈ సమయాల్లోనే ఆర్డర్ చేయండి. మీ సహకారానికి ధన్యవాదాలు! ❤️'+(open?'':'<br><br><b>Home Delivery opens again in / మళ్లీ హోమ్ డెలివరీ ప్రారంభమయ్యే సమయం:</b> <b>'+countdown+'</b>');
+      notice.innerHTML='<b>English:</b> Dear Customer, Home Delivery is available daily from 08:00 AM to 09:00 PM only. Please place your order during these hours. Thank you for understanding! ❤️<br><br><b>తెలుగు:</b> ప్రియమైన కస్టమర్, హోమ్ డెలివరీ సదుపాయం ప్రతిరోజూ ఉదయం 08:00 AM నుండి రాత్రి 09:00 PM వరకు మాత్రమే అందుబాటులో ఉంటుంది. దయచేసి ఈ సమయాల్లోనే ఆర్డర్ చేయండి. మీ సహకారానికి ధన్యవాదాలు! ❤️<br><br><b>Home Delivery opens again in / మళ్లీ హోమ్ డెలివరీ ప్రారంభమయ్యే సమయం:</b> <b>'+countdown+'</b>';
     };
     update();
     if(!homeDeliveryCountdownInterval)homeDeliveryCountdownInterval=setInterval(update,1000);
