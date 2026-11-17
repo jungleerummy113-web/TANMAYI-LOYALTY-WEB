@@ -994,6 +994,35 @@ app.post("/api/customer/reserve-offer", requireUser, async (req, res) => {
 // Customer confirms the staged cart. Confirmed orders remain active until the shop
 // cancels or completes them; the one-hour expiry applies only to unconfirmed selections. Packing is done in-store
 // when the customer arrives; the website does not mark cash paid or award stamps here.
+async function getHomeDeliveryRoadDistanceMeters(latitude, longitude) {
+  const apiKey = process.env.OPENROUTESERVICE_API_KEY;
+  if (!apiKey) throw new Error("Road distance service is not configured.");
+  const response = await fetch("https://api.heigit.org/openrouteservice/v2/directions/driving-car", {
+    method: "POST",
+    headers: { "Authorization": apiKey, "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify({ coordinates: [[78.738013, 13.217485], [longitude, latitude]], instructions: false })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result?.error?.message || result?.message || "Road distance provider request failed.");
+  const meters = Number(result?.routes?.[0]?.summary?.distance);
+  if (!Number.isFinite(meters) || meters < 0) throw new Error("Road distance could not be calculated for this location.");
+  return meters;
+}
+
+app.post("/api/customer/check-delivery-distance", requireUser, async (req, res) => {
+  const latitude = Number(req.body?.latitude), longitude = Number(req.body?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: "Please share a valid current GPS location." });
+  }
+  try {
+    const distanceMeters = await getHomeDeliveryRoadDistanceMeters(latitude, longitude);
+    return res.json({ distanceKm: Number((distanceMeters / 1000).toFixed(2)), withinLimit: distanceMeters <= 15000, limitKm: 15 });
+  } catch (error) {
+    console.error("Home delivery road-distance check failed:", error.message);
+    return res.status(503).json({ error: "Could not verify road distance right now. Please retry in a moment." });
+  }
+});
+
 app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
   let createdOrder = null;
   let isDuplicateRequest = false;
@@ -1013,13 +1042,16 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     const customerLatitude = Number(req.body?.customerLatitude), customerLongitude = Number(req.body?.customerLongitude);
     if (!["SHOP_COLLECTION", "HOME_DELIVERY"].includes(fulfilmentMode)) return res.status(400).json({error:"Choose a valid delivery option."});
     if (fulfilmentMode === "HOME_DELIVERY") {
-      if (!/^\d{10}$/.test(String(deliveryAddress.mobile||"")) || !String(deliveryAddress.name||"").trim() || !String(deliveryAddress.address||"").trim() || !String(deliveryAddress.landmark||"").trim() || String(deliveryAddress.pincode||"") !== "517408") return res.status(400).json({error:"Home delivery not available at this location or pincode. Check all address fields and PIN 517408."});
+      if (!/^\d{10}$/.test(String(deliveryAddress.mobile||"")) || !String(deliveryAddress.name||"").trim() || !String(deliveryAddress.address||"").trim() || !String(deliveryAddress.landmark||"").trim() || !/^\d{6}$/.test(String(deliveryAddress.pincode||""))) return res.status(400).json({error:"Enter all delivery details and a valid 6-digit PIN code."});
       if (!Number.isFinite(customerLatitude) || !Number.isFinite(customerLongitude) || customerLatitude < -90 || customerLatitude > 90 || customerLongitude < -180 || customerLongitude > 180) return res.status(400).json({error:"Please share your current GPS location to check delivery availability."});
-      const rad = n => n * Math.PI / 180;
-      const dLat = rad(customerLatitude - 13.217485), dLon = rad(customerLongitude - 78.738013);
-      const h = Math.sin(dLat/2)**2 + Math.cos(rad(13.217485))*Math.cos(rad(customerLatitude))*Math.sin(dLon/2)**2;
-      const distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1-h));
-      if (distanceKm > 12) return res.status(400).json({error:"Home delivery not available at this location or pincode. Delivery is available only within 12 km of the shop."});
+      let roadDistanceMeters;
+      try {
+        roadDistanceMeters = await getHomeDeliveryRoadDistanceMeters(customerLatitude, customerLongitude);
+      } catch (error) {
+        console.error("Home delivery road-distance validation failed:", error.message);
+        return res.status(503).json({error:"Could not verify road distance right now. Please retry your order."});
+      }
+      if (roadDistanceMeters > 15000) return res.status(400).json({error:"Home delivery is available only within 15 km by road from the shop."});
     }
     if (!["CASH_ON_DELIVERY", "ONLINE_PAYMENT"].includes(paymentMethod)) return res.status(400).json({ error:"Choose a valid payment method." });
     if (fulfilmentMode === "HOME_DELIVERY" && paymentMethod !== "ONLINE_PAYMENT") return res.status(400).json({error:"Home delivery is available with Online Payment only. Cash on Delivery is available only for Visit Shop & Collect."});
@@ -1124,7 +1156,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
         items, productTotal, deliveryCharge, total, paymentMethod,
         specialOfferApplied, specialDiscountPercent:specialOfferApplied?specialDiscountPercent:0,
         fulfilmentMode,
-        deliveryAddress:fulfilmentMode === "HOME_DELIVERY" ? {name:String(deliveryAddress.name).trim(),mobile:String(deliveryAddress.mobile),address:String(deliveryAddress.address).trim(),landmark:String(deliveryAddress.landmark).trim(),pincode:"517408",latitude:customerLatitude,longitude:customerLongitude} : null,
+        deliveryAddress:fulfilmentMode === "HOME_DELIVERY" ? {name:String(deliveryAddress.name).trim(),mobile:String(deliveryAddress.mobile),address:String(deliveryAddress.address).trim(),landmark:String(deliveryAddress.landmark).trim(),pincode:String(deliveryAddress.pincode),latitude:customerLatitude,longitude:customerLongitude} : null,
         paymentUtr: paymentMethod === "ONLINE_PAYMENT" ? paymentUtr : "",
         orderStatus:"ready", collectionStatus:"pending",
         paymentStatus: paymentMethod === "ONLINE_PAYMENT" ? "submitted" : "pending",
