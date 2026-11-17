@@ -70,6 +70,14 @@ async function countHeldReservations(reservationDocs, now, getOrder) {
 }
 
 
+function isHomeDeliveryHoursOpen(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const hour = Number(parts.find(p => p.type === "hour")?.value);
+  const minute = Number(parts.find(p => p.type === "minute")?.value);
+  const minutes = hour * 60 + minute;
+  return minutes >= 480 && minutes < 1260;
+}
+
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const makeCode = () => crypto.randomInt(0, 1000000).toString().padStart(6, "0");
 
@@ -1052,6 +1060,7 @@ app.post("/api/customer/confirm-offers", requireUser, async (req, res) => {
     const customerLatitude = Number(req.body?.customerLatitude), customerLongitude = Number(req.body?.customerLongitude);
     if (!["SHOP_COLLECTION", "HOME_DELIVERY"].includes(fulfilmentMode)) return res.status(400).json({error:"Choose a valid delivery option."});
     if (fulfilmentMode === "HOME_DELIVERY") {
+      if (!isHomeDeliveryHoursOpen()) return res.status(403).json({error:"Home Delivery is available only from 08:00 AM to 09:00 PM IST. Please choose Visit Shop & Collect or try again during delivery hours."});
       if (!/^\d{10}$/.test(String(deliveryAddress.mobile||"")) || !String(deliveryAddress.name||"").trim() || !String(deliveryAddress.address||"").trim() || !String(deliveryAddress.landmark||"").trim() || !/^\d{6}$/.test(String(deliveryAddress.pincode||""))) return res.status(400).json({error:"Enter all delivery details and a valid 6-digit PIN code."});
       if (!Number.isFinite(customerLatitude) || !Number.isFinite(customerLongitude) || customerLatitude < -90 || customerLatitude > 90 || customerLongitude < -180 || customerLongitude > 180) return res.status(400).json({error:"Please share your current GPS location to check delivery availability."});
       let roadDistanceMeters;
