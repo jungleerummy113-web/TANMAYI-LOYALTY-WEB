@@ -849,44 +849,32 @@ app.get("/api/customer/payment-settings", requireUser, async (_req, res) => {
 });
 
 app.get("/api/admin/products", requireAdmin, async (_req, res) => {
+  const startedAt = Date.now();
   try {
-    // Do not use Firestore orderBy here: legacy product documents without
-    // createdAt are excluded by orderBy and disappear from the Admin list.
+    // Keep this screen's catalogue read independent of reservation/order reads.
+    // The previous implementation waited for every active reservation and its
+    // linked order before returning even the product cards.
     const snap = await db.collection(PRODUCTS_COLLECTION).get();
-    let heldByProduct = new Map();
-    try {
-      const reservationSnap = await db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get();
-      const linkedOrderIds = [...new Set(reservationSnap.docs
-        .map(d => d.data())
-        .filter(x => x.status === "active" && x.orderId)
-        .map(x => String(x.orderId)))];
-      const linkedOrderById = new Map();
-      // Fetch linked orders in bounded Firestore multi-get batches instead of
-      // issuing one independent network read per reservation.
-      for (let i = 0; i < linkedOrderIds.length; i += 400) {
-        const batchIds = linkedOrderIds.slice(i, i + 400);
-        const orderSnaps = await db.getAll(...batchIds.map(id => db.collection(ORDERS_COLLECTION).doc(id)));
-        orderSnaps.forEach(orderSnap => linkedOrderById.set(orderSnap.id, orderSnap));
-      }
-      heldByProduct = await countHeldReservations(reservationSnap.docs, Date.now(), null, linkedOrderById);
-    } catch (reservationError) {
-      // Reservation statistics must never prevent existing products from displaying.
-      console.error("admin product reservation counts", reservationError);
-    }
     const docs = [...snap.docs].sort((a,b) => {
       const millis = value => value && typeof value.toMillis === "function" ? value.toMillis() : value instanceof Date ? value.getTime() : 0;
       return millis(b.data().createdAt) - millis(a.data().createdAt);
     });
-    res.json({ products: docs.map(d => {
-      const x=d.data(), stock=Number.isInteger(Number(d.data().stock)) ? Number(d.data().stock) : 0;
+    const products = docs.map(d => {
+      const x=d.data(), stock=Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const { photoData, photoUrls, ...productFields } = x;
-      const reservedCount=heldByProduct.get(d.id) || 0;
-      // Return image data once. Spreading the original Firestore document and
-      // also adding photoUrls duplicated large base64 strings in every response.
-      return { id:d.id, ...productFields, size:String(x.size||""), description:String(x.description||""), stock, reservedCount, availableStock:Math.max(0, stock-reservedCount),
+      // Reservation totals are deliberately not calculated in this catalogue
+      // request. Checkout still validates stock transactionally on the server.
+      return { id:d.id, ...productFields, size:String(x.size||""), description:String(x.description||""), stock,
+        reservedCount:null, availableStock:null,
         photoUrls:Array.isArray(photoData)?photoData:(Array.isArray(photoUrls)?photoUrls:[]), createdAt:safeDate(x.createdAt) };
-    }) });
-  } catch (e) { console.error("admin products", e); res.status(500).json({ error:"Could not load products." }); }
+    });
+    res.set("Cache-Control", "no-store");
+    console.info("[ADMIN_PRODUCTS] Catalogue loaded", { count:products.length, elapsedMs:Date.now()-startedAt });
+    res.json({ products });
+  } catch (e) {
+    console.error("[ADMIN_PRODUCTS] Catalogue read failed", { message:e.message, code:e.code, elapsedMs:Date.now()-startedAt });
+    res.status(500).json({ error:"Could not load products from Firebase. Please refresh and retry." });
+  }
 });
 app.post("/api/admin/products", requireAdmin, async (req, res) => {
   let productRef;
