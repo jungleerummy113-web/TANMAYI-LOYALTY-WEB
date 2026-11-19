@@ -828,6 +828,30 @@ $('publicProducts')?.addEventListener('click',event=>{
 });
 async function imageData(file){if(!file)return '';if(!file.type.startsWith('image/'))throw Error('Please select an image file.');const img=new Image(),url=URL.createObjectURL(file);try{await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});let maxSide=720,scale=Math.min(1,maxSide/Math.max(img.width,img.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);for(const quality of [0.62,0.54,0.46,0.40]){const data=canvas.toDataURL('image/jpeg',quality);if(data.length<=360000)return data}maxSide=640;scale=Math.min(1,maxSide/Math.max(img.width,img.height));canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);const data=canvas.toDataURL('image/jpeg',0.38);if(data.length>360000)throw Error('Photo is too large. Please choose a smaller image.');return data}finally{URL.revokeObjectURL(url)}}
 function moneyPrice(v){return '₹'+Number(v||0).toLocaleString('en-IN')}
+async function refreshAdminProductStock(products){
+  try {
+    const r = await api('/api/admin/products/stock-summary');
+    const stockByProduct = r?.stockByProduct || {};
+    for (const product of products) {
+      const stock = stockByProduct[product.id];
+      const reserved = document.querySelector('[data-reserved-stock="'+CSS.escape(product.id)+'"]');
+      const available = document.querySelector('[data-available-stock="'+CSS.escape(product.id)+'"]');
+      if (!stock) {
+        if (reserved) reserved.textContent = 'Reserved Stock: Not available';
+        if (available) available.textContent = 'Available Stock: Not available';
+        continue;
+      }
+      if (reserved) reserved.textContent = 'Reserved Stock: ' + Number(stock.reservedCount || 0) + ' pieces';
+      if (available) available.textContent = 'Available Stock: ' + Number(stock.availableStock || 0) + ' pieces';
+    }
+  } catch (e) {
+    for (const el of document.querySelectorAll('[data-reserved-stock], [data-available-stock]')) {
+      el.textContent = el.hasAttribute('data-reserved-stock')
+        ? 'Reserved Stock: Could not load'
+        : 'Available Stock: Could not load';
+    }
+  }
+}
 async function loadAdminProducts(force=false){
   const list=$('adminProducts');if(list)list.innerHTML='<p class="muted">Loading uploaded products…</p>';
   if(force)adminReadCache.delete((auth.currentUser?.uid||'admin')+':/api/admin/products');
@@ -841,8 +865,8 @@ async function loadAdminProducts(force=false){
       ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
       ${x.description?`<p style="white-space:pre-wrap"><b>Description:</b> ${esc(x.description)}</p>`:''}
       <p class="stock-line">Total physical stock: ${Number(x.stock??0)} pieces</p>
-      <p class="stock-line">${x.reservedCount===null?'Reserved stock is checked during checkout.':('Confirmed / held by customers: '+Number(x.reservedCount||0)+' pieces')}</p>
-      <button type="button" class="secondary" disabled>${x.availableStock===null?'Stock is validated at checkout.':('Available Stock: '+Math.max(0,Number(x.availableStock||0))+' pieces')}</button>
+      <p class="stock-line" data-reserved-stock="${esc(x.id)}">Reserved Stock: Checking…</p>
+      <button type="button" class="secondary" disabled data-available-stock="${esc(x.id)}">Available Stock: Checking…</button>
       <details class="product-edit">
         <summary>Edit product, photos, price &amp; stock</summary>
         <label>Product name</label><input id="edit-name-${esc(x.id)}" maxlength="80" value="${esc(x.name)}">
@@ -877,6 +901,7 @@ async function loadAdminProducts(force=false){
       }catch(e){msg('productAdminMsg',e.message)}finally{b.disabled=false}
     });
 
+    refreshAdminProductStock(products);
     document.querySelectorAll('[data-product-toggle]').forEach(b=>b.onclick=async()=>{
       b.disabled=true;
       try{
