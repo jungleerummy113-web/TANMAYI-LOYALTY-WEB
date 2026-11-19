@@ -876,6 +876,32 @@ app.get("/api/admin/products", requireAdmin, async (_req, res) => {
     res.status(500).json({ error:"Could not load products from Firebase. Please refresh and retry." });
   }
 });
+app.get("/api/admin/products/stock-summary", requireAdmin, async (_req, res) => {
+  try {
+    const snap = await db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get();
+    const heldCounts = await countHeldReservations(
+      snap.docs,
+      Date.now(),
+      id => db.collection(ORDERS_COLLECTION).doc(id).get()
+    );
+    const productsSnap = await db.collection(PRODUCTS_COLLECTION).get();
+    const stockByProduct = {};
+    for (const d of productsSnap.docs) {
+      const data = d.data();
+      const stock = Number.isInteger(Number(data.stock)) ? Number(data.stock) : 0;
+      const reservedCount = heldCounts.get(d.id) || 0;
+      stockByProduct[d.id] = {
+        reservedCount,
+        availableStock: Math.max(0, stock - reservedCount)
+      };
+    }
+    res.set("Cache-Control", "no-store");
+    res.json({ stockByProduct });
+  } catch (e) {
+    console.error("[ADMIN_PRODUCT_STOCK] Summary read failed", { message:e.message, code:e.code });
+    res.status(500).json({ error:"Could not load reserved and available stock." });
+  }
+});
 app.post("/api/admin/products", requireAdmin, async (req, res) => {
   let productRef;
   try {
