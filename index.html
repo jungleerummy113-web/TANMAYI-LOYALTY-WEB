@@ -841,8 +841,8 @@ async function loadAdminProducts(force=false){
       ${x.size?`<p class="stock-line"><b>Size:</b> ${esc(x.size)}</p>`:''}
       ${x.description?`<p style="white-space:pre-wrap"><b>Description:</b> ${esc(x.description)}</p>`:''}
       <p class="stock-line">Total physical stock: ${Number(x.stock??0)} pieces</p>
-      <p class="stock-line">Confirmed / held by customers: ${Number(x.reservedCount??0)} pieces</p>
-      <button type="button" class="secondary" disabled>Available Stock: ${Math.max(0,Number(x.availableStock??x.stock??0))} pieces</button>
+      <p class="stock-line">${x.reservedCount===null?'Reserved stock is checked during checkout.':('Confirmed / held by customers: '+Number(x.reservedCount||0)+' pieces')}</p>
+      <button type="button" class="secondary" disabled>${x.availableStock===null?'Stock is validated at checkout.':('Available Stock: '+Math.max(0,Number(x.availableStock||0))+' pieces')}</button>
       <details class="product-edit">
         <summary>Edit product, photos, price &amp; stock</summary>
         <label>Product name</label><input id="edit-name-${esc(x.id)}" maxlength="80" value="${esc(x.name)}">
