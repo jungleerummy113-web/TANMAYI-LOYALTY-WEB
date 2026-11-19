@@ -40,13 +40,15 @@ const CODE_TTL_MS = 10 * 60 * 1000;
  * Confirmed reservations stop holding stock once their linked order is
  * completed/collected, cancelled, or expired. Unconfirmed selections use TTL.
  */
-async function countHeldReservations(reservationDocs, now, getOrder) {
+async function countHeldReservations(reservationDocs, now, getOrder, preloadedOrderById = null) {
   const orderIds = [...new Set(reservationDocs
     .map(d => d.data())
     .filter(x => x.status === "active" && x.orderId)
     .map(x => String(x.orderId)))];
-  const orderSnaps = await Promise.all(orderIds.map(id => getOrder(id)));
-  const orderById = new Map(orderSnaps.map(x => [x.id, x]));
+  const orderSnaps = preloadedOrderById
+    ? orderIds.map(id => preloadedOrderById.get(id)).filter(Boolean)
+    : await Promise.all(orderIds.map(id => getOrder(id)));
+  const orderById = preloadedOrderById || new Map(orderSnaps.map(x => [x.id, x]));
   const counts = new Map();
   for (const doc of reservationDocs) {
     const x = doc.data();
@@ -854,7 +856,19 @@ app.get("/api/admin/products", requireAdmin, async (_req, res) => {
     let heldByProduct = new Map();
     try {
       const reservationSnap = await db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get();
-      heldByProduct = await countHeldReservations(reservationSnap.docs, Date.now(), id => db.collection(ORDERS_COLLECTION).doc(id).get());
+      const linkedOrderIds = [...new Set(reservationSnap.docs
+        .map(d => d.data())
+        .filter(x => x.status === "active" && x.orderId)
+        .map(x => String(x.orderId)))];
+      const linkedOrderById = new Map();
+      // Fetch linked orders in bounded Firestore multi-get batches instead of
+      // issuing one independent network read per reservation.
+      for (let i = 0; i < linkedOrderIds.length; i += 400) {
+        const batchIds = linkedOrderIds.slice(i, i + 400);
+        const orderSnaps = await db.getAll(...batchIds.map(id => db.collection(ORDERS_COLLECTION).doc(id)));
+        orderSnaps.forEach(orderSnap => linkedOrderById.set(orderSnap.id, orderSnap));
+      }
+      heldByProduct = await countHeldReservations(reservationSnap.docs, Date.now(), null, linkedOrderById);
     } catch (reservationError) {
       // Reservation statistics must never prevent existing products from displaying.
       console.error("admin product reservation counts", reservationError);
@@ -864,10 +878,13 @@ app.get("/api/admin/products", requireAdmin, async (_req, res) => {
       return millis(b.data().createdAt) - millis(a.data().createdAt);
     });
     res.json({ products: docs.map(d => {
-      const x=d.data(), stock=Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
+      const x=d.data(), stock=Number.isInteger(Number(d.data().stock)) ? Number(d.data().stock) : 0;
+      const { photoData, photoUrls, ...productFields } = x;
       const reservedCount=heldByProduct.get(d.id) || 0;
-      return { id:d.id, ...x, size:String(x.size||""), description:String(x.description||""), stock, reservedCount, availableStock:Math.max(0, stock-reservedCount),
-        photoUrls:Array.isArray(x.photoData)?x.photoData:(Array.isArray(x.photoUrls)?x.photoUrls:[]), createdAt:safeDate(x.createdAt) };
+      // Return image data once. Spreading the original Firestore document and
+      // also adding photoUrls duplicated large base64 strings in every response.
+      return { id:d.id, ...productFields, size:String(x.size||""), description:String(x.description||""), stock, reservedCount, availableStock:Math.max(0, stock-reservedCount),
+        photoUrls:Array.isArray(photoData)?photoData:(Array.isArray(photoUrls)?photoUrls:[]), createdAt:safeDate(x.createdAt) };
     }) });
   } catch (e) { console.error("admin products", e); res.status(500).json({ error:"Could not load products." }); }
 });
