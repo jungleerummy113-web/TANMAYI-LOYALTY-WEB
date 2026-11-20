@@ -489,7 +489,7 @@ body>header{display:none}
 </div><p class="muted" style="font-size:12px;text-align:center;margin:18px 0 0">₹1 నుంచి ₹800 రూపాయల లోపు విలువైన గిఫ్ట్ 🎁 కొనుగోలు చేస్తే = 1 స్టాంప్ గెలుచుకుంటారు. ₹801 రూపాయలు లేదా అంతకంటే ఎక్కువ విలువైన గిఫ్ట్ 🎁 కొనుగోలు చేస్తే = 2 స్టాంపులు గెలుచుకుంటారు. మీ అకౌంట్‌లో 10 స్టాంపులు సేకరించిన తర్వాత ₹800 వరకు విలువ చేసే ఉచిత గిఫ్ట్ 🎁 పొందండి లేదా క్యాష్ 💵💶 రీడీమ్ చేసుకోండి. (నిబంధనలు వర్తిస్తాయి.)</p></div></section>
 <section id="customerView" class="card hidden">
 <div class="customer-profile-top"><button type="button" class="customer-profile-btn" id="openCustomerProfile">👤 My Profile　›</button></div>
-<div id="customerPromoBanner" class="customer-promo-banner"></div><div class="row"><h2>Welcome to TANMAYI STORE AND GIFTS</h2><div class="customer-home-actions"><button type="button" class="secondary" id="refreshCustomerAccount">Refresh</button><a id="customerDashboardWhatsApp" class="customer-whatsapp-dashboard" href="https://wa.me/917899066113" target="_blank" rel="noopener">🟢 WhatsApp · 7899066113</a><button class="secondary" id="customerLogout" hidden>Logout</button></div></div>
+<div id="customerPromoBanner" class="customer-promo-banner"></div><div class="row"><h2>Welcome to TANMAYI STORE AND GIFTS</h2><div class="customer-home-actions"><button type="button" class="secondary" id="refreshCustomerAccount">Refresh</button><a id="customerDashboardWhatsApp" class="customer-whatsapp-dashboard" href="#" target="_blank" rel="noopener" hidden>🟢 WhatsApp</a><button class="secondary" id="customerLogout" hidden>Logout</button></div></div>
 <p id="welcome" class="muted"></p>
 <div class="customer-dashboard">
 <button type="button" class="customer-tile" data-customer-panel="orders"><span>📦</span><small>Orders</small></button>
@@ -1853,7 +1853,7 @@ window.addEventListener("unhandledrejection", function (event) {
     if(welcome)home.append(welcome);
     const actionRow=node('div','customer-home-actions');
     const refreshButton=$('refreshCustomerAccount');if(refreshButton)actionRow.append(refreshButton);
-     const whatsapp=$('customerDashboardWhatsApp')||node('a','customer-whatsapp-dashboard','🟢 WhatsApp · 7899066113');whatsapp.classList.add('customer-whatsapp-dashboard');whatsapp.id='customerDashboardWhatsApp';whatsapp.target='_blank';whatsapp.rel='noopener';actionRow.append(whatsapp);home.append(actionRow);const originalHomeRow=children.find(x=>x.querySelector('#refreshCustomerAccount'));if(originalHomeRow)originalHomeRow.remove();
+     const whatsapp=$('customerDashboardWhatsApp')||node('a','customer-whatsapp-dashboard','🟢 WhatsApp');whatsapp.classList.add('customer-whatsapp-dashboard');whatsapp.id='customerDashboardWhatsApp';whatsapp.target='_blank';whatsapp.rel='noopener';actionRow.append(whatsapp);home.append(actionRow);const originalHomeRow=children.find(x=>x.querySelector('#refreshCustomerAccount'));if(originalHomeRow)originalHomeRow.remove();
     const logoutButton=$('customerLogout');if(logoutButton)logoutButton.style.display='none';
     const tiles=node('div','customer-dashboard');tiles.innerHTML='<button class="customer-tile" data-go="myList"><span>🛍️</span><small>Shop Products</small></button><button class="customer-tile" data-go="stamps"><span>🎟️</span><small>My Stamps</small></button><button class="customer-tile" data-go="orders"><span>📦</span><small>My Orders</small></button><button class="customer-tile" data-go="account"><span>👤</span><small>My Account</small></button>';home.append(tiles);
     const items=[
@@ -1927,7 +1927,7 @@ window.addEventListener("unhandledrejection", function (event) {
      $('refreshOnlineOrders')?.addEventListener('click',()=>loadAdminOfferOrders());
      $('refreshCodOrders')?.addEventListener('click',()=>loadAdminOfferOrders());
      const logoutLink=node('button','drawer-link','↗ Logout');logoutLink.type='button';logoutLink.onclick=()=>{closeAdminDrawer();$('logout')?.click()};adminDrawer?.append(logoutLink);
-     const waPage=$('adminPage-whatsapp');if(waPage)waPage.innerHTML='<div class="app-page-title">🟢 WhatsApp</div><div class="card"><label>WhatsApp number (10 digits)</label><input id="adminWhatsappNumber" inputmode="numeric" maxlength="10" value="7899066113"><button type="button" id="saveWhatsappNumber" class="gold">Save WhatsApp Number</button><div id="whatsappSettingsMsg" class="msg hidden"></div></div>';
+     const waPage=$('adminPage-whatsapp');if(waPage)waPage.innerHTML='<div class="app-page-title">🟢 WhatsApp</div><div class="card"><label>WhatsApp number (10 digits)</label><input id="adminWhatsappNumber" inputmode="numeric" maxlength="10" value=""><button type="button" id="saveWhatsappNumber" class="gold">Save WhatsApp Number</button><div id="whatsappSettingsMsg" class="msg hidden"></div></div>';
      const promoPage=$('adminPage-promotions');if(promoPage)promoPage.innerHTML='<div class="app-page-title">🖼️ Promotions</div><div class="card"><p class="muted">Upload up to 5 promotional photos (maximum 10 MB each). JPG, PNG and WEBP are supported. These appear on the customer dashboard. Uploading again replaces the previous photos.</p><label>Promotion photos</label><input id="promotionPhotos" type="file" accept="image/*" multiple><button type="button" id="savePromotionPhotos" class="gold">Save Promotion Photos</button><div id="promotionSettingsMsg" class="msg hidden"></div><div id="adminPromotionPreview" class="promotion-preview-grid"></div></div>';
       async function promotionImageData(file){
         if(!file)throw Error('Please select a photo.');
@@ -1952,7 +1952,7 @@ window.addEventListener("unhandledrejection", function (event) {
         }catch(e){if(e.name==='AbortError')throw Error('Photo storage timed out after 90 seconds. Check your internet and try again.');throw e}
         finally{clearTimeout(timer)}
       }
-      async function loadStoreSettings(){try{const d=await api('/api/admin/store-settings');$('adminWhatsappNumber').value=d.whatsappNumber||'7899066113';const el=$('adminPromotionPreview');if(el)el.innerHTML=(d.promotionPhotos||[]).map(x=>'<img src="'+x+'" alt="Promotion">').join('');clear('whatsappSettingsMsg')}catch(e){console.error('Could not load store settings:',e);if($('whatsappSettingsMsg'))msg('whatsappSettingsMsg','Could not load saved settings: '+e.message);if($('promotionSettingsMsg'))msg('promotionSettingsMsg','Could not load saved promotions: '+e.message)}}
+      async function loadStoreSettings(){try{const d=await api('/api/admin/store-settings');$('adminWhatsappNumber').value=d.whatsappNumber||'';const el=$('adminPromotionPreview');if(el)el.innerHTML=(d.promotionPhotos||[]).map(x=>'<img src="'+x+'" alt="Promotion">').join('');clear('whatsappSettingsMsg')}catch(e){console.error('Could not load store settings:',e);if($('whatsappSettingsMsg'))msg('whatsappSettingsMsg','Could not load saved settings: '+e.message);if($('promotionSettingsMsg'))msg('promotionSettingsMsg','Could not load saved promotions: '+e.message)}}
      $('saveWhatsappNumber').onclick=async()=>{const n=$('adminWhatsappNumber').value.replace(/\D/g,'');if(!/^\d{10}$/.test(n))return msg('whatsappSettingsMsg','Enter a valid 10-digit WhatsApp number.');const btn=$('saveWhatsappNumber');btn.disabled=true;btn.textContent='Saving...';try{await api('/api/admin/store-settings','PUT',{whatsappNumber:n});$('adminWhatsappNumber').value=n;msg('whatsappSettingsMsg','✓ WhatsApp number updated successfully.');if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings(true)}catch(e){msg('whatsappSettingsMsg','Update failed: '+e.message)}finally{btn.disabled=false;btn.textContent='Save WhatsApp Number'}};
      $('promotionPhotos').addEventListener('change',()=>{const fs=[...$('promotionPhotos').files].slice(0,5);const el=$('adminPromotionPreview');if(el)el.innerHTML='';if(fs.length){msg('promotionSettingsMsg',fs.length+' photo(s) selected. Press Save Promotion Photos to publish.');fs.forEach(f=>{const u=URL.createObjectURL(f),im=node('img');im.src=u;im.onload=()=>URL.revokeObjectURL(u);el?.append(im)})}else clear('promotionSettingsMsg')});
       $('savePromotionPhotos').onclick=async()=>{
@@ -1977,7 +1977,7 @@ window.addEventListener("unhandledrejection", function (event) {
         }catch(e){console.error('Promotion upload failed:',e);msg('promotionSettingsMsg','Upload failed: '+(e.message||'Please try again.'))}
         finally{btn.disabled=false;btn.textContent='Save Promotion Photos'}
       };
-      async function loadCustomerPromo(){try{const d=await api('/api/customer/store-settings');const el=$('customerPromoBanner');if(el){el.innerHTML=(d.promotionPhotos||[]).map(x=>'<img src="'+x+'" alt="TANMAYI STORE AND GIFTS promotion">').join('');el.style.display=d.promotionPhotos?.length?'flex':'none'}const n=String(d.whatsappNumber||'7899066113').replace(/\D/g,'');const href='https://wa.me/91'+n;const a=$('customerDashboardWhatsApp');if(a){a.href=href;a.textContent='🟢 WhatsApp · '+n}const contact=$('customerWhatsAppLink');if(contact){contact.href=href;contact.textContent='Chat on WhatsApp · '+n}}catch(e){console.warn('Store promotion/contact settings unavailable:',e.message)}}
+      async function loadCustomerPromo(){try{const d=await api('/api/customer/store-settings');const el=$('customerPromoBanner');if(el){el.innerHTML=(d.promotionPhotos||[]).map(x=>'<img src="'+x+'" alt="TANMAYI STORE AND GIFTS promotion">').join('');el.style.display=d.promotionPhotos?.length?'flex':'none'}const n=String(d.whatsappNumber||'').replace(/\D/g,'');const a=$('customerDashboardWhatsApp');const contact=$('customerWhatsAppLink');if(/^\d{10}$/.test(n)){const href='https://wa.me/91'+n;if(a){a.href=href;a.textContent='🟢 WhatsApp · '+n;a.hidden=false}if(contact){contact.href=href;contact.textContent='Chat on WhatsApp · '+n;contact.hidden=false}}else{if(a){a.removeAttribute('href');a.hidden=true}if(contact){contact.removeAttribute('href');contact.hidden=true}}}catch(e){console.warn('Store promotion/contact settings unavailable:',e.message)}}
      // Keep the global customer refresh function owned by the customer settings fix script.
      adminDrawer?.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>{if(['whatsapp','promotions'].includes(b.dataset.page))loadStoreSettings()}));
     const headRow=root.querySelector('.app-topbar');
@@ -2108,7 +2108,7 @@ window.addEventListener("unhandledrejection", function (event) {
   async function loadAdminSettings(){
     try{
       const d=await request('/api/admin/store-settings');
-      const number=$('adminWhatsappNumber');if(number)number.value=d.whatsappNumber||'7899066113';
+      const number=$('adminWhatsappNumber');if(number)number.value=d.whatsappNumber||'';
       const preview=$('adminPromotionPreview');
       if(preview)preview.innerHTML=(d.promotionPhotos||[]).map(url=>'<img src="'+String(url).replaceAll('"','&quot;')+'" alt="Promotion">').join('');
       status('whatsappSettingsMsg','Saved settings loaded.');
@@ -2139,7 +2139,7 @@ window.addEventListener("unhandledrejection", function (event) {
     if(!force&&customerSettingsCache&&Date.now()-customerSettingsCacheAt<60000)return customerSettingsCache;
     if(!force&&customerSettingsPending)return customerSettingsPending;
     customerSettingsPending=(async()=>{
-    const response=await fetch(API+'/api/customer/store-settings',{method:'GET',cache:'default',headers:{'Accept':'application/json'}});
+    const response=await fetch(API+'/api/customer/store-settings',{method:'GET',cache:'no-store',headers:{'Accept':'application/json'}});
     const data=await response.json().catch(()=>({error:'Invalid store settings response.'}));
     if(!response.ok)throw Error(data.error||('Store settings request failed ('+response.status+').'));
     const banner=$('customerPromoBanner');
@@ -2156,13 +2156,15 @@ window.addEventListener("unhandledrejection", function (event) {
       });
       banner.style.display=photos.length?'flex':'none';
     }
-    const number=String(data.whatsappNumber||'7899066113').replaceAll(/[^0-9]/g,'').slice(-10);
-    const href='https://wa.me/91'+number;
+    const number=String(data.whatsappNumber||'').replaceAll(/[^0-9]/g,'').slice(-10);
+    const validNumber=/^\d{10}$/.test(number);
+    const href=validNumber?'https://wa.me/91'+number:'#';
     document.querySelectorAll('#customerDashboardWhatsApp,.customer-whatsapp-dashboard').forEach(link=>{
-      link.href=href;link.textContent='🟢 WhatsApp · '+number;
+      if(validNumber){link.href=href;link.textContent='🟢 WhatsApp · '+number;link.hidden=false;}
+      else{link.removeAttribute('href');link.hidden=true;}
     });
     const contact=$('customerWhatsAppLink');
-    if(contact){contact.href=href;contact.textContent='Chat on WhatsApp · '+number}
+    if(contact){if(validNumber){contact.href=href;contact.textContent='Chat on WhatsApp · '+number;contact.hidden=false;}else{contact.removeAttribute('href');contact.hidden=true;}}
     customerSettingsCache=data;customerSettingsCacheAt=Date.now();
     return data;
     })().finally(()=>{customerSettingsPending=null});
@@ -2172,7 +2174,7 @@ window.addEventListener("unhandledrejection", function (event) {
     try{
       const data=await refreshCustomerSettings(force);
       const banner=$('customerPromoBanner');
-      const number=String(data.whatsappNumber||'7899066113').replaceAll(/[^0-9]/g,'').slice(-10);
+      const number=String(data.whatsappNumber||'').replaceAll(/[^0-9]/g,'').slice(-10);
       console.info('[TANMAYI] Customer settings refreshed; WhatsApp:',number,'promotion photos:',(data.promotionPhotos||[]).length);
       return data;
     }catch(e){
