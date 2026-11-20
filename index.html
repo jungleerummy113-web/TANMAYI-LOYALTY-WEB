@@ -341,6 +341,16 @@ table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;
 #customerProducts .product-card{gap:4px!important;padding:8px!important}
 #customerProducts .product-photos img{height:205px!important;max-height:205px!important}
 
+
+/* Customer catalogue search and optional price filters */
+.customer-product-tools{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:10px 0 14px;}
+.customer-product-tools>input{width:100%;min-width:0;box-sizing:border-box;border:1px solid #d9c7b6;border-radius:10px;padding:11px 12px;font-size:14px;background:#fff;}
+.customer-product-filter-row{display:flex;align-items:center;justify-content:flex-end;gap:7px;}
+.customer-product-filter-row label{font-size:12px;font-weight:700;color:#57453c;white-space:nowrap;}
+.customer-product-filter-row select{max-width:68%;min-width:0;border:1px solid #d9c7b6;border-radius:9px;padding:9px 28px 9px 9px;background:#fff;font-size:12px;}
+#clearCustomerProductFilters{width:34px;height:34px;min-width:34px;padding:0;border:0;border-radius:50%;background:#8f294f;color:#fff;font-size:23px;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
+#customerProductFilterEmpty{padding:12px;text-align:center;}
+@media(min-width:600px){.customer-product-tools{grid-template-columns:minmax(180px,1fr) auto;align-items:center}.customer-product-tools>input{max-width:360px}.customer-product-filter-row{justify-content:flex-end}}
 </style>
 <style id="tanmayi-app-redesign">
 :root{--app-bg:#f5f3ed;--app-card:#fff;--app-ink:#201b14;--app-gold:#d9ad55;--app-red:#8d1d24}
@@ -501,7 +511,7 @@ body>header{display:none}
 <section class="customer-panel hidden" id="customerPanel-orders"><div class="row"><h3>📦 Orders &amp; Order History</h3><button type="button" class="secondary" id="refreshMyOrders">Refresh Orders</button></div><p class="muted">Running, completed and cancelled orders are shown separately.</p><div id="customerOrders"><p class="muted">Loading orders…</p></div></section>
 <section class="customer-panel hidden" id="customerPanel-buyAgain"><h3>🔁 Buy Again</h3><p class="muted">Products you ordered before. Only currently active products with available stock can be selected.</p><div id="customerBuyAgain" class="customer-product-grid">Loading previous purchases…</div></section>
 <section class="customer-panel hidden" id="customerPanel-account"><h3>👤 Account Details</h3><label>Customer Name</label><input id="profileName" maxlength="80" autocomplete="name"><label>Registered Mobile Number</label><input id="profileMobile" readonly><label>Address / Village</label><textarea id="profileAddress" rows="3" maxlength="250" placeholder="Enter your address"></textarea><div class="profile-actions"><button type="button" id="saveCustomerAddress">Save Address</button></div><div id="profileMsg" class="msg hidden"></div></section>
-<section class="customer-panel hidden" id="customerPanel-myList"><h3>🛍️ My List – Shop Products</h3><p class="muted">Products uploaded by TANMAYI STORE AND GIFTS, with current offer price and stock.</p><div id="customerProducts" class="customer-product-grid">Loading products…</div><div id="orderFlowMount"></div><div id="selectedOfferCount" class="offer-count" style="margin-top:14px">Selected items: 0</div></section>
+<section class="customer-panel hidden" id="customerPanel-myList"><h3>🛍️ My List – Shop Products</h3><p class="muted">Products uploaded by TANMAYI STORE AND GIFTS, with current offer price and stock.</p><div class="customer-product-tools"><input id="customerProductSearch" type="search" placeholder="Search product name (enter 3 letters)" autocomplete="off" aria-label="Search products by name"><div class="customer-product-filter-row"><label for="customerProductPriceFilter">Price range</label><select id="customerProductPriceFilter" aria-label="Filter products by price"><option value="">All prices</option><option value="below500">Below ₹500</option><option value="500to1000">₹500 to below ₹1,000</option><option value="1000to2000">₹1,000 to below ₹2,000</option></select><button type="button" id="clearCustomerProductFilters" aria-label="Clear search and price filter" title="Clear filters">×</button></div></div><p id="customerProductFilterEmpty" class="muted" hidden>No products match your search or selected price range.</p><div id="customerProducts" class="customer-product-grid">Loading products…</div><div id="orderFlowMount"></div><div id="selectedOfferCount" class="offer-count" style="margin-top:14px">Selected items: 0</div></section>
 <section class="customer-panel hidden" id="customerPanel-stamps"><h3>🎟️ My Stamps &amp; Rewards</h3><div class="stats"><div class="stat"><small>Current stamps</small><b id="myStamps">0</b></div><div class="stat"><small>Latest bill</small><b id="myBills">₹0</b></div><div class="stat"><small>Gifts redeemed</small><b id="myGifts">0</b></div></div><div id="customerPending" class="card hidden"><h3>🎁 Reward ready to collect</h3><p id="pendingText"></p><label id="rewardChoiceLabel" class="hidden">Choose your reward</label><div id="rewardChoices" class="hidden"><label><input type="radio" name="rewardChoice" value="gift" checked style="width:auto"> Free gift</label><label id="pointsChoiceLabel"><input type="radio" name="rewardChoice" value="points" style="width:auto"> Approved points</label></div><div id="approvedPointsInfo" class="card hidden" style="background:#fffaf0;margin:10px 0;padding:14px"><strong>Approved points available to redeem</strong><div style="font-size:26px;font-weight:800;margin-top:6px"><span id="approvedPointsValue">0</span> Points</div><div id="approvedPointsRupees" class="muted">Redeem value: ₹0</div></div><button id="customerTaken" class="gold">REDEEM TAKEN – Confirm collection</button><div id="customerRedeemMsg" class="msg hidden"></div></div><div class="card" style="background:#fff8e8;border:1px solid #e4cf9d"><strong>🎁 Stamp Rules</strong><p>₹1–₹800 purchase = 1 stamp. ₹801 or above = 2 stamps. Collect 10 stamps to redeem a free gift up to ₹800 or approved cash points.</p></div></section>
 <section class="customer-panel hidden" id="customerPanel-profile"><h3>👤 My Profile &amp; History</h3><p id="profileSummary" class="muted"></p><div id="profileOrdersHistory"></div><button type="button" class="history-toggle" id="toggleCustomerHistory" aria-expanded="false">📋 My Bill History　▼</button><section class="card hidden" id="customerHistoryPanel"><p class="muted">Your bill date, time and bill amount. Scroll to see older bills.</p><div class="history-scroll"><table><thead><tr><th>Date &amp; Time</th><th>Bill Amount</th></tr></thead><tbody id="customerHistory"></tbody></table></div></section></section>
 </section>
@@ -1170,6 +1180,37 @@ function renderProductSpecialOfferMessages(){
     el.innerHTML=pct>0?'<div style="margin:8px 0;padding:11px 12px;border-radius:10px;background:#dff2ff;border:2px solid #78c5f2;color:#e0ad00;text-shadow:0 1px 1px #31536b;font-size:13px;font-weight:900;letter-spacing:.25px;text-align:center;box-shadow:0 2px 7px rgba(34,115,165,.16)">🎉 SPECIAL DAYS OFFER<br>EXTRA '+pct+'% OFF ON ONLINE PAYMENT ONLY</div>':'';
   });
 }
+function applyCustomerProductFilters(){
+  const search=String($('customerProductSearch')?.value||'').trim().toLocaleLowerCase();
+  const priceRange=String($('customerProductPriceFilter')?.value||'');
+  const cards=document.querySelectorAll('#customerProducts [data-product-card-id]');
+  let visible=0;
+  cards.forEach(card=>{
+    const name=String(card.querySelector(':scope > strong')?.textContent||'').toLocaleLowerCase();
+    const price=Number(card.dataset.offerPrice||0);
+    const matchesName=search.length<3||name.includes(search);
+    let matchesPrice=true;
+    if(priceRange==='below500')matchesPrice=price<500;
+    else if(priceRange==='500to1000')matchesPrice=price>=500&&price<1000;
+    else if(priceRange==='1000to2000')matchesPrice=price>=1000&&price<2000;
+    const show=matchesName&&matchesPrice;
+    card.hidden=!show;
+    if(show)visible++;
+  });
+  const empty=$('customerProductFilterEmpty');
+  if(empty)empty.hidden=visible>0||cards.length===0;
+}
+function bindCustomerProductFilters(){
+  const search=$('customerProductSearch'),price=$('customerProductPriceFilter'),clearButton=$('clearCustomerProductFilters');
+  if(search)search.oninput=applyCustomerProductFilters;
+  if(price)price.onchange=applyCustomerProductFilters;
+  if(clearButton)clearButton.onclick=()=>{
+    if(search)search.value='';
+    if(price)price.value='';
+    applyCustomerProductFilters();
+  };
+  applyCustomerProductFilters();
+}
 async function loadCustomerProducts(){
   const productsMount=$('customerProducts');
   if(productsMount)productsMount.textContent='Loading products, please wait…';
@@ -1188,7 +1229,7 @@ async function loadCustomerProducts(){
       const pendingCount=pendingOfferCart.filter(p=>p.productId===x.id).reduce((n,p)=>n+Math.max(1,Number(p.quantity)||1),0);
       const available=Math.max(0,Number(x.availableStock??x.stock??0));const canAddMore=available>pendingCount;
       const photos=Array.isArray(x.photoUrls)?x.photoUrls.slice(0,2):[];
-      return `<div class="product-card" data-product-card-id="${esc(x.id)}">
+      return `<div class="product-card" data-product-card-id="${esc(x.id)}" data-offer-price="${Number(x.offerPrice)||0}">
         <strong>${esc(x.name)}</strong>
         <div class="customer-product-topline">${x.isNew?'<span class="product-new-badge">NEW ARRIVAL</span>':''}${photos.length>1?'<span class="product-photo-hint">📸 2 PHOTOS · SWIPE LEFT / RIGHT <span class="photo-arrow">↔</span></span>':''}</div>
         <div class="product-photos">${photos.map((u,i)=>`<img src="${esc(u)}" alt="${esc(x.name)} photo ${i+1}" data-zoom-product-image="${esc(u)}" loading="lazy" decoding="async">`).join('')}</div>
@@ -1201,6 +1242,7 @@ async function loadCustomerProducts(){
         </div>
       </div>`;
     }).join('')||'<p class="muted">No active offers right now.</p>';
+    bindCustomerProductFilters();
     if(pendingOfferCart.length&&!orderConfirmedData)placeOrderFlowAfterProduct(activeOfferAnchorId||pendingOfferCart[pendingOfferCart.length-1].productId);
     renderInlineProductSelections();
     renderProductSpecialOfferMessages();
