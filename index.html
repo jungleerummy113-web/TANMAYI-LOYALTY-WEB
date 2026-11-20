@@ -1195,6 +1195,11 @@ function applyCustomerProductFilters(){
     else if(priceRange==='1000to2000')matchesPrice=price>=1000&&price<2000;
     const show=matchesName&&matchesPrice;
     card.hidden=!show;
+    // Product cards use an explicit CSS grid display rule, which overrides the
+    // browser's default [hidden] display style. Apply an inline important hide
+    // so search and price filters actually remove non-matching cards.
+    if(show)card.style.removeProperty('display');
+    else card.style.setProperty('display','none','important');
     if(show)visible++;
   });
   const empty=$('customerProductFilterEmpty');
