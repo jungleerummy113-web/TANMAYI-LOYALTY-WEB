@@ -576,7 +576,7 @@ const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),API='https:/
 window.tanmayiAuth=auth;window.tanmayiFirebaseAuth={EmailAuthProvider,reauthenticateWithCredential,updatePassword};
 const $=id=>document.getElementById(id),money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),date=v=>v?new Date(v).toLocaleString('en-IN'):'—',customerEmail=m=>`${m}@tanmayi-loyalty.app`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null,customerProfile=null,customerOrdersCache=[],customerProductsCache=[],customerPaymentQr="",customerPaymentSettings={},paymentStepOpen=false,orderConfirmedData=null,selectedOrderPaymentMethod="CASH_ON_DELIVERY",selectedFulfilmentMode="SHOP_COLLECTION",deliveryCoordinates=null,activeOfferAnchorId="",cartOwnerMobile="",cartRestoredForMobile="",pendingOfferCartExpiresAt=0;
+let customers=[],selected=null,pendingId=null,pendingOfferCart=[],pendingOrderRequestId=null,customerProfile=null,customerOrdersCache=[],customerProductsCache=[],customerPaymentQr="",customerPaymentSettings={},paymentStepOpen=false,orderConfirmedData=null,selectedOrderPaymentMethod="CASH_ON_DELIVERY",selectedFulfilmentMode="SHOP_COLLECTION",deliveryCoordinates=null,activeOfferAnchorId="",cartOwnerMobile="",cartRestoredForMobile="",pendingOfferCartExpiresAt=0,customerSecondaryLoadPromise=Promise.resolve();
 const CUSTOMER_CART_TTL_MS=30*60*1000;
 function customerCartExpiryKey(mobile){return customerCartStorageKey(mobile)+"_expires_at"}
 function clearExpiredCustomerCart(){
@@ -1635,8 +1635,45 @@ onAuthStateChanged(auth,async u=>{
     msg('adminMsg','Admin verification failed: '+(e.message||'Could not read the admin permission record. Check Firestore access and network.'));
   }
 });
-async function loadCustomer(){const h=await customerGet('/api/customer/home',20000);show('customerView');restorePendingOfferCart(h.profile.mobile);customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};$('welcome').textContent=`${h.profile.name} · ${h.profile.mobile} · ${h.profile.address||h.profile.village}`;$('profileName').value=h.profile.name||'';$('profileMobile').value=h.profile.mobile||'';$('profileAddress').value=customerProfile.address||'';$('myStamps').textContent=h.stamps;$('dashboardStamps').textContent=`${h.stamps} / 10`;$('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';$('myGifts').textContent=h.giftsRedeemed;pendingId=h.pendingRedemption?.id||null;$('approvedPointsInfo').classList.add('hidden');document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;if(h.pendingRedemption){$('customerPending').classList.remove('hidden');const pts=Number(h.pendingRedemption.approvedPoints||0);$('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';$('rewardChoices').classList.toggle('hidden',pts<=0);$('rewardChoiceLabel').classList.toggle('hidden',pts<=0);$('pointsChoiceLabel').classList.toggle('hidden',pts<=0);$('approvedPointsValue').textContent=pts.toLocaleString('en-IN');$('approvedPointsRupees').textContent='Redeem value: '+money(pts)}else $('customerPending').classList.add('hidden');try{const hist=await customerGet('/api/customer/history',30000);$('customerHistory').innerHTML=hist.history.map(x=>`<tr><td>${date(x.date)}</td><td><strong>${moneyPrice(x.amount)}</strong></td></tr>`).join('')||'<tr><td colspan="2">No bill history yet</td></tr>'}catch(e){$('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'}await loadCustomerOrders();if(window.refreshTanmayiStoreSettings)await window.refreshTanmayiStoreSettings();if(window.showTanmayiInstallPopup)window.showTanmayiInstallPopup(customerProfile.mobile)}
-$('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
+async function loadCustomer(){
+  // Start store settings immediately and in parallel; never make the Home screen
+  // wait for banner/contact, bill history, or order-history requests.
+  const settingsPromise=window.refreshTanmayiStoreSettings ? window.refreshTanmayiStoreSettings() : Promise.resolve(null);
+  const h=await customerGet('/api/customer/home',20000);
+  show('customerView');
+  restorePendingOfferCart(h.profile.mobile);
+  customerProfile={...h.profile,address:h.profile.address||h.profile.village||''};
+  $('welcome').textContent=h.profile.name+' · '+h.profile.mobile+' · '+(h.profile.address||h.profile.village);
+  $('profileName').value=h.profile.name||'';
+  $('profileMobile').value=h.profile.mobile||'';
+  $('profileAddress').value=customerProfile.address||'';
+  $('myStamps').textContent=h.stamps;
+  $('dashboardStamps').textContent=h.stamps+' / 10';
+  $('myBills').textContent=h.latestBill?money(h.latestBillAmount):'No bills yet';
+  $('myGifts').textContent=h.giftsRedeemed;
+  pendingId=h.pendingRedemption?.id||null;
+  $('approvedPointsInfo').classList.add('hidden');
+  document.querySelector('input[name="rewardChoice"][value="gift"]').checked=true;
+  if(h.pendingRedemption){
+    $('customerPending').classList.remove('hidden');
+    const pts=Number(h.pendingRedemption.approvedPoints||0);
+    $('pendingText').textContent=pts>0?'You are eligible. Choose a free gift or approved points (1 point = ₹1).':'You are eligible for a free gift.';
+    $('rewardChoices').classList.toggle('hidden',pts<=0);
+    $('rewardChoiceLabel').classList.toggle('hidden',pts<=0);
+    $('pointsChoiceLabel').classList.toggle('hidden',pts<=0);
+    $('approvedPointsValue').textContent=pts.toLocaleString('en-IN');
+    $('approvedPointsRupees').textContent='Redeem value: '+money(pts);
+  }else $('customerPending').classList.add('hidden');
+  // Secondary panels populate after the customer sees the Home screen.
+  $('customerHistory').innerHTML='<tr><td colspan="2">Loading bill history…</td></tr>';
+  const historyPromise=customerGet('/api/customer/history',30000).then(hist=>{
+    $('customerHistory').innerHTML=hist.history.map(x=>'<tr><td>'+date(x.date)+'</td><td><strong>'+moneyPrice(x.amount)+'</strong></td></tr>').join('')||'<tr><td colspan="2">No bill history yet</td></tr>';
+  }).catch(()=>{ $('customerHistory').innerHTML='<tr><td colspan="2">Bill history is temporarily unavailable.</td></tr>'; });
+  const ordersPromise=loadCustomerOrders().catch(error=>console.warn('Customer orders loaded later:',error));
+  customerSecondaryLoadPromise=Promise.allSettled([historyPromise,ordersPromise,settingsPromise]);
+  if(window.showTanmayiInstallPopup)window.showTanmayiInstallPopup(customerProfile.mobile);
+}
+$('refreshCustomerAccount').onclick=async()=>{try{await loadCustomer();await customerSecondaryLoadPromise;msg('customerRedeemMsg','Account refreshed. Your latest stamps and bill history are shown.')}catch(e){msg('customerRedeemMsg',e.message)}};
 document.querySelectorAll('input[name="rewardChoice"]').forEach(el=>el.addEventListener('change',()=>{$('approvedPointsInfo').classList.toggle('hidden',el.value!=='points'||!el.checked)}));
 $('customerTaken').onclick=async()=>{if(!pendingId)return;clear('customerRedeemMsg');$('customerTaken').disabled=true;try{const choice=document.querySelector('input[name="rewardChoice"]:checked')?.value||'gift';await api('/api/customer/redeem-taken','POST',{redemptionId:pendingId,choice});msg('customerRedeemMsg','Redemption completed. Stamps and current cycle reset successfully.');await loadCustomer()}catch(e){msg('customerRedeemMsg',e.message)}finally{$('customerTaken').disabled=false}};
 async function loadRewardEligible(){
@@ -1891,7 +1928,8 @@ window.addEventListener("unhandledrejection", function (event) {
   function setupCustomer(){
     const root=$('customerView');if(!root||root.dataset.redesigned)return;root.dataset.redesigned='1';
     const children=[...root.children];
-    const welcome=children.find(x=>x.querySelector('#welcome'));
+    const welcomeRow=children.find(x=>x.querySelector('#welcome'));
+    const welcome=welcomeRow?.querySelector('#welcome')||null;
     const panels=['orders','buyAgain','account','myList','stamps','profile'].map(id=>$('customerPanel-'+id)).filter(Boolean);
     const home=node('div','customer-home');
     const profileTop=children.find(x=>x.classList.contains('customer-profile-top'));if(profileTop)home.append(profileTop);
@@ -2182,27 +2220,37 @@ window.addEventListener("unhandledrejection", function (event) {
     finally{button.disabled=false;button.textContent='Save WhatsApp Number'}
   }
   let customerSettingsCache=null,customerSettingsCacheAt=0,customerSettingsPending=null;
+  function renderCustomerPromotionPhotos(photos){
+    const banner=$('customerPromoBanner');
+    if(!banner)return;
+    banner.replaceChildren();
+    (Array.isArray(photos)?photos:[]).forEach(url=>{
+      const img=document.createElement('img');
+      img.src=url;
+      img.alt='TANMAYI STORE AND GIFTS promotion';
+      img.loading='eager';
+      img.decoding='async';
+      img.onerror=()=>{img.alt='Promotion photo could not load';};
+      banner.append(img);
+    });
+    banner.style.display=photos?.length?'flex':'none';
+  }
   async function refreshCustomerSettings(force=false){
+    // Reuse last published banner URLs instantly. WhatsApp is never cached:
+    // the contact number always comes from the current customer settings API.
+    try{
+      const cachedPhotos=JSON.parse(localStorage.getItem('tanmayi_customer_promotion_photos_v1')||'null');
+      if(Array.isArray(cachedPhotos))renderCustomerPromotionPhotos(cachedPhotos);
+    }catch(_){}
     if(!force&&customerSettingsCache&&Date.now()-customerSettingsCacheAt<60000)return customerSettingsCache;
     if(!force&&customerSettingsPending)return customerSettingsPending;
     customerSettingsPending=(async()=>{
     const response=await fetch(API+'/api/customer/store-settings',{method:'GET',cache:'no-store',headers:{'Accept':'application/json'}});
     const data=await response.json().catch(()=>({error:'Invalid store settings response.'}));
     if(!response.ok)throw Error(data.error||('Store settings request failed ('+response.status+').'));
-    const banner=$('customerPromoBanner');
     const photos=Array.isArray(data.promotionPhotos)?data.promotionPhotos:[];
-    if(banner){
-      banner.replaceChildren();
-      photos.forEach(url=>{
-        const img=document.createElement('img');
-        img.src=url+(url.includes('?')?'&':'?')+'v='+Date.now();
-        img.alt='TANMAYI STORE AND GIFTS promotion';
-        img.loading='eager';
-        img.onerror=()=>{img.alt='Promotion photo could not load';};
-        banner.append(img);
-      });
-      banner.style.display=photos.length?'flex':'none';
-    }
+    renderCustomerPromotionPhotos(photos);
+    try{localStorage.setItem('tanmayi_customer_promotion_photos_v1',JSON.stringify(photos))}catch(_){};
     const number=String(data.whatsappNumber||'').replaceAll(/[^0-9]/g,'').slice(-10);
     const validNumber=/^\d{10}$/.test(number);
     const href=validNumber?'https://wa.me/91'+number:'#';
