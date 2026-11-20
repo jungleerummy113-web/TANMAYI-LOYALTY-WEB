@@ -40,14 +40,18 @@ const CODE_TTL_MS = 10 * 60 * 1000;
  * Confirmed reservations stop holding stock once their linked order is
  * completed/collected, cancelled, or expired. Unconfirmed selections use TTL.
  */
-async function countHeldReservations(reservationDocs, now, getOrder, preloadedOrderById = null) {
+async function countHeldReservations(reservationDocs, now, getOrder, preloadedOrderById = null, batchGetOrders = null) {
   const orderIds = [...new Set(reservationDocs
     .map(d => d.data())
     .filter(x => x.status === "active" && x.orderId)
     .map(x => String(x.orderId)))];
+  // Customer/public catalogue requests batch all linked order reads into one
+  // Firestore RPC instead of issuing one network request per reservation.
   const orderSnaps = preloadedOrderById
     ? orderIds.map(id => preloadedOrderById.get(id)).filter(Boolean)
-    : await Promise.all(orderIds.map(id => getOrder(id)));
+    : batchGetOrders && orderIds.length
+      ? await batchGetOrders(orderIds)
+      : await Promise.all(orderIds.map(id => getOrder(id)));
   const orderById = preloadedOrderById || new Map(orderSnaps.map(x => [x.id, x]));
   const counts = new Map();
   for (const doc of reservationDocs) {
@@ -560,12 +564,16 @@ app.get("/api/customer/home", requireUser, async (req,res)=>{
     // Historical bills remain stored and visible in Bill History.
     const latestBillData=latestBillDoc?latestBillDoc.data():null;
     const latestBillIsCurrent=!!latestBillData && (!d.lastRedeemedAt || asMillis(latestBillData.date)>asMillis(d.lastRedeemedAt));
-    // Read redemption records once and filter in memory. This avoids a Firestore
-    // status-field query/index failure from blocking every customer's login.
-    const redemptionSnap=await customerRef(req.user.uid).collection("redemptions").get();
-    const redemptionDocs=redemptionSnap.docs;
-    const pendingDoc=redemptionDocs.find(x=>x.data().status==="pending")||null;
-    const takenCount=redemptionDocs.filter(x=>x.data().status==="taken").length;
+    // Fetch only the pending redemption document and an aggregate count of
+    // taken redemptions; do not download the customer's entire redemption history
+    // on every login.
+    const redemptionsRef=customerRef(req.user.uid).collection("redemptions");
+    const [pendingSnap,takenCountSnap]=await Promise.all([
+      redemptionsRef.where("status","==","pending").limit(1).get(),
+      redemptionsRef.where("status","==","taken").count().get()
+    ]);
+    const pendingDoc=pendingSnap.docs[0]||null;
+    const takenCount=Number(takenCountSnap.data().count||0);
     const pendingRedemption=pendingDoc?(()=>{const a=pendingDoc.data();return{id:pendingDoc.id,type:a.type,approvedPoints:moneyNumber(a.approvedPoints),status:a.status,createdAt:safeDate(a.date)}})():null;
     res.json({profile:{name:d.name||"",mobile:d.mobile||"",village:d.village||""},stamps:moneyNumber(d.stamps),latestBill:latestBillIsCurrent?safeDate(latestBillData.date):null,latestBillAmount:latestBillIsCurrent?moneyNumber(latestBillData.billTotal):0,giftsRedeemed:takenCount,pendingRedemption});
   }catch(e){console.error("customer home failed:",e.message,e.stack);res.status(500).json({error:"Could not load customer account."});}
@@ -988,7 +996,7 @@ app.get("/api/public/products", async (_req, res) => {
       db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
     ]);
     const now = Date.now();
-    const heldByProduct = await countHeldReservations(reservationSnap.docs, now, id => db.collection(ORDERS_COLLECTION).doc(id).get());
+    const heldByProduct = await countHeldReservations(reservationSnap.docs, now, id => db.collection(ORDERS_COLLECTION).doc(id).get(), null, ids => db.getAll(...ids.map(id => db.collection(ORDERS_COLLECTION).doc(id))));
     const products = orderProductsForDisplay(snap.docs.map(d => {
       const x = d.data(), stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const held = heldByProduct.get(d.id) || 0;
@@ -1011,7 +1019,7 @@ app.get("/api/customer/offers", requireUser, async (_req, res) => {
       db.collection(RESERVATIONS_COLLECTION).where("status", "==", "active").get()
     ]);
     const now = Date.now();
-    const heldByProduct = await countHeldReservations(reservationSnap.docs, now, id => db.collection(ORDERS_COLLECTION).doc(id).get());
+    const heldByProduct = await countHeldReservations(reservationSnap.docs, now, id => db.collection(ORDERS_COLLECTION).doc(id).get(), null, ids => db.getAll(...ids.map(id => db.collection(ORDERS_COLLECTION).doc(id))));
     const products = orderProductsForDisplay(snap.docs.map(d => {
       const x = d.data(), stock = Number.isInteger(Number(x.stock)) ? Number(x.stock) : 0;
       const held = heldByProduct.get(d.id) || 0;
