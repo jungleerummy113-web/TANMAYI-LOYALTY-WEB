@@ -755,7 +755,7 @@ app.post("/api/admin/promotion-upload-signature", requireAdmin, (req, res) => {
 const STORE_SETTINGS_COLLECTION = "storeSettings";
 function sendStoreSettings(res, d, source) {
   const payload = {
-    whatsappNumber: String(d.whatsappNumber || "7899066113"),
+    whatsappNumber: String(d.whatsappNumber || ""),
     promotionPhotos: Array.isArray(d.promotionPhotos) ? d.promotionPhotos.slice(0, 5) : [],
     updatedAt: d.updatedAt?.toDate ? d.updatedAt.toDate().toISOString() : null
   };
@@ -820,7 +820,7 @@ app.put("/api/admin/store-settings", requireAdmin, async (req, res) => {
     const verifySnap = await settingsRef.get();
     const saved = verifySnap.exists ? verifySnap.data() : {};
     const savedPhotos = Array.isArray(saved.promotionPhotos) ? saved.promotionPhotos.slice(0, 5) : [];
-    const savedNumber = String(saved.whatsappNumber || "7899066113");
+    const savedNumber = String(saved.whatsappNumber || "");
     const numberMatches = !Object.prototype.hasOwnProperty.call(update, "whatsappNumber") || savedNumber === update.whatsappNumber;
     const photosMatch = !Object.prototype.hasOwnProperty.call(update, "promotionPhotos") || JSON.stringify(savedPhotos) === JSON.stringify(update.promotionPhotos);
     console.log("[STORE_SETTINGS] Save verified", {
